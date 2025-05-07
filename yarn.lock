@@ -73,7 +73,7 @@
   dependencies:
     regenerator-runtime "^0.12.0"
 
-"@babel/runtime@^7.12.5", "@babel/runtime@^7.17.8":
+"@babel/runtime@^7.12.5", "@babel/runtime@^7.17.8", "@babel/runtime@^7.20.6":
   version "7.27.1"
   resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.27.1.tgz#9fce313d12c9a77507f264de74626e87fd0dc541"
   integrity sha512-1x3D2xEk2fRo3PAhwQwu5UubzgiVWSXTBfWpVd2Mx2AzRqJuDJCsgaDVZ7HB5iGzDW1Hl1sWN2mFyKjmR9uAog==
@@ -944,6 +944,68 @@
   resolved "https://registry.yarnpkg.com/@storybook/theming/-/theming-8.6.12.tgz#2d521f422daf85e0b27179520ce1cfb520284447"
   integrity sha512-6VjZg8HJ2Op7+KV7ihJpYrDnFtd9D1jrQnUS8LckcpuBXrIEbaut5+34ObY8ssQnSqkk2GwIZBBBQYQBCVvkOw==
 
+"@strudel/core@1.2.0", "@strudel/core@^1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@strudel/core/-/core-1.2.0.tgz#0b0828987713887624f9952bbe213830af2ee6f9"
+  integrity sha512-llIeqZvhv4ufEPR04jSpfrAATbakM7u1Rv5pLJjX+xuavjoza+zoJPndqUPEee8GhpqZGwRZLVxe1KwTosl6Yg==
+  dependencies:
+    fraction.js "^5.2.1"
+
+"@strudel/draw@1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@strudel/draw/-/draw-1.2.0.tgz#82e56f046ec01c33219aa37073a1dce2c87dcac3"
+  integrity sha512-mL+5JALNrSp3bv7qd/49TxW987SWgaG5MKAORVhIqy3PoOy47fFwHakv/dYFzk4wbdgHOvHzzAI9NCGIkMqz3Q==
+  dependencies:
+    "@strudel/core" "1.2.0"
+
+"@strudel/mini@1.2.0", "@strudel/mini@^1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@strudel/mini/-/mini-1.2.0.tgz#b0dcbc7906dd6b9e91d77771f1eae6408cae3b9d"
+  integrity sha512-NgBY9oSMVFT1xyKNBwJO0xam6+ruqEnnHg9K6jR1ISu4rSSe/7BpKxuWlp/HsohVwSi4c/rswICBIOlJxx07+Q==
+  dependencies:
+    "@strudel/core" "1.2.0"
+
+"@strudel/tonal@1.2.0", "@strudel/tonal@^1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@strudel/tonal/-/tonal-1.2.0.tgz#57c2193d527a2aaaf7743c3e48c1c301ce80d33d"
+  integrity sha512-EjSJlcHx6CUKHdb88UjxdizCJhAMD7VhiioLZdi5A2VDYy/vFTu5UW9R/tTYVSUe4as76REVfWcKAu8ziD2/Hw==
+  dependencies:
+    "@strudel/core" "1.2.0"
+    "@tonaljs/tonal" "^4.10.0"
+    chord-voicings "^0.0.1"
+    webmidi "^3.1.12"
+
+"@strudel/transpiler@1.2.0", "@strudel/transpiler@^1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@strudel/transpiler/-/transpiler-1.2.0.tgz#1c002c750c76b05b01a908fcf33e91aa1c222cdd"
+  integrity sha512-fxpWx7Wt3wAJlMvG3lfJNAq/xuPzf/U/QAsa/KTvFQti2UJKH7w6g7jtll74Zcl5A1FjYleUuCyXxmEzGp6k7w==
+  dependencies:
+    "@strudel/core" "1.2.0"
+    "@strudel/mini" "1.2.0"
+    acorn "^8.14.0"
+    escodegen "^2.1.0"
+    estree-walker "^3.0.3"
+
+"@strudel/web@^1.2.1":
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/@strudel/web/-/web-1.2.1.tgz#89db7a1c36d570dcb8f49005df4cdc6ec1efda19"
+  integrity sha512-lISEyBkIvVQW4W5mVpzsAiMMXvQHbvb5+/j8Nflujs9vCr9rqpQwOB3msC2boYLwxYcBbruYRTfdnATFcDYE5A==
+  dependencies:
+    "@strudel/core" "1.2.0"
+    "@strudel/mini" "1.2.0"
+    "@strudel/tonal" "1.2.0"
+    "@strudel/transpiler" "1.2.0"
+    "@strudel/webaudio" "1.2.1"
+
+"@strudel/webaudio@1.2.1", "@strudel/webaudio@^1.2.1":
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/@strudel/webaudio/-/webaudio-1.2.1.tgz#6f4c561d62e74ab7cd6a523117b517009bf5d4d4"
+  integrity sha512-G03CdnnnxyipU8a7Y4hIa35Xcw6DKpfjCYaBZEgOppRwZ3NgRelqF0RucNRwiyVnW33Ixg1EL5d+SqYsMrF8BQ==
+  dependencies:
+    "@strudel/core" "1.2.0"
+    "@strudel/draw" "1.2.0"
+    superdough "1.2.1"
+
 "@sveltejs/acorn-typescript@^1.0.5":
   version "1.0.5"
   resolved "https://registry.yarnpkg.com/@sveltejs/acorn-typescript/-/acorn-typescript-1.0.5.tgz#f518101d1b2e12ce80854f1cd850d3b9fb91d710"
@@ -1168,6 +1230,293 @@
   resolved "https://registry.yarnpkg.com/@testing-library/user-event/-/user-event-14.6.1.tgz#13e09a32d7a8b7060fe38304788ebf4197cd2149"
   integrity sha512-vq7fv0rnt+QTXgPxr5Hjc210p6YKq2kmdziLgnsZGgLJ9e6VAShx1pACLuRjd/AS/sr7phAR58OIIpf0LlmQNw==
 
+"@tonaljs/abc-notation@^4.8.0":
+  version "4.9.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/abc-notation/-/abc-notation-4.9.1.tgz#392a770b19b703a82c9f403605e3925f17149f04"
+  integrity sha512-2fDUdPsFDdgZgyIiZCTYGKy30QiwIQxSXCSN2thGrSMXbQKCp8iTC8haStYcrA+25MPWhWlmvC/pz3tGcTNAqQ==
+  dependencies:
+    "@tonaljs/pitch-distance" "5.0.5"
+    "@tonaljs/pitch-note" "6.1.0"
+
+"@tonaljs/array@^4.8.0":
+  version "4.8.4"
+  resolved "https://registry.yarnpkg.com/@tonaljs/array/-/array-4.8.4.tgz#493e4b3e6a52c1003d024f3b82bf66dbe5610591"
+  integrity sha512-97HVdpZy82PqNBDMM9PRSbO2DUrnxNg3++N4xqLpfby70fKHAHhTWrMXWZK+Dzs76HDPQLd+qhd4cq28eBZzjw==
+  dependencies:
+    "@tonaljs/pitch-note" "6.1.0"
+
+"@tonaljs/chord-detect@4.9.1", "@tonaljs/chord-detect@^4.8.1":
+  version "4.9.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/chord-detect/-/chord-detect-4.9.1.tgz#e9a00f06743a00a36eaf3daeda7bf3462513dcce"
+  integrity sha512-rV/9+R7aZ9cQorQ3jdNMMMh63onosglYZM71Q0n7KKcWMAGrxF66MzxBG82xy+w1QDMJQslB3iHfDHUiS6wRjA==
+  dependencies:
+    "@tonaljs/chord-type" "5.1.1"
+    "@tonaljs/pcset" "4.10.1"
+    "@tonaljs/pitch-note" "6.1.0"
+
+"@tonaljs/chord-type@5.1.1":
+  version "5.1.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/chord-type/-/chord-type-5.1.1.tgz#9e992f58ea343baef9780e3537c83c2efc7c75d0"
+  integrity sha512-ti4WzRYvvjH7to0G3zlJFq7WsjHqmcqbk8Jv98aZSR5YumLdY/ua2yOPPyoPq82n6vfgjZsacnAZ3v8/SodOcw==
+  dependencies:
+    "@tonaljs/pcset" "4.10.1"
+
+"@tonaljs/chord-type@^4.8.0", "@tonaljs/chord-type@^4.8.2":
+  version "4.8.2"
+  resolved "https://registry.yarnpkg.com/@tonaljs/chord-type/-/chord-type-4.8.2.tgz#86b9264374cc1a1bbbb64bd1a87a78a88debf6a1"
+  integrity sha512-GzSTjQmZjkUdPhyesFDeJbxpW8R7L/bAE34E8ApGAh9FMcKYpRdX3Tn+gkluRsXOiRMfW07p3E0Adx4bjtyN+Q==
+  dependencies:
+    "@tonaljs/core" "^4.8.0"
+    "@tonaljs/pcset" "^4.8.2"
+
+"@tonaljs/chord@6.1.1":
+  version "6.1.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/chord/-/chord-6.1.1.tgz#d14c19782e3e5bb8892861a5582d0f6d016b8c4f"
+  integrity sha512-gsLyGGkOt0g5L/uF4ICpYQengahW3WAMjckyvyzvqMYpvH7fokmtcymOfbltDQzaVuYuL0TsVmbfjbah2rKEww==
+  dependencies:
+    "@tonaljs/chord-detect" "4.9.1"
+    "@tonaljs/chord-type" "5.1.1"
+    "@tonaljs/collection" "4.9.0"
+    "@tonaljs/interval" "^5.1.0"
+    "@tonaljs/pcset" "4.10.1"
+    "@tonaljs/pitch-distance" "5.0.5"
+    "@tonaljs/pitch-note" "6.1.0"
+    "@tonaljs/scale-type" "4.9.1"
+
+"@tonaljs/chord@^4.8.0":
+  version "4.10.2"
+  resolved "https://registry.yarnpkg.com/@tonaljs/chord/-/chord-4.10.2.tgz#6ce4bb77e5a8a87fef2ee6406cfaf406be301160"
+  integrity sha512-Zlqtq6c6T4y+EqvwHRQp9icEjHqyniCpnIwwCFg5amgAQwXmWzarouOOSmcdJ1Is92eEvcPVuCoLiVUtajS30A==
+  dependencies:
+    "@tonaljs/chord-detect" "^4.8.1"
+    "@tonaljs/chord-type" "^4.8.2"
+    "@tonaljs/collection" "^4.8.0"
+    "@tonaljs/core" "^4.10.0"
+    "@tonaljs/pcset" "^4.8.2"
+    "@tonaljs/scale-type" "^4.8.2"
+
+"@tonaljs/collection@4.9.0", "@tonaljs/collection@^4.8.0":
+  version "4.9.0"
+  resolved "https://registry.yarnpkg.com/@tonaljs/collection/-/collection-4.9.0.tgz#149d4847dd8667c62d4f9c1fa1b6cbe59a24948d"
+  integrity sha512-Mk0h7O54nT6PgNVcUYauzxa5KOB23+0AOKudWzRH7JhJIN9vhVIC7PtwZXE+/G051UTbHSFIcN/afkgF4nB/8A==
+
+"@tonaljs/core@^4.10.0", "@tonaljs/core@^4.8.0":
+  version "4.10.4"
+  resolved "https://registry.yarnpkg.com/@tonaljs/core/-/core-4.10.4.tgz#44184a00b30b2effc2cf77b2067f4676ffc9ba67"
+  integrity sha512-PhGlQ2Js6rFQ6CufkSiBpEJoPS8QIIhbXSXhT4U+5ffqckli+YBZRN24vjZ4AEKuX8xoYDmCCbl+r6agauvzmw==
+  dependencies:
+    "@tonaljs/pitch" "5.0.1"
+    "@tonaljs/pitch-distance" "5.0.2"
+    "@tonaljs/pitch-interval" "5.0.2"
+    "@tonaljs/pitch-note" "5.0.3"
+
+"@tonaljs/duration-value@^4.8.0":
+  version "4.9.0"
+  resolved "https://registry.yarnpkg.com/@tonaljs/duration-value/-/duration-value-4.9.0.tgz#47a015932bf679adbb053099206a0b410b46a07f"
+  integrity sha512-Muz54HyIe0nMYKWx6wyTa4y17ma29DtpJF4/oqJphy6A124rAVDe/SKit8JGOvDYAQj71FUXqs17sXBxO/ExVw==
+
+"@tonaljs/interval@5.1.0", "@tonaljs/interval@^5.1.0":
+  version "5.1.0"
+  resolved "https://registry.yarnpkg.com/@tonaljs/interval/-/interval-5.1.0.tgz#3f70222f02a7ddfa31db6a133f616a2defb82680"
+  integrity sha512-GR9dUjn0j7yhjwjRh8HQxZYXOiVl05WfY3AFyMB9rfg807K4dSJmWfPTULPQXyHJ6NiZOPXcwRs8MxMLDxgdbg==
+  dependencies:
+    "@tonaljs/pitch" "^5.0.2"
+    "@tonaljs/pitch-distance" "^5.0.4"
+    "@tonaljs/pitch-interval" "^6.0.0"
+
+"@tonaljs/interval@^4.8.0":
+  version "4.8.2"
+  resolved "https://registry.yarnpkg.com/@tonaljs/interval/-/interval-4.8.2.tgz#f4aac6e70034ca69fc9d95dbb12686050b4f7baa"
+  integrity sha512-9SEuJuqFdmu9lnvMmJtxbReQcQvZ1YHXhCcxaF6Re23/w+BqiJvvkvNZhfWH+n1+g0uaSdTsuvMfamp7hAvPMw==
+  dependencies:
+    "@tonaljs/pitch" "^5.0.1"
+    "@tonaljs/pitch-distance" "^5.0.2"
+    "@tonaljs/pitch-interval" "^5.0.2"
+
+"@tonaljs/key@^4.9.0":
+  version "4.11.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/key/-/key-4.11.1.tgz#92f09031d0d3449aee19b8f938f40c6598540d0f"
+  integrity sha512-bZGKhSR+ThYS4CHVR3gS4aVkAM9PYqQPjNvsqwSRDzpuPynuGqIJbEXxx2sTmoendSOQYQXh5OaiDCQZAbk66w==
+  dependencies:
+    "@tonaljs/note" "4.12.0"
+    "@tonaljs/pitch-note" "6.1.0"
+    "@tonaljs/roman-numeral" "4.9.1"
+
+"@tonaljs/midi@4.10.1", "@tonaljs/midi@^4.8.0":
+  version "4.10.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/midi/-/midi-4.10.1.tgz#575c0d84c9631873810a04240ec8b7ce8210be9c"
+  integrity sha512-8epOg4fFArpoR94fkWiPf60kPwFnTi2ZSxYTfueTVOI9l/TIaMk9oEBfw8ZKuuJygGU2LMk27/hKW2rQI5zFNg==
+  dependencies:
+    "@tonaljs/pitch-note" "6.1.0"
+
+"@tonaljs/mode@^4.8.0":
+  version "4.9.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/mode/-/mode-4.9.1.tgz#d701baf37c2ba9a8f198a36b9d4b1d46270250a4"
+  integrity sha512-h+K7eOUKpyX7kMRCwCew6cV1oN0sZYD5LLeKD7zEERNd/6wvGBfGCdMZECGqzpFUmjUyCY87IOntem6EPbKVCg==
+  dependencies:
+    "@tonaljs/collection" "4.9.0"
+    "@tonaljs/interval" "5.1.0"
+    "@tonaljs/pcset" "4.10.1"
+    "@tonaljs/pitch-distance" "5.0.5"
+    "@tonaljs/pitch-note" "6.1.0"
+    "@tonaljs/scale-type" "4.9.1"
+
+"@tonaljs/note@4.12.0", "@tonaljs/note@^4.9.0":
+  version "4.12.0"
+  resolved "https://registry.yarnpkg.com/@tonaljs/note/-/note-4.12.0.tgz#7887d08c42f9a3e1c740793af2a03a6b1e391fba"
+  integrity sha512-MgHeSTRldgPteucHI+gKzFkqJ8eVPHelxCNeAFr+hTryLoottr/rfqI93GeJkriH3r8jG81LQBxKRbzN4m3Qeg==
+  dependencies:
+    "@tonaljs/midi" "4.10.1"
+    "@tonaljs/pitch" "5.0.2"
+    "@tonaljs/pitch-distance" "5.0.5"
+    "@tonaljs/pitch-interval" "6.1.0"
+    "@tonaljs/pitch-note" "6.1.0"
+
+"@tonaljs/pcset@4.10.1", "@tonaljs/pcset@^4.8.0", "@tonaljs/pcset@^4.8.2":
+  version "4.10.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/pcset/-/pcset-4.10.1.tgz#432ff9cb34f1a66926db062f8f2b94ddefc3f65f"
+  integrity sha512-CZG1rpKc38yMfpEJsbDTvsTmQqsek9xxcuMgK64Tr6sP1lEiDuZJbQeKVWWRnreBF2FQ1cEGLmfOpvSO+40csA==
+  dependencies:
+    "@tonaljs/collection" "4.9.0"
+    "@tonaljs/pitch" "5.0.2"
+    "@tonaljs/pitch-distance" "5.0.5"
+    "@tonaljs/pitch-interval" "6.1.0"
+    "@tonaljs/pitch-note" "6.1.0"
+
+"@tonaljs/pitch-distance@5.0.2":
+  version "5.0.2"
+  resolved "https://registry.yarnpkg.com/@tonaljs/pitch-distance/-/pitch-distance-5.0.2.tgz#344b2847963af69ab417a99eee5bc71821ca23de"
+  integrity sha512-DPxfGJCf4BvfIVRxl2v142tuCKIziM6PomOBT0/s7U5o+Z5qFAIW0tNx/MKyL83guV74p+XIf5VI0w1flmXxDA==
+  dependencies:
+    "@tonaljs/pitch" "5.0.1"
+    "@tonaljs/pitch-interval" "5.0.2"
+    "@tonaljs/pitch-note" "5.0.3"
+
+"@tonaljs/pitch-distance@5.0.5", "@tonaljs/pitch-distance@^5.0.2", "@tonaljs/pitch-distance@^5.0.4":
+  version "5.0.5"
+  resolved "https://registry.yarnpkg.com/@tonaljs/pitch-distance/-/pitch-distance-5.0.5.tgz#2d2bf7bbd28752d41c0d52aa7e4f5742caf37b85"
+  integrity sha512-dTfjsU0zyrj5YmiFio5prPaD5w7sBmHp4nnmlEg70nHY+SerAH0KiO9HM9usttVgRFUaXl0Gc7OI8YMGfSFmug==
+  dependencies:
+    "@tonaljs/pitch" "5.0.2"
+    "@tonaljs/pitch-interval" "6.1.0"
+    "@tonaljs/pitch-note" "6.1.0"
+
+"@tonaljs/pitch-interval@5.0.2", "@tonaljs/pitch-interval@^5.0.2":
+  version "5.0.2"
+  resolved "https://registry.yarnpkg.com/@tonaljs/pitch-interval/-/pitch-interval-5.0.2.tgz#dc1459424db4fb86fe505a23c24138a65332f82c"
+  integrity sha512-bQmxeenRFNuuABs9mDc+bSUp3ySGw8I49pHMoGDdCcro9n3MDN8IsSwhvKoGOYErFMx76rNn1t+7WL8ukpvX5w==
+  dependencies:
+    "@tonaljs/pitch" "5.0.1"
+
+"@tonaljs/pitch-interval@6.1.0", "@tonaljs/pitch-interval@^6.0.0":
+  version "6.1.0"
+  resolved "https://registry.yarnpkg.com/@tonaljs/pitch-interval/-/pitch-interval-6.1.0.tgz#1b8308023143879bf105023951d57e9bd22d02d4"
+  integrity sha512-9ZMxA7V4UgySnOKPIG6HECzhDb8mbiTCIdNNIzCIfz5XpjUmohku2YZpVVWMacLHgyeQicJzNoRiPel5oSAn4A==
+  dependencies:
+    "@tonaljs/pitch" "5.0.2"
+
+"@tonaljs/pitch-note@5.0.3":
+  version "5.0.3"
+  resolved "https://registry.yarnpkg.com/@tonaljs/pitch-note/-/pitch-note-5.0.3.tgz#14189266dbea3cb4206ee13f268f6a57c6d32d01"
+  integrity sha512-JsPgqPa8VZdZtfwvgoHJz996BZqzvlnRxUF6c/Q9q8E0iq30UHBEid0Y6XldK+h6tuIENsG3a9jyvNNxRqIeYw==
+  dependencies:
+    "@tonaljs/pitch" "5.0.1"
+
+"@tonaljs/pitch-note@6.1.0":
+  version "6.1.0"
+  resolved "https://registry.yarnpkg.com/@tonaljs/pitch-note/-/pitch-note-6.1.0.tgz#bbe08228ef99a560fb23c2c804ff046a5e08a4c4"
+  integrity sha512-A4OSLo8DjM38u73862LnDmL4YInDDRBmg0fojXcvu4cyU3oOlqndyeHOra1OVoH/WW46uNIxNs1wJDZNPWL5KQ==
+  dependencies:
+    "@tonaljs/pitch" "5.0.2"
+
+"@tonaljs/pitch@5.0.1":
+  version "5.0.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/pitch/-/pitch-5.0.1.tgz#417bbf748bf947d609983928b444908ac4a5ac09"
+  integrity sha512-5HYkF4hGY0jS2y5V3Hf5gNFXX46kT4cAcI7JLEn+qQb9N1dU9Gz9koI9di0mD1Tbam+kviceiCsJl4WX/FqYjA==
+
+"@tonaljs/pitch@5.0.2", "@tonaljs/pitch@^5.0.1", "@tonaljs/pitch@^5.0.2":
+  version "5.0.2"
+  resolved "https://registry.yarnpkg.com/@tonaljs/pitch/-/pitch-5.0.2.tgz#ca2dcd60b99e90536f52293d2491187edfbc9967"
+  integrity sha512-mxaXJPPe+LIJdjzpZEl8I8Wx3dEvlzkBbsr2Ltwc2dTAdnErAZ5R0TxVq2egF27lMvQN2QPQPWI9iDPPdVUmrg==
+
+"@tonaljs/progression@^4.8.0":
+  version "4.9.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/progression/-/progression-4.9.1.tgz#15ac67cf6c69f99575b11290a448cc84e94ddca9"
+  integrity sha512-jHdZUNlXRmjrvbZrvjoW6syW7dO9ilhgvyouB6YuVM5lGShwTN9dsSuQYsugso9jYHkwQBgYj5SaXTTY0/0nHw==
+  dependencies:
+    "@tonaljs/chord" "6.1.1"
+    "@tonaljs/pitch-distance" "5.0.5"
+    "@tonaljs/pitch-interval" "6.1.0"
+    "@tonaljs/pitch-note" "6.1.0"
+    "@tonaljs/roman-numeral" "4.9.1"
+
+"@tonaljs/range@^4.8.0":
+  version "4.9.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/range/-/range-4.9.1.tgz#1291ee59ec44636f66ef3e7d27a3dd1630972562"
+  integrity sha512-7afFvdcdseqiG/kkCL3LuOc9rTNBR4+3H5lKx9MttAHVJq8uRJMooO1GdEziQ5f7UYZPmXd17e6ZXd0AdnkXrA==
+  dependencies:
+    "@tonaljs/collection" "4.9.0"
+    "@tonaljs/midi" "4.10.1"
+
+"@tonaljs/roman-numeral@4.9.1", "@tonaljs/roman-numeral@^4.8.0":
+  version "4.9.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/roman-numeral/-/roman-numeral-4.9.1.tgz#4b72d9d31ed0090c174a1149d2fde54f6a0b6f02"
+  integrity sha512-dJGKBNHdPrNTE97ZDk4t6wpNmgYcpHyLkAvWkRP9I/HsDkeTFFQqNXosYIvspPWrFySlRpeqqFwcqV74MYoOag==
+  dependencies:
+    "@tonaljs/pitch" "5.0.2"
+    "@tonaljs/pitch-interval" "6.1.0"
+    "@tonaljs/pitch-note" "6.1.0"
+
+"@tonaljs/scale-type@4.9.1", "@tonaljs/scale-type@^4.8.0", "@tonaljs/scale-type@^4.8.2":
+  version "4.9.1"
+  resolved "https://registry.yarnpkg.com/@tonaljs/scale-type/-/scale-type-4.9.1.tgz#1e677e651a20d56374632ad0eb3d83e7acd08603"
+  integrity sha512-Nz2wThzz5NmWNx0vazX7MqNbF8kT1g5BEcbZcWjgkc67zhwosfZE0LEn7W9XcVDEws71b8CqQqDPKUEEybC9Rw==
+  dependencies:
+    "@tonaljs/pcset" "4.10.1"
+
+"@tonaljs/scale@^4.9.0":
+  version "4.13.2"
+  resolved "https://registry.yarnpkg.com/@tonaljs/scale/-/scale-4.13.2.tgz#1851382e9058c3aed4dfcdb919d14b0bf28236cd"
+  integrity sha512-fL9ydv2gxqipjKI2tEo5OHHyKp/kz0d2kcDHLH8zRR5eyeiYcxL05g34fo4jKydQGWsNSrD0n/DoMTIp4yMIhQ==
+  dependencies:
+    "@tonaljs/chord-type" "5.1.1"
+    "@tonaljs/collection" "4.9.0"
+    "@tonaljs/note" "4.12.0"
+    "@tonaljs/pcset" "4.10.1"
+    "@tonaljs/pitch-distance" "5.0.5"
+    "@tonaljs/pitch-note" "6.1.0"
+    "@tonaljs/scale-type" "4.9.1"
+
+"@tonaljs/time-signature@^4.8.0":
+  version "4.9.0"
+  resolved "https://registry.yarnpkg.com/@tonaljs/time-signature/-/time-signature-4.9.0.tgz#15a898daa682353bb28e1dfc58a97844e7f50e00"
+  integrity sha512-zRo8CBqg/2guzTlF2vxyVIuB5gmwWQaxlknJPUSDII8CTdQ/x3a1LlNoMKkvTUnqwCihe3WrNPZ5XUfOOTthYA==
+
+"@tonaljs/tonal@^4.10.0", "@tonaljs/tonal@^4.6.5":
+  version "4.10.0"
+  resolved "https://registry.yarnpkg.com/@tonaljs/tonal/-/tonal-4.10.0.tgz#81e43303480c2ee8b228988b87675740aba37759"
+  integrity sha512-F2T9Fiy+j0MVped89kCrX1XF68mQOLUnny4pDOHrIf+OkrjtLQOzzaSOrX1tx0o72WUwQm1knz6D1d57b9X1HA==
+  dependencies:
+    "@tonaljs/abc-notation" "^4.8.0"
+    "@tonaljs/array" "^4.8.0"
+    "@tonaljs/chord" "^4.8.0"
+    "@tonaljs/chord-type" "^4.8.0"
+    "@tonaljs/collection" "^4.8.0"
+    "@tonaljs/core" "^4.8.0"
+    "@tonaljs/duration-value" "^4.8.0"
+    "@tonaljs/interval" "^4.8.0"
+    "@tonaljs/key" "^4.9.0"
+    "@tonaljs/midi" "^4.8.0"
+    "@tonaljs/mode" "^4.8.0"
+    "@tonaljs/note" "^4.9.0"
+    "@tonaljs/pcset" "^4.8.0"
+    "@tonaljs/progression" "^4.8.0"
+    "@tonaljs/range" "^4.8.0"
+    "@tonaljs/roman-numeral" "^4.8.0"
+    "@tonaljs/scale" "^4.9.0"
+    "@tonaljs/scale-type" "^4.8.0"
+    "@tonaljs/time-signature" "^4.8.0"
+
 "@tybys/wasm-util@^0.9.0":
   version "0.9.0"
   resolved "https://registry.yarnpkg.com/@tybys/wasm-util/-/wasm-util-0.9.0.tgz#3e75eb00604c8d6db470bf18c37b7d984a0e3355"
@@ -1216,6 +1565,11 @@
   version "9.0.8"
   resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-9.0.8.tgz#7545ba4fc3c003d6c756f651f3bf163d8f0f29ba"
   integrity sha512-jg+97EGIcY9AGHJJRaaPVgetKDsrTgbRjQ5Msgjh/DQKEFl0DtyRr/VCOyD1T2R1MNeWPK/u7JoGhlDZnKBAfA==
+
+"@types/webmidi@^2.1.0":
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/@types/webmidi/-/webmidi-2.1.0.tgz#085ec7279a9c9c13453589db9ecebbcfa4bf771b"
+  integrity sha512-k898MjEUSHB+6rSeCPQk/kLgie0wgWZ2t78GlWj86HbTQ+XmtbBafYg5LNjn8bVHfItEhPGZPf579Xfc6keV6w==
 
 "@typescript-eslint/eslint-plugin@8.32.0":
   version "8.32.0"
@@ -2219,6 +2573,13 @@ chokidar@^4.0.1:
   dependencies:
     readdirp "^4.0.1"
 
+chord-voicings@^0.0.1:
+  version "0.0.1"
+  resolved "https://registry.yarnpkg.com/chord-voicings/-/chord-voicings-0.0.1.tgz#d9fbbff48fbf985da90263d1ddf5c2d283e6114e"
+  integrity sha512-SutgB/4ynkkuiK6qdQ/k3QvCFcH0Vj8Ch4t6LbRyRQbVzP/TOztiCk3kvXd516UZ6fqk7ijDRELEFcKN+6V8sA==
+  dependencies:
+    "@tonaljs/tonal" "^4.6.5"
+
 chromatic@^11.15.0:
   version "11.28.2"
   resolved "https://registry.yarnpkg.com/chromatic/-/chromatic-11.28.2.tgz#c0b9f59dcc323ca8bf2c2790f3c9e3d285834efb"
@@ -2549,6 +2910,13 @@ devalue@^5.1.0:
   resolved "https://registry.yarnpkg.com/devalue/-/devalue-5.1.1.tgz#a71887ac0f354652851752654e4bd435a53891ae"
   integrity sha512-maua5KUiapvEwiEAe+XnlZ3Rh0GD+qI1J/nb9vrJc3muPXvcF/8gXYTWF76+5DAqHyDUtOIImEuo0YKE9mshVw==
 
+djipevents@^2.0.7:
+  version "2.0.7"
+  resolved "https://registry.yarnpkg.com/djipevents/-/djipevents-2.0.7.tgz#4805dcb8dcf0b4a2c6e51eaecdfc218bb8f202fb"
+  integrity sha512-KNFYaU85imxOCKOUsIR70Iz9E19r96/X7LSH+u0tSoZdpWcBdzoqtTsU+wuLhc6GMpSFob+KInkZAbfKi01Bjg==
+  dependencies:
+    "@babel/runtime" "^7.20.6"
+
 doctrine@^3.0.0:
   version "3.0.0"
   resolved "https://registry.yarnpkg.com/doctrine/-/doctrine-3.0.0.tgz#addebead72a6574db783639dc87a121773973961"
@@ -2858,6 +3226,17 @@ escape-string-regexp@^4.0.0:
   resolved "https://registry.yarnpkg.com/escape-string-regexp/-/escape-string-regexp-4.0.0.tgz#14ba83a5d373e3d311e5afca29cf5bfad965bf34"
   integrity sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==
 
+escodegen@^2.1.0:
+  version "2.1.0"
+  resolved "https://registry.yarnpkg.com/escodegen/-/escodegen-2.1.0.tgz#ba93bbb7a43986d29d6041f99f5262da773e2e17"
+  integrity sha512-2NlIDTwUWJN0mRPQOdtQBzbUHvdGY2P1VXSyU83Q3xKxM7WHX2Ql8dKq782Q9TgQUNOLEzEYu9bzLNj1q88I5w==
+  dependencies:
+    esprima "^4.0.1"
+    estraverse "^5.2.0"
+    esutils "^2.0.2"
+  optionalDependencies:
+    source-map "~0.6.1"
+
 eslint-config-prettier@^10.0.1:
   version "10.1.2"
   resolved "https://registry.yarnpkg.com/eslint-config-prettier/-/eslint-config-prettier-10.1.2.tgz#31a4b393c40c4180202c27e829af43323bf85276"
@@ -3035,7 +3414,7 @@ espree@^9.2.0, espree@^9.4.0:
     acorn-jsx "^5.3.2"
     eslint-visitor-keys "^3.4.1"
 
-esprima@~4.0.0:
+esprima@^4.0.1, esprima@~4.0.0:
   version "4.0.1"
   resolved "https://registry.yarnpkg.com/esprima/-/esprima-4.0.1.tgz#13b04cdb3e6c5d19df91ab6987a8695619b0aa71"
   integrity sha512-eGuFFw7Upda+g4p+QHvnW0RyTX/SVeJBDM/gCtMARO0cLuT2HcEKnTPvhjV6aGeqrCB/sbNop0Kszm0jsaWU4A==
@@ -3365,6 +3744,11 @@ fraction.js@^4.3.7:
   version "4.3.7"
   resolved "https://registry.yarnpkg.com/fraction.js/-/fraction.js-4.3.7.tgz#06ca0085157e42fda7f9e726e79fefc4068840f7"
   integrity sha512-ZsDfxO51wGAXREY55a7la9LScWpwv9RxIrYABrlvOFBlH/ShPnrtsXeuUIfXKKOVicNxQ+o8JTbJvjS4M89yew==
+
+fraction.js@^5.2.1:
+  version "5.2.2"
+  resolved "https://registry.yarnpkg.com/fraction.js/-/fraction.js-5.2.2.tgz#c1295bc47307c5f93f75790859645fd74edaa195"
+  integrity sha512-uXBDv5knpYmv/2gLzWQ5mBHGBRk9wcKTeWu6GLTUEQfjCxO09uM/mHDrojlL+Q1mVGIIFo149Gba7od1XPgSzQ==
 
 fresh@0.5.2:
   version "0.5.2"
@@ -4010,6 +4394,11 @@ jackspeak@^3.1.2:
   optionalDependencies:
     "@pkgjs/parseargs" "^0.11.0"
 
+jazz-midi@^1.7.9:
+  version "1.7.9"
+  resolved "https://registry.yarnpkg.com/jazz-midi/-/jazz-midi-1.7.9.tgz#ad564e85acf12414aec7ef7d879ad61a5d7f6896"
+  integrity sha512-c8c4BBgwxdsIr1iVm53nadCrtH7BUlnX3V95ciK/gbvXN/ndE5+POskBalXgqlc/r9p2XUbdLTrgrC6fou5p9w==
+
 jiti@^2.4.2:
   version "2.4.2"
   resolved "https://registry.yarnpkg.com/jiti/-/jiti-2.4.2.tgz#d19b7732ebb6116b06e2038da74a55366faef560"
@@ -4121,6 +4510,14 @@ jws@^3.2.1:
   dependencies:
     jwa "^1.4.1"
     safe-buffer "^5.0.1"
+
+jzz@^1.8.5:
+  version "1.9.3"
+  resolved "https://registry.yarnpkg.com/jzz/-/jzz-1.9.3.tgz#4730d2cc38b9616d8b9bc394cdd8872e3108fc06"
+  integrity sha512-DXQ7xXuJzC4YxNbQZy9pfHC/DOXM6IHgceTXnkhk1/+lU/qDk8W9xUaNpgCH6t1QDQ9roz7FSVtFc0/JhYQFxg==
+  dependencies:
+    "@types/webmidi" "^2.1.0"
+    jazz-midi "^1.7.9"
 
 keyv@^4.5.3, keyv@^4.5.4:
   version "4.5.4"
@@ -4517,6 +4914,11 @@ nanoid@^3.3.8:
   version "3.3.11"
   resolved "https://registry.yarnpkg.com/nanoid/-/nanoid-3.3.11.tgz#4f4f112cefbe303202f2199838128936266d185b"
   integrity sha512-N8SpfPUnUp1bK+PMYW8qSWdl9U+wwNWI4QKxOYDy9JAro3WMX7p2OeVRF9v+347pnakNevPmiHhNmZ2HbFA76w==
+
+nanostores@^0.11.3:
+  version "0.11.4"
+  resolved "https://registry.yarnpkg.com/nanostores/-/nanostores-0.11.4.tgz#4ed323f7b2cbbf0342c2d6be3a0c833dab73af34"
+  integrity sha512-k1oiVNN4hDK8NcNERSZLQiMfRzEGtfnvZvdBvey3SQbgn8Dcrk0h1I6vpxApjb10PFUflZrgJ2WEZyJQ+5v7YQ==
 
 natural-compare@^1.4.0:
   version "1.4.0"
@@ -5751,6 +6153,13 @@ strip-json-comments@^3.1.0, strip-json-comments@^3.1.1:
   resolved "https://registry.yarnpkg.com/strip-json-comments/-/strip-json-comments-3.1.1.tgz#31f1281b3832630434831c310c01cccda8cbe006"
   integrity sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==
 
+superdough@1.2.1:
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/superdough/-/superdough-1.2.1.tgz#5c9a827276a65ba23e067ad724a36d766f15ef8e"
+  integrity sha512-Dy/8R293vf3+wu2iZydEIDk9JW8PtwlOFtcV//AYn+Vao31Mqye9TrlyLtzt8Wh+AHLOGNv24ZlWTDRgYE6JvA==
+  dependencies:
+    nanostores "^0.11.3"
+
 supports-color@^5.3.0:
   version "5.5.0"
   resolved "https://registry.yarnpkg.com/supports-color/-/supports-color-5.5.0.tgz#e2e69a44ac8772f78a1ec0b35b689df6530efc8f"
@@ -6329,6 +6738,15 @@ webidl-conversions@^7.0.0:
   version "7.0.0"
   resolved "https://registry.yarnpkg.com/webidl-conversions/-/webidl-conversions-7.0.0.tgz#256b4e1882be7debbf01d05f0aa2039778ea080a"
   integrity sha512-VwddBukDzu71offAQR975unBIGqfKZpM+8ZX6ySk8nYhVoo5CYaZyzt3YBvYtRtO+aoGlqxPg/B87NGVZ/fu6g==
+
+webmidi@^3.1.12:
+  version "3.1.12"
+  resolved "https://registry.yarnpkg.com/webmidi/-/webmidi-3.1.12.tgz#448f2faf35a537b30cc2caf2aa22b5503d7fd719"
+  integrity sha512-X1lACggXm2BxuAPdx5wleh8S2kygduHbtR2ti5sGhivLkX6Muv/sLAYmPuIaNLOUddyxr71+3tsq8m5dKXoT4A==
+  dependencies:
+    djipevents "^2.0.7"
+  optionalDependencies:
+    jzz "^1.8.5"
 
 webpack-virtual-modules@^0.6.2:
   version "0.6.2"

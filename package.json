@@ -64,6 +64,12 @@
 	},
 	"packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e",
 	"dependencies": {
-		"@lucide/svelte": "^0.508.0"
+		"@lucide/svelte": "^0.508.0",
+		"@strudel/core": "^1.2.0",
+		"@strudel/mini": "^1.2.0",
+		"@strudel/tonal": "^1.2.0",
+		"@strudel/transpiler": "^1.2.0",
+		"@strudel/web": "^1.2.1",
+		"@strudel/webaudio": "^1.2.1"
 	}
 }
