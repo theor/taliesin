@@ -12,14 +12,7 @@
     // }; 
     
 </script>
-<style>
-    div {
-        display: flex;
-        flex-direction: row;
-        justify-content: space-between;
-    }
-</style>
-<div>
-    <p>Network ID: {network.id}</p>
-    <p>Network Status: {network.status}</p>
+<div class="flex items-center gap-4">
+    <p>{network.id}</p>
+    <p class="chip preset-filled">{network.status}</p>
 </div>

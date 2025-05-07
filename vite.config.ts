@@ -4,12 +4,17 @@ import { defineConfig } from 'vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/experimental-addon-test/vitest-plugin';
+import tailwindcss from '@tailwindcss/vite'
 const dirname =
 	typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
 // More info at: https://storybook.js.org/docs/writing-tests/test-addon
 export default defineConfig({
-	plugins: [sveltekit()],
+	plugins: [
+		
+		tailwindcss(),
+		sveltekit()
+	],
 	test: {
 		workspace: [
 			{
