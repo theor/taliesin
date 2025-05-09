@@ -9,7 +9,7 @@
 	console.log(network.id + ' ' + network.status);
 
 	function onKeyDown(event: KeyboardEvent) {
-		console.log(event.key, event.code);
+		// console.log(event.key, event.code);
 
 		if (event.code === 'Space') {
 			strudel.toggle();
@@ -20,13 +20,17 @@
 	}
 	let title = 'Rave';
 
-	console.log($store);
+    $effect(() => {
+        console.log('store changed', $state.snapshot(store.value));
+    });
 
-    function onChange(i:number,instrumentData: IInstrumentData) {
-        console.log('onChange',i, instrumentData);
-        $store.instrumentViews[i].instrument.data = instrumentData;
-        $store.instrumentViews[i].instrument.generate();
-    }
+	let s = store.value;
+	$inspect(s);
+
+	function onChange(i: number, instrumentData: IInstrumentData) {
+		console.log('onChange', i, instrumentData);
+		store.setInstrument(i, instrumentData);
+	}
 </script>
 
 <div class="h-screen grid grid-rows-[auto_1fr_auto]">
@@ -50,9 +54,13 @@
 	</AppBar>
 
 	<div class="h-100% p-4">
-		{#each $store.instrumentViews as instrumentView,index}
+		{#each s.instrumentViews as instrumentView, index}
 			<p>i {index}</p>
-			<svelte:component this={instrumentView.component} instrumentData={instrumentView.instrument.data} onChange={d => onChange(index,d)} />
+            {@const Component   = instrumentView.component}
+			<Component
+				instrumentData={instrumentView.instrument.data}
+				onChange={(d) => onChange(index, d)}
+			/>
 		{/each}
 	</div>
 	<footer class=" p-4 h-10%">(footer)</footer>
