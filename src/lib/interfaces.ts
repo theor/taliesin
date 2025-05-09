@@ -23,7 +23,7 @@ export interface IInstrument{
     name: string;
     generate: () => string;
 }
-export abstract  class Instrument<T> implements IInstrument {
+export abstract  class Instrument<T extends IInstrumentData> implements IInstrument {
     abstract name: string;
     abstract createData():  T;
     private _data: T;
@@ -38,18 +38,25 @@ export abstract  class Instrument<T> implements IInstrument {
     }
 }
 
-export class PianoScale extends Instrument<{notes: number[]}> {
+export interface IInstrumentData {}
+
+export type PianoScaleData = {
+    notes: number[];
+};
+
+export class PianoScale extends Instrument<PianoScaleData> {
     name: string = 'PianoScale';
     generate(){
         return `note("${this.data.notes.join(' ')}")`;
     }
-    createData(): {notes: number[]} {
+    createData(): PianoScaleData {
         return {notes:[1, 2, 3, 4]};
     }
 }
 
-export interface IInstrumentViewProps<T extends IInstrument> {
-    instrument: T;
+export interface IInstrumentViewProps<T extends IInstrumentData> {
+    instrumentData: T;
+    onChange: (data: T) => void;
 }
 // interface IInstrumentView<T extends IInstrument> {
 //     getInstrument(): T;

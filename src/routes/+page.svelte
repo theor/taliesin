@@ -1,12 +1,8 @@
 <script lang="ts">
 	import { AppBar } from '@skeletonlabs/skeleton-svelte';
-	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
-	import Paperclip from '@lucide/svelte/icons/paperclip';
-	import Calendar from '@lucide/svelte/icons/calendar';
-	import CircleUser from '@lucide/svelte/icons/circle-user';
 	import Menu from '@lucide/svelte/icons/menu';
 
-	import { network, strudel, store } from '$lib';
+	import { network, strudel, store, type IInstrumentData } from '$lib';
 	import '../main.scss';
 	import Network from '../components/Network.svelte';
 	import Transport from '../components/Transport.svelte';
@@ -24,8 +20,13 @@
 	}
 	let title = 'Rave';
 
-	let storeData = $store;
-	console.log(storeData);
+	console.log($store);
+
+    function onChange(i:number,instrumentData: IInstrumentData) {
+        console.log('onChange',i, instrumentData);
+        $store.instrumentViews[i].instrument.data = instrumentData;
+        $store.instrumentViews[i].instrument.generate();
+    }
 </script>
 
 <div class="h-screen grid grid-rows-[auto_1fr_auto]">
@@ -49,9 +50,9 @@
 	</AppBar>
 
 	<div class="h-100% p-4">
-		{#each storeData.instrumentViews as instrumentView,index}
+		{#each $store.instrumentViews as instrumentView,index}
 			<p>i {index}</p>
-			<svelte:component this={instrumentView.component} instrument={instrumentView.instrument} />
+			<svelte:component this={instrumentView.component} instrumentData={instrumentView.instrument.data} onChange={d => onChange(index,d)} />
 		{/each}
 	</div>
 	<footer class=" p-4 h-10%">(footer)</footer>
