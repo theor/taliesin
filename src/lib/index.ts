@@ -3,3 +3,4 @@
 export * from './interfaces';
 
 export {strudel} from './strudel';
+export {store} from './Store.svelte';

@@ -6,7 +6,7 @@
 	import CircleUser from '@lucide/svelte/icons/circle-user';
 	import Menu from '@lucide/svelte/icons/menu';
 
-	import { network, strudel } from '$lib';
+	import { network, strudel, store } from '$lib';
 	import '../main.scss';
 	import Network from '../components/Network.svelte';
 	import Transport from '../components/Transport.svelte';
@@ -18,12 +18,14 @@
 		if (event.code === 'Space') {
 			strudel.toggle();
 		}
-        if (event.code === 'Escape') {
-            strudel.stop();
-        }
+		if (event.code === 'Escape') {
+			strudel.stop();
+		}
 	}
-    let title = "Rave";
+	let title = 'Rave';
 
+	let storeData = $store;
+	console.log(storeData);
 </script>
 
 <div class="h-screen grid grid-rows-[auto_1fr_auto]">
@@ -46,7 +48,12 @@
 		<span>{title}</span>
 	</AppBar>
 
-	<div class="h-100%"></div>
+	<div class="h-100% p-4">
+		{#each storeData.instrumentViews as instrumentView,index}
+			<p>i {index}</p>
+			<svelte:component this={instrumentView.component} instrument={instrumentView.instrument} />
+		{/each}
+	</div>
 	<footer class=" p-4 h-10%">(footer)</footer>
 </div>
 
