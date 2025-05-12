@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { AppBar } from '@skeletonlabs/skeleton-svelte';
+	import { AppBar, } from '@skeletonlabs/skeleton-svelte';
 	import Menu from '@lucide/svelte/icons/menu';
 
 	import { network, strudel, store, type IInstrumentData } from '$lib';
 	import '../main.scss';
 	import Network from '../components/Network.svelte';
 	import Transport from '../components/Transport.svelte';
+	import PianoScaleView from '../instruments/PianoScaleView.svelte';
 	console.log(network.id + ' ' + network.status);
 
 	function onKeyDown(event: KeyboardEvent) {
@@ -20,12 +21,14 @@
 	}
 	let title = 'Rave';
 
+    let code = store.code();
     $effect(() => {
-        console.log('store changed', $state.snapshot(store.value));
+        console.log('store changed', $state.snapshot(store.instruments));
+        code = store.code();
     });
 
-	let s = store.value;
-	$inspect(s);
+	$inspect(store);
+
 
 	function onChange(i: number, instrumentData: IInstrumentData) {
 		console.log('onChange', i, instrumentData);
@@ -53,14 +56,21 @@
 		<span>{title}</span>
 	</AppBar>
 
-	<div class="h-100% p-4">
-		{#each s.instrumentViews as instrumentView, index}
+	<div class="h-100% p-4 grid grid-cols-4 gap-4">
+        <div class="card preset-outlined-surface-200-800 bg-surface-50-950 p-5 space-y-5">
+            Code
+            <pre>
+{code}
+            </pre>
+        </div>
+		{#each store.instruments as instrumentView, index}
+        <div class="card preset-outlined-surface-200-800 bg-surface-50-950 p-5 space-y-5">
 			<p>i {index}</p>
-            {@const Component   = instrumentView.component}
-			<Component
-				instrumentData={instrumentView.instrument.data}
-				onChange={(d) => onChange(index, d)}
+			<PianoScaleView
+				instrumentData={instrumentView.data}
+				index={index}
 			/>
+        </div>
 		{/each}
 	</div>
 	<footer class=" p-4 h-10%">(footer)</footer>
