@@ -21,21 +21,24 @@ export const network: INetwork = new TestNetwork();
 
 export interface IInstrument{
     name: string;
-    generate: () => string;
+    generate: (data: IInstrumentData) => string;
 }
 export abstract  class Instrument<T extends IInstrumentData> implements IInstrument {
     abstract name: string;
     abstract createData():  T;
-    private _data: T;
-    get data(): T { return this._data; }
-    set data(d: T) { this._data = d; }
-    abstract generate ():  string;
-    constructor(data?: Partial<T>) {
-        this._data = this.createData();
-        if (data) {
-            this._data = {...this._data,...data};
-        }
+    // private _data: T;
+    // get data(): T { return this._data; }
+    // set data(d: T) { this._data = d; }
+    generate(data: IInstrumentData) : string {
+        return this.generate_(data as T);
     }
+    protected abstract generate_ (data: T):  string;
+    // constructor(data?: Partial<T>) {
+        // this._data = this.createData();
+        // if (data) {
+            // this._data = {...this._data,...data};
+        // }
+    // }
 }
 
 export interface IInstrumentData {}
@@ -45,17 +48,17 @@ export type PianoScaleData = {
 };
 
 export class PianoScale extends Instrument<PianoScaleData> {
-    name: string = 'PianoScale';
-    generate(){
-        return `note("${this.data.notes.join(' ')}")`;
+    protected generate_(data: PianoScaleData): string {
+        return `note("${data.notes.join(' ')}")`;
     }
+    name: string = 'PianoScale';
     createData(): PianoScaleData {
         return {notes:[1, 2, 3, 4]};
     }
 }
 
 export interface IInstrumentViewProps<T extends IInstrumentData> {
-    instrumentData: T;
+    instrumentData: IInstrumentData;
     index: number;
 }
 // interface IInstrumentView<T extends IInstrument> {

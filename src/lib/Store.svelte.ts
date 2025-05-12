@@ -30,18 +30,23 @@ import { writable, type Writable } from "svelte/store";
 // })
 
 class AppStore {
+    instrumentsData = $state([] as IInstrumentData[]);
     instruments = $state([] as Instrument<any>[]);
     code = () => {
-        return this.instruments.map(i => i.generate()).join("\n");
+        return this.instruments.map((i,index) => i.generate(this.instrumentsData[index])).join("\n");
     };
     constructor() {
         this.instruments.push(new PianoScale());
-        this.instruments.push(new PianoScale({ notes: [5, 6] }));
+        this.instruments.push(new PianoScale());
+        this.instrumentsData.push(this.instruments[0].createData());
+        this.instrumentsData.push(this.instruments[0].createData());
+
     }
     setInstrument(index: number, data: IInstrumentData) {
         // this.instruments[index].data = data;
         // !!!! state must be IInstrumentData[]
-        this.instruments[index] = {...this.instruments[index], data };
+        // this.instruments[index] = {...this.instruments[index], data };
+        this.instrumentsData[index] = data;
         // this.instruments = [...this.instruments, this.instruments[0]]; // trigger reactivity
     };
 }

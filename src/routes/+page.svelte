@@ -21,7 +21,9 @@
 	}
 	let title = 'Rave';
 
-    let code = store.code();
+    console.log($state.snapshot(store.instruments));
+    console.log($state.snapshot(store.instrumentsData));
+    let code = $state(store.code());
     $effect(() => {
         console.log('store changed', $state.snapshot(store.instruments));
         code = store.code();
@@ -67,7 +69,7 @@
         <div class="card preset-outlined-surface-200-800 bg-surface-50-950 p-5 space-y-5">
 			<p>i {index}</p>
 			<PianoScaleView
-				instrumentData={instrumentView.data}
+				instrumentData={store.instrumentsData[index]}
 				index={index}
 			/>
         </div>
