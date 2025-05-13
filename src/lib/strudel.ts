@@ -32,7 +32,7 @@ if (import.meta.hot) {
   }
 
 class StrudelWrapper {
-    evaluate(code: string): void { repls.evaluate(code); }
+    evaluate(code: string): void { console.log(repls.evaluate(code)); }
     isPlaying: Writable<boolean> = writable(false);
     /**
      *

@@ -49,7 +49,7 @@ export type PianoScaleData = {
 
 export class PianoScale extends Instrument<PianoScaleData> {
     protected generate_(data: PianoScaleData): string {
-        return `note("${data.notes.join(' ')}")`;
+        return `n("${data.notes.join(' ')}").scale("C2:minor").sound("sawtooth").n(4)`;
     }
     name: string = 'PianoScale';
     createData(): PianoScaleData {

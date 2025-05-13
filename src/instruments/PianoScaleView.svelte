@@ -5,7 +5,7 @@
 
     let rnd = () => {
         const data  = {notes: instrumentData.notes.map((note) => {
-            return Math.floor(Math.random() * 7);
+            return Math.floor(7+Math.random() * 7);
         })};
         store.setInstrument(index, data);
         console.log($state.snapshot(store.instruments))

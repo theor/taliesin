@@ -33,13 +33,20 @@ class AppStore {
     instrumentsData = $state([] as IInstrumentData[]);
     instruments = $state([] as Instrument<any>[]);
     code = () => {
-        return this.instruments.map((i,index) => i.generate(this.instrumentsData[index])).join("\n");
+        return this.instruments.map((i,index) => `$: ${i.generate(this.instrumentsData[index])}`).join("\n");
     };
+    createInstrument<T extends Instrument<TD>, TD extends IInstrumentData>(instr: T, data?: Partial<TD>){
+        // const instr = new T();
+        this.instruments.push(instr);
+        let rdata = instr.createData();
+        if(data)
+            rdata = {...rdata, ...data};
+        this.instrumentsData.push(rdata);
+
+    }
     constructor() {
-        this.instruments.push(new PianoScale());
-        this.instruments.push(new PianoScale());
-        this.instrumentsData.push(this.instruments[0].createData());
-        this.instrumentsData.push(this.instruments[0].createData());
+        this.createInstrument(new PianoScale(), {notes:[1,3,5]});
+        this.createInstrument(new PianoScale(), {notes:[1,2,3,4]});
 
     }
     setInstrument(index: number, data: IInstrumentData) {

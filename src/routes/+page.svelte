@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { AppBar, } from '@skeletonlabs/skeleton-svelte';
+	import { AppBar } from '@skeletonlabs/skeleton-svelte';
 	import Menu from '@lucide/svelte/icons/menu';
 
 	import { network, strudel, store, type IInstrumentData } from '$lib';
@@ -13,7 +13,10 @@
 		// console.log(event.key, event.code);
 
 		if (event.code === 'Space') {
-			strudel.toggle();
+            // console.log(strudel.isPlaying)
+			// if (strudel.isPlaying) strudel.stop();
+			// else
+             strudel.evaluate(code);
 		}
 		if (event.code === 'Escape') {
 			strudel.stop();
@@ -21,16 +24,15 @@
 	}
 	let title = 'Rave';
 
-    console.log($state.snapshot(store.instruments));
-    console.log($state.snapshot(store.instrumentsData));
-    let code = $state(store.code());
-    $effect(() => {
-        console.log('store changed', $state.snapshot(store.instruments));
-        code = store.code();
-    });
+	console.log($state.snapshot(store.instruments));
+	console.log($state.snapshot(store.instrumentsData));
+	let code = $state(store.code());
+	$effect(() => {
+		console.log('store changed', $state.snapshot(store.instruments));
+		code = store.code();
+	});
 
 	$inspect(store);
-
 
 	function onChange(i: number, instrumentData: IInstrumentData) {
 		console.log('onChange', i, instrumentData);
@@ -59,20 +61,17 @@
 	</AppBar>
 
 	<div class="h-100% p-4 grid grid-cols-4 gap-4">
-        <div class="card preset-outlined-surface-200-800 bg-surface-50-950 p-5 space-y-5">
-            Code
-            <pre>
+		<div class="card preset-outlined-surface-200-800 bg-surface-50-950 p-5 space-y-5">
+			Code
+			<pre>
 {code}
             </pre>
-        </div>
+		</div>
 		{#each store.instruments as instrumentView, index}
-        <div class="card preset-outlined-surface-200-800 bg-surface-50-950 p-5 space-y-5">
-			<p>i {index}</p>
-			<PianoScaleView
-				instrumentData={store.instrumentsData[index]}
-				index={index}
-			/>
-        </div>
+			<div class="card preset-outlined-surface-200-800 bg-surface-50-950 p-5 space-y-5">
+				<p>i {index}</p>
+				<PianoScaleView instrumentData={store.instrumentsData[index]} {index} />
+			</div>
 		{/each}
 	</div>
 	<footer class=" p-4 h-10%">(footer)</footer>
