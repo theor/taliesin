@@ -1,11 +1,12 @@
 <script lang="ts">
-	import { store, type IInstrumentViewProps, type PianoScale, type PianoScaleData } from "$lib";
+	import { castProps, store, type IInstrumentViewProps, type ITypedInstrumentViewProps, type PianoScale, type PianoScaleData } from "$lib";
 
-    let {instrumentData,index}:  IInstrumentViewProps = $props();
-    const instrumentData2 = instrumentData as PianoScaleData;
+    // let p:  IInstrumentViewProps = $props();
+    // let {instrumentData,index} = p as ITypedInstrumentViewProps<PianoScaleData>;
+    let {instrumentData,index} = castProps<PianoScaleData>($props);
 
     let rnd = () => {
-        const data  = {notes: instrumentData2.notes.map((note) => {
+        const data  = {notes: instrumentData.notes.map((note) => {
             return Math.floor(7+Math.random() * 7);
         })};
         store.setInstrument(index, data);

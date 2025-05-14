@@ -61,6 +61,9 @@ export interface IInstrumentViewProps {
     instrumentData: IInstrumentData;
     index: number;
 }
+export function castProps<T extends IInstrumentData>(p:IInstrumentData): ITypedInstrumentViewProps<T>{
+    return p as ITypedInstrumentViewProps<T>;
+}
 export interface ITypedInstrumentViewProps<T extends IInstrumentData> {
     instrumentData: T;
     index: number;
