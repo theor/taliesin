@@ -57,8 +57,12 @@ export class PianoScale extends Instrument<PianoScaleData> {
     }
 }
 
-export interface IInstrumentViewProps<T extends IInstrumentData> {
+export interface IInstrumentViewProps {
     instrumentData: IInstrumentData;
+    index: number;
+}
+export interface ITypedInstrumentViewProps<T extends IInstrumentData> {
+    instrumentData: T;
     index: number;
 }
 // interface IInstrumentView<T extends IInstrument> {
