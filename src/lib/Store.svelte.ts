@@ -1,6 +1,6 @@
 import type { Component, ComponentType } from "svelte"
 import PianoScaleView from "../instruments/PianoScaleView.svelte";
-import { PianoScale, type IInstrument, type IInstrumentData, type IInstrumentViewProps, type Instrument } from "./interfaces";
+import { createInstrument, getInstrument, type PianoScaleData, type IInstrumentData, type IInstrumentViewProps } from "./interfaces";
 import { writable, type Writable } from "svelte/store";
 
 import { syncedStore, getYjsDoc } from "@syncedstore/core";
@@ -34,28 +34,35 @@ import { WebrtcProvider } from "y-webrtc";
 
 class AppStore {
     instrumentsData = $state([] as IInstrumentData[]);
-    instruments = $state([] as Instrument<any>[]);
+    // instruments = $state([] as Instrument<any>[]);
     code = () => {
-        return this.instruments.map((i,index) => `$: ${i.generate(this.instrumentsData[index])}`).join("\n");
+        return this.instrumentsData.map((i) => {
+            const instr = getInstrument(i);
+            return `$: ${instr.generate(i)}`;
+        }).join("\n");
     };
-    createInstrument<T extends Instrument<TD>, TD extends IInstrumentData>(instr: T, data?: Partial<TD>){
-        // const instr = new T();
-        this.instruments.push(instr);
-        let rdata = instr.createData();
-        if(data)
-            rdata = {...rdata, ...data};
-        this.instrumentsData.push(rdata);
+    // createInstrument<T extends Instrument<TD>, TD extends IInstrumentData>(instr: T, data?: Partial<TD>){
+    //     // const instr = new T();
+    //     this.instruments.push(instr);
+    //     let rdata = instr.createData();
+    //     if(data)
+    //         rdata = {...rdata, ...data};
+    //     this.instrumentsData.push(rdata);
 
-    }
+    // }
     constructor() {
-        this.createInstrument(new PianoScale(), {notes:[1,3,5]});
-        this.createInstrument(new PianoScale(), {notes:[1,2,3,4]});
+        this.instrumentsData.push(createInstrument<PianoScaleData>( { notes: [1, 2, 3] }));
+        this.instrumentsData.push(createInstrument<PianoScaleData>( { notes: [1, 2, 4,4] }));
+        // this.createInstrument(new PianoScale(), {notes:[1,3,5]});
+        // this.createInstrument(new PianoScale(), {notes:[1,2,3,4]});
 
     }
     setInstrument(index: number, data: IInstrumentData) {
         // this.instruments[index].data = data;
         // !!!! state must be IInstrumentData[]
         // this.instruments[index] = {...this.instruments[index], data };
+        console.log("setInstrument", index, $state.snapshot(data));
+        
         this.instrumentsData[index] = data;
         // this.instruments = [...this.instruments, this.instruments[0]]; // trigger reactivity
     };

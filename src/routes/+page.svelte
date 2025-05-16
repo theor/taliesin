@@ -24,11 +24,10 @@
 	}
 	let title = 'Rave';
 
-	console.log($state.snapshot(store.instruments));
 	console.log($state.snapshot(store.instrumentsData));
 	let code = $state(store.code());
 	$effect(() => {
-		console.log('store changed', $state.snapshot(store.instruments));
+		console.log('store changed', $state.snapshot(store.instrumentsData));
 		code = store.code();
 	});
 
@@ -67,10 +66,10 @@
 {code}
             </pre>
 		</div>
-		{#each store.instruments as instrumentView, index}
+		{#each store.instrumentsData as instrumentData, index}
 			<div class="card preset-outlined-surface-200-800 bg-surface-50-950 p-5 space-y-5">
 				<p>i {index}</p>
-				<PianoScaleView instrumentData={store.instrumentsData[index]} {index} />
+				<PianoScaleView instrumentData={instrumentData} {index} />
 			</div>
 		{/each}
 	</div>
