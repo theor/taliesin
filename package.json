@@ -70,6 +70,10 @@
 		"@strudel/tonal": "^1.2.0",
 		"@strudel/transpiler": "^1.2.0",
 		"@strudel/web": "^1.2.1",
-		"@strudel/webaudio": "^1.2.1"
+		"@strudel/webaudio": "^1.2.1",
+		"@syncedstore/core": "^0.6.0",
+		"@syncedstore/svelte": "^0.6.0",
+		"y-webrtc": "^10.3.0",
+		"yjs": "^13.6.27"
 	}
 }

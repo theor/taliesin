@@ -3,6 +3,9 @@ import PianoScaleView from "../instruments/PianoScaleView.svelte";
 import { PianoScale, type IInstrument, type IInstrumentData, type IInstrumentViewProps, type Instrument } from "./interfaces";
 import { writable, type Writable } from "svelte/store";
 
+import { syncedStore, getYjsDoc } from "@syncedstore/core";
+import { WebrtcProvider } from "y-webrtc";
+
 // interface State {
 //     instrumentViews: {
 //         // component: ComponentType<IInstrumentViewProps<any>>,
