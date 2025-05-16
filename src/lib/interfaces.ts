@@ -47,6 +47,7 @@ export interface PianoScaleData extends IInstrumentData {
 };
 export class PianoScale extends Instrument<PianoScaleData> {
     protected generate_(data: PianoScaleData): string {
+        return `s("bd sd,hh*16")`;
         return `n("${data.notes.join(' ')}").scale("C2:minor").sound("sawtooth").n(4)`;
     }
     name: string = 'PianoScale';

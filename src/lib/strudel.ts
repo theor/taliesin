@@ -1,11 +1,11 @@
-// import { initStrudel, evaluate, samples, hush } from '@strudel/web';
+import { initStrudel } from '@strudel/web';
 import { repl, evalScope } from '@strudel/core';
-import { getAudioContext, webaudioOutput, initAudioOnFirstClick, registerSynthSounds } from '@strudel/webaudio';
+import { getAudioContext, webaudioOutput, initAudioOnFirstClick, registerSynthSounds,  } from '@strudel/webaudio';
 import { transpiler } from '@strudel/transpiler';
 import { writable, type Writable } from 'svelte/store';
-// initStrudel({
-//     prebake: () => samples('github:tidalcycles/dirt-samples'),
-//   });
+initStrudel({
+    prebake: () => samples('github:tidalcycles/dirt-samples'),
+  });
 const ctx = getAudioContext();
 initAudioOnFirstClick();
 registerSynthSounds();
@@ -32,7 +32,7 @@ if (import.meta.hot) {
   }
 
 class StrudelWrapper {
-    evaluate(code: string): void { console.log(repls.evaluate(code)); }
+    evaluate(code: string): void { console.log(repls.evaluate(`samples('github:tidalcycles/dirt-samples')\n${code}`)); }
     isPlaying: Writable<boolean> = writable(false);
     /**
      *
