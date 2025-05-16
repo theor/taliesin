@@ -3,7 +3,8 @@
 
     // let p:  IInstrumentViewProps = $props();
     // let {instrumentData,index} = p as ITypedInstrumentViewProps<PianoScaleData>;
-    let {instrumentData,index} = castProps<PianoScaleData>($props);
+    const props:IInstrumentViewProps = $props();
+    let {instrumentData,index} = castProps<PianoScaleData>(props);
 
     let rnd = () => {
         const data  = {notes: instrumentData.notes.map((note) => {
