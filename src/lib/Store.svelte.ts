@@ -8,8 +8,8 @@ class AppStore {
         }).join("\n");
     };
     constructor() {
-        this.instrumentsData.push(createInstrument<PianoScaleData>( { notes: [1, 2, 3] }));
-        this.instrumentsData.push(createInstrument<PianoScaleData>( { notes: [1, 2, 4,4] }));
+        this.instrumentsData.push(createInstrument( { instrumentName:"PianoScale", notes: [1, 2, 3] }));
+        this.instrumentsData.push(createInstrument({instrumentName:"Drum"} ));
     }
     setInstrument(index: number, data: IInstrumentData) {
         console.log("setInstrument", index, $state.snapshot(data));

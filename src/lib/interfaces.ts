@@ -47,7 +47,6 @@ export interface PianoScaleData extends IInstrumentData {
 };
 export class PianoScale extends Instrument<PianoScaleData> {
     protected generate_(data: PianoScaleData): string {
-        return `s("bd sd,hh*16")`;
         return `n("${data.notes.join(' ')}").scale("C2:minor").sound("sawtooth").n(4)`;
     }
     name: string = 'PianoScale';
@@ -56,10 +55,35 @@ export class PianoScale extends Instrument<PianoScaleData> {
     }
 }
 
+enum DrumNote {
+    kick = 'bd',
+    snare = 'sd',
+    hiHat = 'hh',
+    clap = 'cp',
+    crash = 'cr',
+    ride = 'rd',
+    highTom = 'ht',
+    medTom = 'mt',
+    lowTom = 'lt',
+}
+export interface DrumData extends IInstrumentData {
+    notes: DrumNote[];
+};
+export class Drum extends Instrument<DrumData> {
+    protected generate_(data: DrumData): string {
+        return `s("${data.notes.join(' ')}")`;
+    }
+    name: string = 'Drum';
+    createData_() {
+        return {notes:[DrumNote.kick, DrumNote.snare, DrumNote.hiHat]};
+    }
+}
+
 
 
 const instrumentMap: { [key: string]: IInstrument } = {
     'PianoScale': new PianoScale(),
+    'Drum': new Drum(),
 }
 export function getInstrument<TD extends IInstrumentData>(data:TD): Instrument<TD> {
     const instr = instrumentMap[data.instrumentName];
@@ -69,8 +93,8 @@ export function getInstrument<TD extends IInstrumentData>(data:TD): Instrument<T
         throw new Error(`Instrument ${name} not found`);
     }
 }
-export function createInstrument<TD extends IInstrumentData>(d?: Partial<TD>): TD {
-    var instr = instrumentMap['PianoScale'];
+export function createInstrument<TD extends IInstrumentData>(d: Partial<TD> & IInstrumentData): TD {
+    var instr = instrumentMap[d.instrumentName!] as Instrument<TD>;
     var baseData = instr.createData() as TD;
     if(d)
     {

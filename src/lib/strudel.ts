@@ -3,9 +3,9 @@ import { repl, evalScope } from '@strudel/core';
 import { getAudioContext, webaudioOutput, initAudioOnFirstClick, registerSynthSounds,  } from '@strudel/webaudio';
 import { transpiler } from '@strudel/transpiler';
 import { writable, type Writable } from 'svelte/store';
-initStrudel({
-    prebake: () => samples('github:tidalcycles/dirt-samples'),
-  });
+// initStrudel({
+//     prebake: () => samples('github:tidalcycles/dirt-samples'),
+//   });
 const ctx = getAudioContext();
 initAudioOnFirstClick();
 registerSynthSounds();
