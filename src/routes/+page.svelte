@@ -33,6 +33,8 @@
 
 	$inspect(store);
 
+	const commands = store.commands;
+
 	function onChange(i: number, instrumentData: IInstrumentData) {
 		console.log('onChange', i, instrumentData);
 		store.setInstrument(i, instrumentData);
@@ -62,6 +64,9 @@
 	<div class="h-100% p-4 grid grid-cols-2 gap-4">
 		<div class="card preset-outlined-surface-200-800 bg-surface-50-950 p-5 space-y-5">
 			Code
+			<pre>
+{JSON.stringify($commands.commands, null, 2)}
+			</pre>
 			<pre>
 {code}
             </pre>

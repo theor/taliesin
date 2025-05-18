@@ -82,8 +82,8 @@ export class Drum extends Instrument<DrumData> {
 
 
 const instrumentMap: { [key: string]: IInstrument } = {
-    'PianoScale': new PianoScale(),
-    'Drum': new Drum(),
+    PianoScale: new PianoScale(),
+    Drum: new Drum(),
 }
 export function getInstrument<TD extends IInstrumentData>(data:TD): Instrument<TD> {
     const instr = instrumentMap[data.instrumentName];
@@ -103,8 +103,6 @@ export function createInstrument<TD extends IInstrumentData>(d: Partial<TD> & II
     }
     else
         return baseData;
-
-
 } 
 
 
