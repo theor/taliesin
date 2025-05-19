@@ -31,6 +31,7 @@
 	<!--     <pre>
         {instrument.generate()}
     </pre> -->
+	<p>notes: {instrumentData.notes.length}</p>
 	<pre>data: {JSON.stringify(instrumentData)}</pre>
-	<button onclick={rnd}>Randomize</button>
+	<button class="btn preset-filled my-4" onclick={rnd}>Randomize</button>
 </div>

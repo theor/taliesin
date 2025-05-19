@@ -1,4 +1,4 @@
-import { createInstrument, getInstrument, type PianoScaleData, type IInstrumentData, type IInstrumentViewProps } from "./interfaces";
+import { createInstrument, getInstrument, type PianoScaleData, type IInstrumentData, type IInstrumentViewProps, Status } from "./interfaces";
 import { syncedStore, getYjsValue, getYjsDoc } from "@syncedstore/core";
 import { svelteSyncedStore } from "@syncedstore/svelte";
 import { WebrtcProvider } from "y-webrtc";
@@ -13,7 +13,7 @@ type PlayCommand = {
 type SetDataCommand = {
     name: "setData";
     index: number;
-    value: {};
+    value: Partial<IInstrumentData>;
 }
 type Command = SetDataCommand | PlayCommand;
 
@@ -40,15 +40,32 @@ class AppStore {
             return `$: ${instr.generate(i)}`;
         }).join("\n");
     };
+    status(): Status {
+        if(this.webrtcProvider.connected)
+            return Status.connected;
+        return Status.disconnected;
+    }
     constructor() {
         this.instrumentsData.push(createInstrument( { instrumentName:"PianoScale", notes: [1, 2, 3] }));
         this.instrumentsData.push(createInstrument({instrumentName:"Drum"} ));
+        // this.webrtcProvider.on("synced", x => console.error("synced", x, $state.snapshot(this.synchedStore)));
         this.webrtcProvider.connect();
     }
     setInstrument(index: number, data: IInstrumentData) {
         console.log("setInstrument", index, $state.snapshot(data));
         
         this.instrumentsData[index] = data;
+    };
+    setInstrumentPartial = (index: number, data: Partial<IInstrumentData>) => {
+        
+        // this.instrumentsData[index] = Object.assign(this.instrumentsData[index], data);
+        
+        this.instrumentsData[index] = {
+            ...this.instrumentsData[index],
+            ...data
+        };
+        this.instrumentsData = [...this.instrumentsData];
+        console.log("setInstrumentPartial", index, data, $state.snapshot(this.instrumentsData));
     };
 }
 

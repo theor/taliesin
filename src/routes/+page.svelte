@@ -2,21 +2,20 @@
 	import { AppBar } from '@skeletonlabs/skeleton-svelte';
 	import Menu from '@lucide/svelte/icons/menu';
 
-	import { network, strudel, store, type IInstrumentData } from '$lib';
+	import { strudel, store, type IInstrumentData } from '$lib';
 	import '../main.scss';
 	import Network from '../components/Network.svelte';
 	import Transport from '../components/Transport.svelte';
 	import PianoScaleView from '../instruments/PianoScaleView.svelte';
-	console.log(network.id + ' ' + network.status);
 
 	function onKeyDown(event: KeyboardEvent) {
 		// console.log(event.key, event.code);
 
 		if (event.code === 'Space') {
-            // console.log(strudel.isPlaying)
+			// console.log(strudel.isPlaying)
 			// if (strudel.isPlaying) strudel.stop();
 			// else
-             strudel.evaluate(code);
+			strudel.evaluate(code);
 		}
 		if (event.code === 'Escape') {
 			strudel.stop();
@@ -27,7 +26,7 @@
 	console.log($state.snapshot(store.instrumentsData));
 	let code = $state(store.code());
 	$effect(() => {
-		console.log('store changed', $state.snapshot(store.instrumentsData));
+		console.log('store changed', $state.snapshot(store.instrumentsData), store.instrumentsData[0]);
 		code = store.code();
 	});
 
@@ -35,17 +34,24 @@
 
 	const commands = store.commands;
 
-	function onChange(i: number, instrumentData: IInstrumentData) {
-		console.log('onChange', i, instrumentData);
-		store.setInstrument(i, instrumentData);
-	}
+	$effect(() => {
+		const commandsSnapshot = $state.snapshot($commands.commands);
+		console.log('commands changed', commands);
+		commandsSnapshot.forEach((command) => {
+			if (command.name === 'setData') {
+				console.warn('cmd', $state.snapshot(command.value));
+				store.setInstrumentPartial(command.index, command.value);
+			}
+		});
+		store.clearCommands();
+	});
 </script>
 
-<div class="h-screen grid grid-rows-[auto_1fr_auto]">
+<div class="grid h-screen grid-rows-[auto_1fr_auto]">
 	<AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block">
 		{#snippet lead()}
 			<!-- <ArrowLeft size={24} /> -->
-			<Network {network} />
+			<Network  />
 		{/snippet}
 		{#snippet trail()}
 			<div class="hidden space-x-4 sm:flex">
@@ -61,10 +67,10 @@
 		<span>{title}</span>
 	</AppBar>
 
-	<div class="h-100% p-4 grid grid-cols-2 gap-4">
-		<div class="card preset-outlined-surface-200-800 bg-surface-50-950 p-5 space-y-5">
+	<div class="h-100% grid grid-cols-2 gap-4 p-4">
+		<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-5 p-5">
 			Code
-			<button onclick={() => store.clearCommands()}>Clear</button>
+			<button class="btn preset-filled ml-4" onclick={() => store.clearCommands()}>Clear</button>
 			<pre>
 {JSON.stringify($commands.commands, null, 2)}
 			</pre>
@@ -73,13 +79,15 @@
             </pre>
 		</div>
 		{#each store.instrumentsData as instrumentData, index}
-			<div class="card preset-outlined-surface-200-800 bg-surface-50-950 p-5 space-y-5">
-				<p>i {index}</p>
-				<PianoScaleView instrumentData={instrumentData} {index} />
-			</div>
+			{#key instrumentData}
+				<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-5 p-5">
+					<p>i {index}</p>
+					<PianoScaleView {instrumentData} {index} />
+				</div>
+			{/key}
 		{/each}
 	</div>
-	<footer class=" p-4 h-10%">(footer)</footer>
+	<footer class=" h-10% p-4">(footer)</footer>
 </div>
 
 <!-- <main class="container">

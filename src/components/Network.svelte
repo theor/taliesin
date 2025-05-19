@@ -1,10 +1,6 @@
 <script lang="ts">
-	import type { INetwork } from "$lib";
+	import { store } from "$lib";
 
-    interface Props {
-        network: INetwork;
-    }
-  const { network }: Props = $props();
 
     // const network = {
     //     id: '12345',
@@ -13,6 +9,5 @@
     
 </script>
 <div class="flex items-center gap-4">
-    <p>{network.id}</p>
-    <p class="chip preset-filled">{network.status}</p>
+    <p class="chip preset-filled">{store.status()}</p>
 </div>
