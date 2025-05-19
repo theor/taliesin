@@ -45,10 +45,16 @@ class AppStore {
             return Status.connected;
         return Status.disconnected;
     }
+    id() {
+        return this.webrtcProvider.doc.clientID;
+    }
     constructor() {
         this.instrumentsData.push(createInstrument( { instrumentName:"PianoScale", notes: [1, 2, 3] }));
         this.instrumentsData.push(createInstrument({instrumentName:"Drum"} ));
+        
         // this.webrtcProvider.on("synced", x => console.error("synced", x, $state.snapshot(this.synchedStore)));
+        // this.webrtcProvider.awareness.on('update', (x:any) => console.log("update awareness", x));
+        // this.webrtcProvider.awareness.on('change', (x:any) => console.log("change awareness", x));
         this.webrtcProvider.connect();
     }
     setInstrument(index: number, data: IInstrumentData) {

@@ -9,5 +9,7 @@
     
 </script>
 <div class="flex items-center gap-4">
+    <p>{store.id()}</p>
     <p class="chip preset-filled">{store.status()}</p>
+
 </div>
