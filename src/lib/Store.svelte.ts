@@ -18,6 +18,13 @@ type SetDataCommand = {
 type Command = SetDataCommand | PlayCommand;
 
 class AppStore {
+	setInstrumentData<TD extends IInstrumentData>(_: TD, index: number, data: Partial<TD>) {
+		const commands = this.commands;
+        this.synchedStore.commands.push({ name: "setData", index, value: data });
+	}
+    clearCommands() {
+        this.synchedStore.commands.splice(0, this.synchedStore.commands.length);
+    }
     synchedStore = syncedStore({ commands: [] as Command[] });
     commands = svelteSyncedStore(this.synchedStore);
     instrumentsData = $state([] as IInstrumentData[]);

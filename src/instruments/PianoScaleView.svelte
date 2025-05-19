@@ -8,20 +8,20 @@
 
 	const props: IInstrumentViewProps = $props();
 	let instrumentData = props.instrumentData as PianoScaleData;
-	const commands = store.commands;
 
 	let rnd = () => {
 		const notes = instrumentData.notes.map(() => {
 			return Math.floor(7 + Math.random() * 7);
 		});
-		$commands.commands.push({
-			name: 'setData',
-			index: props.index,
+		store.setInstrumentData(instrumentData, props.index, { notes});
+		// $commands.commands.push({
+		// 	name: 'setData',
+		// 	index: props.index,
 
-			value: {
-				notes,
-			}
-		});
+		// 	value: {
+		// 		notes,
+		// 	}
+		// });
 		// instrumentData.notes = notes;
 	};
 </script>
