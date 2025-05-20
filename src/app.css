@@ -5,3 +5,9 @@
 @import '@skeletonlabs/skeleton/themes/cerberus';
 
 @source '../node_modules/@skeletonlabs/skeleton-svelte/dist';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+.text-primary-300-700 {
+    color: light-dark(var(--color-primary-300), var(--color-primary-700));
+  }

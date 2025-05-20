@@ -21,10 +21,10 @@ class AppStore {
 	removeInstrument(index: number): any {
 		this.synchedStore.instrumentsData.splice(index, 1);
 	}
-    setInstrumentData<TD extends IInstrumentData>(_: TD, index: number, data: Partial<TD>) {
-        // const commands = this.commands;
-        // this.synchedStore.commands.push({ name: "setData", index, value: data });
-    }
+    // setInstrumentData<TD extends IInstrumentData>(_: TD, index: number, data: Partial<TD>) {
+    //     // const commands = this.commands;
+    //     // this.synchedStore.commands.push({ name: "setData", index, value: data });
+    // }
     clearCommands() {
         // this.synchedStore.commands.splice(0, this.synchedStore.commands.length);
     }
@@ -33,7 +33,7 @@ class AppStore {
     // instrumentsData = $state([] as IInstrumentData[]);
     instrumentsData = svelteSyncedStore(this.synchedStore);
     doc = getYjsDoc(this.synchedStore);
-    webrtcProvider = new WebrtcProvider("rave/#", this.doc, {
+    webrtcProvider = new WebrtcProvider("rave/#2", this.doc, {
         signaling: [
             // 'wss://y-webrtc-ckynwnzncc.now.sh', 
             'ws://localhost:4444'
@@ -59,23 +59,25 @@ class AppStore {
         // this.webrtcProvider.on("synced", x => console.error("synced", x, $state.snapshot(this.synchedStore)));
         // this.webrtcProvider.awareness.on('update', (x:any) => console.log("update awareness", x));
         // this.webrtcProvider.awareness.on('change', (x:any) => console.log("change awareness", x));
-        this.webrtcProvider.on('synced', x => console.error("synced", x, this.doc));
-        this.doc.on('load', x => console.error("loaded", this.doc));
-        this.doc.on('update', x => console.error("updateed", this.doc));
+        // this.webrtcProvider.on('synced', x => console.error("synced", x, this.doc));
+        // this.doc.on('load', x => console.error("loaded", this.doc));
+        // this.doc.on('update', x => console.error("updateed", this.doc));
 
         this.webrtcProvider.connect();
     }
     init(host: boolean) {
         if (host) {
-            this.synchedStore.instrumentsData.push(createInstrument({ instrumentName: "PianoScale", notes: [1, 2, 3] }));
+            this.synchedStore.instrumentsData.push(createInstrument({ instrumentName: "PianoScale",
+                //  notes: [1, 2, 3,undefined,4,5,3,undefined]
+                 }));
             this.synchedStore.instrumentsData.push(createInstrument({ instrumentName: "Drum" }));
 
         }
     }
     setInstrument(index: number, data: IInstrumentData) {
         console.log("setInstrument", index, $state.snapshot(data));
-
-        this.synchedStore.instrumentsData[index] = data;
+        const snapshot = $state.snapshot(data);
+        this.synchedStore.instrumentsData.splice(index, 1, snapshot);
     };
     setInstrumentPartial = (index: number, data: Partial<IInstrumentData>) => {
 

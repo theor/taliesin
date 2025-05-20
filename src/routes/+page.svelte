@@ -22,7 +22,7 @@ import {X} from '@lucide/svelte';
 		if (event.code === 'Escape') {
 			strudel.stop();
 		}
-		if(event.code === 'A')
+		if(event.code === 'KeyA')
 		{
 			store.init(true);
 		}
@@ -72,7 +72,7 @@ import {X} from '@lucide/svelte';
 		<span>{title}</span>
 	</AppBar>
 
-	<div class="h-100% grid grid-cols-2 gap-4 p-4">
+	<div class="h-100% grid col-span-2 gap-4 p-4">
 		<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-5 p-5">
 			Code
 			<button class="btn preset-filled ml-4" onclick={() => store.clearCommands()}>Clear</button>

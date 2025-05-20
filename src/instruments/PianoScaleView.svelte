@@ -5,6 +5,7 @@
 		type IInstrumentViewProps,
 		type PianoScaleData
 	} from '$lib';
+	import Sequencer from './Sequencer.svelte';
 
 	const props: IInstrumentViewProps = $props();
 	let instrumentData = props.instrumentData as PianoScaleData;
@@ -13,7 +14,7 @@
 		const notes = instrumentData.notes.map(() => {
 			return Math.floor(7 + Math.random() * 7);
 		});
-		store.setInstrumentData(instrumentData, props.index, { notes});
+		// store.setInstrumentData(instrumentData, props.index, { notes});
 		// $commands.commands.push({
 		// 	name: 'setData',
 		// 	index: props.index,
@@ -34,4 +35,5 @@
 	<p>notes: {instrumentData.notes.length}</p>
 	<pre>data: {JSON.stringify(instrumentData)}</pre>
 	<button class="btn preset-filled my-4" onclick={rnd}>Randomize</button>
+	<Sequencer instrumentData={instrumentData} index={props.index} />
 </div>

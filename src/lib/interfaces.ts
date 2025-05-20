@@ -23,8 +23,10 @@ export interface IInstrument{
     name: string;
     generate: (data: IInstrumentData) => string;
     createData: () => IInstrumentData;
+    notes: string[];
 }
 export abstract  class Instrument<T extends IInstrumentData> implements IInstrument {
+    notes: string[] = [];;
     name: string = this.constructor.name;
     
     abstract createData_():  Omit<T,'instrumentName'>;
@@ -43,19 +45,20 @@ export interface IInstrumentData {
 }
 
 export interface PianoScaleData extends IInstrumentData {
-    notes: number[];
+    notes: (number|undefined)[];
 };
 export class PianoScale extends Instrument<PianoScaleData> {
     protected generate_(data: PianoScaleData): string {
         return `n("${data.notes.join(' ')}").scale("C2:minor").sound("sawtooth").n(4)`;
     }
     name: string = 'PianoScale';
+    notes = [1,2,3,4,5,6,7].map(x => x.toString());
     createData_() {
         return {notes:[1, 2, 3, 4]};
     }
 }
 
-enum DrumNote {
+export enum DrumNote {
     kick = 'bd',
     snare = 'sd',
     hiHat = 'hh',
@@ -67,15 +70,36 @@ enum DrumNote {
     lowTom = 'lt',
 }
 export interface DrumData extends IInstrumentData {
-    notes: DrumNote[];
+    notes: {[key in DrumNote]: (0|1)[]};
 };
 export class Drum extends Instrument<DrumData> {
+    notes = Object.values(DrumNote);
     protected generate_(data: DrumData): string {
-        return `s("${data.notes.join(' ')}")`;
+        const joined = Object.entries(data.notes).map(t => {
+            const [k, v] = t;
+            var p = v.map(x =>x == 1 ? k : "~").join(" ");
+            return p;
+        }).join(",");// `s("${data.notes.join(' ')}")`;
+        return `s("${joined}")`;
     }
     name: string = 'Drum';
     createData_() {
-        return {notes:[DrumNote.kick, DrumNote.snare, DrumNote.hiHat]};
+        let o = {notes: {}} as DrumData;
+
+        o.notes[DrumNote.kick] = [1,0,0,0,1,0,0,0];
+        o.notes[DrumNote.snare] = [0,0,1,0,0,0,1,0];
+        o.notes[DrumNote.hiHat] = [1,1,1,1,1,1,1,1];
+        return o;
+        // return {notes:[
+            // [DrumNote.kick,DrumNote.hiHat],
+            // [DrumNote.hiHat],
+            // [DrumNote.snare, DrumNote.hiHat],
+            // [DrumNote.hiHat],
+            // [DrumNote.kick,DrumNote.hiHat],
+            // [DrumNote.hiHat],
+            // [DrumNote.snare, DrumNote.hiHat],
+            // [DrumNote.hiHat],
+            // ]};
     }
 }
 
@@ -85,12 +109,14 @@ const instrumentMap: { [key: string]: IInstrument } = {
     PianoScale: new PianoScale(),
     Drum: new Drum(),
 }
-export function getInstrument<TD extends IInstrumentData>(data:TD): Instrument<TD> {
+export function getInstrument<TD extends IInstrumentData>(data:TD): Instrument<TD> | undefined {
     const instr = instrumentMap[data.instrumentName];
     if (instr) {
         return instr as Instrument<TD>;
     } else {
-        throw new Error(`Instrument ${name} not found`);
+        console.error("Instrument not found", data);
+        return undefined;
+        // throw new Error(`Instrument ${name} not found`);
     }
 }
 export function createInstrument<TD extends IInstrumentData>(d: Partial<TD> & IInstrumentData): TD {
