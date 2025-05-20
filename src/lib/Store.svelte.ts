@@ -18,30 +18,36 @@ type SetDataCommand = {
 type Command = SetDataCommand | PlayCommand;
 
 class AppStore {
-	setInstrumentData<TD extends IInstrumentData>(_: TD, index: number, data: Partial<TD>) {
-		const commands = this.commands;
-        this.synchedStore.commands.push({ name: "setData", index, value: data });
+	removeInstrument(index: number): any {
+		this.synchedStore.instrumentsData.splice(index, 1);
 	}
-    clearCommands() {
-        this.synchedStore.commands.splice(0, this.synchedStore.commands.length);
+    setInstrumentData<TD extends IInstrumentData>(_: TD, index: number, data: Partial<TD>) {
+        // const commands = this.commands;
+        // this.synchedStore.commands.push({ name: "setData", index, value: data });
     }
-    synchedStore = syncedStore({ commands: [] as Command[] });
-    commands = svelteSyncedStore(this.synchedStore);
-    instrumentsData = $state([] as IInstrumentData[]);
+    clearCommands() {
+        // this.synchedStore.commands.splice(0, this.synchedStore.commands.length);
+    }
+    synchedStore = syncedStore({ instrumentsData: [] as IInstrumentData[] });
+    // commands = svelteSyncedStore(this.synchedStore);
+    // instrumentsData = $state([] as IInstrumentData[]);
+    instrumentsData = svelteSyncedStore(this.synchedStore);
     doc = getYjsDoc(this.synchedStore);
-    webrtcProvider = new WebrtcProvider("rave/#", this.doc,{ signaling: [
-        // 'wss://y-webrtc-ckynwnzncc.now.sh', 
-        'ws://localhost:4444'
-    ] });
+    webrtcProvider = new WebrtcProvider("rave/#", this.doc, {
+        signaling: [
+            // 'wss://y-webrtc-ckynwnzncc.now.sh', 
+            'ws://localhost:4444'
+        ]
+    });
     // commands = $state([] as Command[]);
     code = () => {
-        return this.instrumentsData.map((i) => {
+        return this.synchedStore.instrumentsData.map((i) => {
             const instr = getInstrument(i);
             return `$: ${instr.generate(i)}`;
         }).join("\n");
     };
     status(): Status {
-        if(this.webrtcProvider.connected)
+        if (this.webrtcProvider.connected)
             return Status.connected;
         return Status.disconnected;
     }
@@ -49,28 +55,37 @@ class AppStore {
         return this.webrtcProvider.doc.clientID;
     }
     constructor() {
-        this.instrumentsData.push(createInstrument( { instrumentName:"PianoScale", notes: [1, 2, 3] }));
-        this.instrumentsData.push(createInstrument({instrumentName:"Drum"} ));
-        
+
         // this.webrtcProvider.on("synced", x => console.error("synced", x, $state.snapshot(this.synchedStore)));
         // this.webrtcProvider.awareness.on('update', (x:any) => console.log("update awareness", x));
         // this.webrtcProvider.awareness.on('change', (x:any) => console.log("change awareness", x));
+        this.webrtcProvider.on('synced', x => console.error("synced", x, this.doc));
+        this.doc.on('load', x => console.error("loaded", this.doc));
+        this.doc.on('update', x => console.error("updateed", this.doc));
+
         this.webrtcProvider.connect();
+    }
+    init(host: boolean) {
+        if (host) {
+            this.synchedStore.instrumentsData.push(createInstrument({ instrumentName: "PianoScale", notes: [1, 2, 3] }));
+            this.synchedStore.instrumentsData.push(createInstrument({ instrumentName: "Drum" }));
+
+        }
     }
     setInstrument(index: number, data: IInstrumentData) {
         console.log("setInstrument", index, $state.snapshot(data));
-        
-        this.instrumentsData[index] = data;
+
+        this.synchedStore.instrumentsData[index] = data;
     };
     setInstrumentPartial = (index: number, data: Partial<IInstrumentData>) => {
-        
+
         // this.instrumentsData[index] = Object.assign(this.instrumentsData[index], data);
-        
-        this.instrumentsData[index] = {
-            ...this.instrumentsData[index],
+
+        this.synchedStore.instrumentsData[index] = {
+            ...this.synchedStore.instrumentsData[index],
             ...data
         };
-        this.instrumentsData = [...this.instrumentsData];
+        // this.synchedStore.instrumentsData = [...this.synchedStore.instrumentsData];
         console.log("setInstrumentPartial", index, data, $state.snapshot(this.instrumentsData));
     };
 }
