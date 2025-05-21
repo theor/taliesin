@@ -36,7 +36,7 @@
         {instrument.generate()}
     </pre> -->
 	<p>notes: {instrumentData.notes.length}</p>
-	<pre>data: {JSON.stringify(instrumentData)}</pre>
+	<pre class="whitespace-normal">data: {JSON.stringify(instrumentData)}</pre>
 	<button class="btn preset-filled my-4" onclick={rnd}>Randomize</button>
 	{#if seq}
 	<Sequencer instrumentData={instrumentData} index={props.index} />

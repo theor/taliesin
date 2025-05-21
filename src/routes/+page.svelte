@@ -9,6 +9,7 @@
 	import PianoScaleView from '../instruments/PianoScaleView.svelte';
 import {X} from '@lucide/svelte';
 	const isHost = new URLSearchParams(window.location.search).getAll("join").length == 0;
+	store.init(isHost);
 
 	function onKeyDown(event: KeyboardEvent) {
 		// console.log(event.key, event.code);
@@ -24,7 +25,7 @@ import {X} from '@lucide/svelte';
 		}
 		if(event.code === 'KeyA')
 		{
-			store.init(true);
+			store.preset();
 		}
 	}
 	let title = 'Rave';
@@ -33,7 +34,7 @@ import {X} from '@lucide/svelte';
 	// console.log($instrumentsData.instrumentsData);
 	let code = $state(store.code());
 	$effect(() => {
-		console.log('store changed', $state.snapshot($instrumentsData.instrumentsData), $instrumentsData.instrumentsData[0]);
+		console.log('store changed', $state.snapshot(instrumentsData.instrumentsData), instrumentsData.instrumentsData[0]);
 		code = store.code();
 		strudel.evaluate(code);
 
@@ -82,7 +83,7 @@ import {X} from '@lucide/svelte';
 {code}
             </pre>
 		</div>
-		{#each $instrumentsData.instrumentsData as instrumentData, index}
+		{#each instrumentsData.instrumentsData as instrumentData, index}
 			{#key instrumentData}
 				<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-5 p-5">
 					<header class="card-header flex justify-between">
