@@ -1,6 +1,6 @@
 import { createInstrument, getInstrument, type PianoScaleData, type IInstrumentData, type IInstrumentViewProps, Status } from "./interfaces";
 import { joinRoom } from 'trystero/nostr';
-import { selfId, type ActionSender } from 'trystero'
+import { selfId, type ActionSender, type JsonValue } from 'trystero'
 
 const config = {
     appId: 'rave',
@@ -22,31 +22,23 @@ type SetDataCommand = {
     value: Partial<IInstrumentData>;
 }
 type Command = SetDataCommand | PlayCommand;
-
+type WrappedInstrument = {
+    index: number;
+    instrument: IInstrumentData & {[key: string]: JsonValue};
+}
 class AppStore {
-    removeInstrument(index: number): any {
-        this.instrumentsData.instrumentsData.splice(index, 1);
-    }
-    // setInstrumentData<TD extends IInstrumentData>(_: TD, index: number, data: Partial<TD>) {
-    //     // const commands = this.commands;
-    //     // this.synchedStore.commands.push({ name: "setData", index, value: data });
-    // }
+	randomize(index: number) {
+		const instr = getInstrument(this.instrumentsData.instrumentsData[index]);
+        if (instr) {
+            const data = instr.randomize(this.instrumentsData.instrumentsData[index]);
+            this.setInstrumentPartial(index, data);
+        }
+	}
+    
     clearCommands() {
         // this.synchedStore.commands.splice(0, this.synchedStore.commands.length);
     }
-    // synchedStore = syncedStore({ instrumentsData: [] as IInstrumentData[] });
-    // commands = svelteSyncedStore(this.synchedStore);
-    // instrumentsData = $state([] as IInstrumentData[]);
     instrumentsData = $state({ instrumentsData: [] as IInstrumentData[] });
-    // instrumentsData = svelteSyncedStore(this.synchedStore);
-    // doc = getYjsDoc(this.synchedStore);
-    // webrtcProvider = new WebrtcProvider("rave/#2", this.doc, {
-    // signaling: [
-    // 'wss://y-webrtc-ckynwnzncc.now.sh', 
-    // 'ws://localhost:4444'
-    // ]
-    // });
-    // commands = $state([] as Command[]);
     code = () => {
         return this.instrumentsData.instrumentsData.map((i) => {
             const instr = getInstrument(i);
@@ -71,14 +63,22 @@ class AppStore {
     }
 
     sendState: ActionSender<IInstrumentData[]>;
+    sendInstrument: ActionSender<WrappedInstrument>;
+  
     constructor() {
-        const [sendState, onReceiveState] = room.makeAction<IInstrumentData[]>("rave");
+        const [sendState, onReceiveState] = room.makeAction<IInstrumentData[]>("state");
+        const [sendInstrument, onReceiveInstrument] = room.makeAction<WrappedInstrument>("instrument");
         this.sendState = sendState;
+        this.sendInstrument = sendInstrument;
         onReceiveState((data, peerId) => {
             if (this.host)
                 return;
             console.log("receiveState", data, peerId);
             this.instrumentsData.instrumentsData = data;
+        });
+        onReceiveInstrument((data, peerId) => {
+            console.log("receiveInstrument", data, peerId);
+            this.instrumentsData.instrumentsData.splice(data.index, 1,data.instrument);
         });
         // this.webrtcProvider.on("synced", x => console.error("synced", x, $state.snapshot(this.synchedStore)));
         // this.webrtcProvider.awareness.on('update', (x:any) => console.log("update awareness", x));
@@ -104,6 +104,7 @@ class AppStore {
         console.log("setInstrument", index, $state.snapshot(data));
         const snapshot = $state.snapshot(data);
         this.instrumentsData.instrumentsData.splice(index, 1, snapshot);
+        this.sendInstrument({index,instrument: snapshot})
     };
     setInstrumentPartial = (index: number, data: Partial<IInstrumentData>) => {
 
@@ -116,6 +117,9 @@ class AppStore {
         // this.synchedStore.instrumentsData = [...this.synchedStore.instrumentsData];
         console.log("setInstrumentPartial", index, data, $state.snapshot(this.instrumentsData));
     };
+    removeInstrument(index: number): any {
+        this.instrumentsData.instrumentsData.splice(index, 1);
+    }
 }
 
 export const store = new AppStore();

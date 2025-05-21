@@ -7,7 +7,10 @@
 		type IInstrumentViewProps,
 		type PianoScaleData
 	} from '$lib';
+	import { getGlobalContext } from '$lib/context';
 	import Sequencer from './Sequencer.svelte';
+
+	const ctx = getGlobalContext();
 
 	const props: IInstrumentViewProps = $props();
 	let instrumentData = props.instrumentData as PianoScaleData;
@@ -31,13 +34,13 @@
 </script>
 
 <div>
-	<h2>{instrumentData.instrumentName}</h2>
 	<!--     <pre>
         {instrument.generate()}
     </pre> -->
+	{#if ctx.debug}
 	<p>notes: {instrumentData.notes.length}</p>
 	<pre class="whitespace-normal">data: {JSON.stringify(instrumentData)}</pre>
-	<button class="btn preset-filled my-4" onclick={rnd}>Randomize</button>
+	{/if}
 	{#if seq}
 	<Sequencer instrumentData={instrumentData} index={props.index} />
 	{/if}

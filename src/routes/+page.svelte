@@ -7,8 +7,16 @@
 	import Network from '../components/Network.svelte';
 	import Transport from '../components/Transport.svelte';
 	import PianoScaleView from '../instruments/PianoScaleView.svelte';
-import {X} from '@lucide/svelte';
-	const isHost = new URLSearchParams(window.location.search).getAll("join").length == 0;
+import {X, Dices} from '@lucide/svelte';
+	import { setGlobalContext } from '$lib/context';
+
+	const params = new URLSearchParams(window.location.search);
+	const isHost = params.getAll("join").length == 0;
+	const isDebug = params.getAll("debug").length > 0;
+	setGlobalContext({
+		host: isHost,
+		debug: isDebug
+	});
 	store.init(isHost);
 
 	function onKeyDown(event: KeyboardEvent) {
@@ -34,7 +42,7 @@ import {X} from '@lucide/svelte';
 	// console.log($instrumentsData.instrumentsData);
 	let code = $state(store.code());
 	$effect(() => {
-		console.log('store changed', $state.snapshot(instrumentsData.instrumentsData), instrumentsData.instrumentsData[0]);
+		// console.log('store changed', $state.snapshot(instrumentsData.instrumentsData), instrumentsData.instrumentsData[0]);
 		code = store.code();
 		strudel.evaluate(code);
 
@@ -55,7 +63,7 @@ import {X} from '@lucide/svelte';
 	// });
 </script>
 
-<div class="grid h-screen grid-rows-[auto_1fr_auto]">
+<div class="h-screen flex flex-col">
 	<AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block">
 		{#snippet lead()}
 			<!-- <ArrowLeft size={24} /> -->
@@ -75,27 +83,33 @@ import {X} from '@lucide/svelte';
 		<span>{title}</span>
 	</AppBar>
 
-	<div class="h-100% grid col-span-2 gap-4 p-4">
-		<div class="invisible lg:visible card preset-outlined-surface-200-800 bg-surface-50-950 space-y-5 p-5">
+	<div class="flex-1 grid col-span-2 gap-4 p-4 ">
+		{#if isDebug}
+		<div class="hidden lg:flex card preset-outlined-surface-200-800 bg-surface-50-950 space-y-5 p-5">
 			Code
 			<button class="btn preset-filled ml-4" onclick={() => store.clearCommands()}>Clear</button>
 			<pre>
 {code}
             </pre>
 		</div>
+		{/if}
 		{#each instrumentsData.instrumentsData as instrumentData, index}
 			{#key instrumentData}
-				<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-5 p-5">
+				<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
 					<header class="card-header flex justify-between">
 						<span>{index} {instrumentData.instrumentName}</span>
-						<button class="btn btn-sm rounded-lg preset-outlined-error-500" onclick={() => store.removeInstrument(index)}><X/></button>
-					</header>
+						<div>
+						<button class="btn preset-filled py-1 px-2 mr-4" onclick={store.randomize(index)}><Dices size={16}/></button>
+
+						<button class="btn btn-xs rounded-lg preset-outlined-error-500 py-1 px-2" onclick={() => store.removeInstrument(index)}><X size="16"/></button>
+					</div>
+				</header>
 					<PianoScaleView {instrumentData} {index} />
 				</div>
 			{/key}
 		{/each}
 	</div>
-	<footer class=" h-10% p-4">(footer)</footer>
+	<!-- <footer class=" h-10% p-4">(footer)</footer> -->
 </div>
 
 <!-- <main class="container">

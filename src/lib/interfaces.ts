@@ -31,9 +31,14 @@ export interface IInstrument{
     createData: () => IInstrumentData;
     // sequencer(data: IInstrumentData): ISequencer|undefined ;
     sequencer: ISequencer|undefined;
+    randomize(data: IInstrumentData): IInstrumentData;
 
 }
 export abstract  class Instrument<T extends IInstrumentData> implements IInstrument {
+    randomize(data: IInstrumentData): IInstrumentData {
+        return this._randomize(data as T);
+    }
+    protected abstract _randomize(data: T): T;
     sequencer: ISequencer | undefined;
     // abstract sequencer(data: IInstrumentData): ISequencer|undefined ;
     notes: string[] = [];;
@@ -58,6 +63,9 @@ export interface PianoScaleData extends IInstrumentData {
     notes: (number|undefined)[];
 };
 export class PianoScale extends Instrument<PianoScaleData> {
+    protected _randomize(data: PianoScaleData): PianoScaleData {
+        return data;
+    }
     protected generate_(data: PianoScaleData): string {
         return `n("${data.notes.join(' ')}").scale("C2:minor").sound("sawtooth").n(4)`;
     }
@@ -103,6 +111,9 @@ class DrumSequencer implements ISequencer {
     }
 }
 export class Drum extends Instrument<DrumData> {
+    protected _randomize(data: DrumData): DrumData {
+        return data;
+    }
     // notes = Object.values(DrumNote);
     // sequencer(data: IInstrumentData): ISequencer|undefined {
     //     return new DrumSequencer(data as DrumData);
@@ -150,6 +161,8 @@ const instrumentMap: { [key: string]: IInstrument } = {
     Drum: new Drum(),
 }
 export function getInstrument<TD extends IInstrumentData>(data:TD): Instrument<TD> | undefined {
+    if(!data)
+        return undefined;
     const instr = instrumentMap[data.instrumentName];
     if (instr) {
         return instr as Instrument<TD>;

@@ -10,7 +10,7 @@ const ctx = getAudioContext();
 initAudioOnFirstClick();
 registerSynthSounds();
 
-evalScope(import('@strudel/core'), import('@strudel/mini'), import('@strudel/webaudio'), import('@strudel/tonal'));
+const initPromise = evalScope(import('@strudel/core'), import('@strudel/mini'), import('@strudel/webaudio'), import('@strudel/tonal'));
 
 const repls = repl({
   defaultOutput: webaudioOutput,
@@ -32,14 +32,20 @@ if (import.meta.hot) {
   }
 
 class StrudelWrapper {
-    evaluate(code: string): void { console.log(repls.evaluate(`samples('github:tidalcycles/dirt-samples')\n${code}`)); }
+    evaluate(code: string): Promise<void> { 
+        if(code === "")
+            return Promise.resolve();
+        console.log("Strudel evaluate!", code);
+        // console.log(
+        return repls.evaluate(`samples('github:tidalcycles/dirt-samples')\n${code}`)
+        // return repls.evaluate(`${code}`)
+    // );
+ }
     isPlaying: Writable<boolean> = writable(false);
     /**
      *
      */
     constructor() {
-        // repls.scheduler.onToggle()
-        writable
     }
    
     stop () {

@@ -14,7 +14,7 @@
     const seq = instr?.sequencer!;
 
 	const buttonClassOn = 'preset-filled-primary-500';
-    const buttonClassOff = 'preset-outlined-surface-200-800';
+    const buttonClassOff = 'preset-outlined-primary-500';
 
 	function toggleCell(note: string, i: number): any {
         seq.setCell(instrumentData,note, i, !seq.getCell(instrumentData, note, i));
@@ -42,10 +42,10 @@
 		{#each seq.tracks() as track, index}
 			
 			<div class="flex flex-row gap-1">
-				<div class="w-14 flex-none">{track}</div>
+				<div class="w-4 mr-1 flex-none">{track}</div>
 				{#each { length: 8 }, i}
 					{@const cell = seq.getCell(instrumentData,track, i)}
-					<a onclick={() => toggleCell(track, i)} class="btn flex-1 {cell ? buttonClassOn : buttonClassOff}" />
+					<a aria-label="seq-{index}-{i}" role="application" onclick={() => toggleCell(track, i)} class="btn flex-1 {cell ? buttonClassOn : buttonClassOff}" />
 				{/each}
 			</div>
 		{/each}
