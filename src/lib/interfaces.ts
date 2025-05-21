@@ -18,14 +18,24 @@ export enum Status {
 // }
 
 // export const network: INetwork = new TestNetwork();
-
+export interface ISequencer {
+    tracks(): string[];
+    
+    getCell(data:IInstrumentData,track: string, step: number) : boolean ;
+    setCell(data:IInstrumentData,track: string,step: number, value: boolean): void;
+    
+}
 export interface IInstrument{
     name: string;
     generate: (data: IInstrumentData) => string;
     createData: () => IInstrumentData;
-    notes: string[];
+    // sequencer(data: IInstrumentData): ISequencer|undefined ;
+    sequencer: ISequencer|undefined;
+
 }
 export abstract  class Instrument<T extends IInstrumentData> implements IInstrument {
+    sequencer: ISequencer | undefined;
+    // abstract sequencer(data: IInstrumentData): ISequencer|undefined ;
     notes: string[] = [];;
     name: string = this.constructor.name;
     
@@ -52,7 +62,7 @@ export class PianoScale extends Instrument<PianoScaleData> {
         return `n("${data.notes.join(' ')}").scale("C2:minor").sound("sawtooth").n(4)`;
     }
     name: string = 'PianoScale';
-    notes = [1,2,3,4,5,6,7].map(x => x.toString());
+    // notes = [1,2,3,4,5,6,7].map(x => x.toString());
     createData_() {
         return {notes:[1, 2, 3, 4]};
     }
@@ -72,8 +82,31 @@ export enum DrumNote {
 export interface DrumData extends IInstrumentData {
     notes: {[key in DrumNote]: (0|1)[]};
 };
+
+class DrumSequencer implements ISequencer {
+    tracks(): string[] {
+        return Object.values(DrumNote);
+    }
+    getCell(data:IInstrumentData, track: string, step: number): boolean {
+        const trackData = (data as DrumData).notes[track as DrumNote];
+        if(!trackData) return false;
+        if(step < 0 || step >= trackData.length) return false;
+        return trackData[step] == 1;
+    }
+    setCell(data:IInstrumentData,track: string, step: number, value: boolean): void {
+        let trackData = (data as DrumData).notes[track as DrumNote];
+        if(!trackData) {
+            trackData = new Array(8).fill(0);
+        }
+        trackData[step] = value ? 1 : 0;
+        (data as DrumData).notes[track as DrumNote] = trackData;
+    }
+}
 export class Drum extends Instrument<DrumData> {
-    notes = Object.values(DrumNote);
+    // notes = Object.values(DrumNote);
+    // sequencer(data: IInstrumentData): ISequencer|undefined {
+    //     return new DrumSequencer(data as DrumData);
+    // }
     protected generate_(data: DrumData): string {
         const joined = Object.entries(data.notes).map(t => {
             const [k, v] = t;
@@ -83,6 +116,13 @@ export class Drum extends Instrument<DrumData> {
         return `s("${joined}")`;
     }
     name: string = 'Drum';
+    /**
+     *
+     */
+    constructor() {
+        super();
+        this.sequencer = new DrumSequencer();
+    }
     createData_() {
         let o = {notes: {}} as DrumData;
 
