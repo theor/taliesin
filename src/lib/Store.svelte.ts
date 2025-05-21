@@ -30,7 +30,7 @@ class AppStore {
 	randomize(index: number) {
 		const instr = getInstrument(this.instrumentsData.instrumentsData[index]);
         if (instr) {
-            const data = instr.randomize(this.instrumentsData.instrumentsData[index]);
+            const data = instr.randomize($state.snapshot(this.instrumentsData.instrumentsData[index]));
             this.setInstrumentPartial(index, data);
         }
 	}

@@ -16,21 +16,7 @@
 	let instrumentData = props.instrumentData as PianoScaleData;
 	const instr: IInstrument | undefined = getInstrument(instrumentData);
 	const seq = instr?.sequencer;
-	let rnd = () => {
-		const notes = instrumentData.notes.map(() => {
-			return Math.floor(7 + Math.random() * 7);
-		});
-		// store.setInstrumentData(instrumentData, props.index, { notes});
-		// $commands.commands.push({
-		// 	name: 'setData',
-		// 	index: props.index,
 
-		// 	value: {
-		// 		notes,
-		// 	}
-		// });
-		// instrumentData.notes = notes;
-	};
 </script>
 
 <div>

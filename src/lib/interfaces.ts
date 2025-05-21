@@ -64,6 +64,10 @@ export interface PianoScaleData extends IInstrumentData {
 };
 export class PianoScale extends Instrument<PianoScaleData> {
     protected _randomize(data: PianoScaleData): PianoScaleData {
+        const notes = data.notes.map(() => {
+			return Math.floor(7 + Math.random() * 7);
+		});
+        data.notes = notes;
         return data;
     }
     protected generate_(data: PianoScaleData): string {
