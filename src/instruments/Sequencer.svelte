@@ -45,7 +45,7 @@
 				<div class="w-4 mr-1 flex-none">{track}</div>
 				{#each { length: 8 }, i}
 					{@const cell = seq.getCell(instrumentData,track, i)}
-					<a aria-label="seq-{index}-{i}" role="application" onclick={() => toggleCell(track, i)} class="btn flex-1 {cell ? buttonClassOn : buttonClassOff}" />
+					<button aria-label="seq-{index}-{i}" onclick={() => toggleCell(track, i)} class="btn flex-1 {cell ? buttonClassOn : buttonClassOff}" ></button>
 				{/each}
 			</div>
 		{/each}
