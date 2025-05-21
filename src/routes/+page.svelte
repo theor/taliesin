@@ -35,6 +35,8 @@ import {X} from '@lucide/svelte';
 	$effect(() => {
 		console.log('store changed', $state.snapshot($instrumentsData.instrumentsData), $instrumentsData.instrumentsData[0]);
 		code = store.code();
+		strudel.evaluate(code);
+
 	});
 
 	$inspect(store);
@@ -73,7 +75,7 @@ import {X} from '@lucide/svelte';
 	</AppBar>
 
 	<div class="h-100% grid col-span-2 gap-4 p-4">
-		<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-5 p-5">
+		<div class="invisible lg:visible card preset-outlined-surface-200-800 bg-surface-50-950 space-y-5 p-5">
 			Code
 			<button class="btn preset-filled ml-4" onclick={() => store.clearCommands()}>Clear</button>
 			<pre>
