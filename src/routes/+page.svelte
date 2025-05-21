@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { AppBar } from '@skeletonlabs/skeleton-svelte';
+	import { AppBar, Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Menu from '@lucide/svelte/icons/menu';
 
 	import { strudel, store, type IInstrumentData } from '$lib';
@@ -40,6 +40,7 @@
 	const instrumentsData = store.instrumentsData;
 	// console.log($instrumentsData.instrumentsData);
 	let code = $state(store.code());
+	let group = $state('0');
 	$effect(() => {
 		// console.log('store changed', $state.snapshot(instrumentsData.instrumentsData), instrumentsData.instrumentsData[0]);
 		code = store.code();
@@ -114,21 +115,25 @@
 				</div>
 			{/key}
 		{/snippet}
-		{#each instrumentsData.instrumentsData as instrumentData, index}
+		<!-- {#each instrumentsData.instrumentsData as instrumentData, index}
 			{@render instrumentCard(instrumentData, index)}
-		{/each}
+		{/each} -->
+		<Tabs value={group} onValueChange={(e) => (group = e.value)}>
+			{#snippet list()}
+				{#each instrumentsData.instrumentsData as instrumentData, index}
+					<Tabs.Control value={index.toString()}>{instrumentData.instrumentName}</Tabs.Control>
+				{/each}
+			{/snippet}
+			{#snippet content()}
+				{#each instrumentsData.instrumentsData as instrumentData, index}
+					<Tabs.Panel value={index.toString()}>
+						{@render instrumentCard(instrumentData, index)}
+					</Tabs.Panel>
+				{/each}
+			{/snippet}
+		</Tabs>
 	</div>
 	<!-- <footer class=" h-10% p-4">(footer)</footer> -->
 </div>
-
-<!-- <main class="container">
-	<header>
-		<Network network={network} />
-	</header>
-	<h1>Welcome to SvelteKit</h1>
-	<p>
-		Visit <a href="https://svelte.dev/docs/kit">svelte.dev/docs/kit</a> to read the documentation
-	</p>
-</main> -->
 
 <svelte:window on:keydown={onKeyDown} />
