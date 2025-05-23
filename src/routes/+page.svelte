@@ -2,7 +2,7 @@
 	import { AppBar, Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Menu from '@lucide/svelte/icons/menu';
 
-	import { strudel, store, type IInstrumentData, createInstrument, getInstrument, hasOctave } from '$lib';
+	import { strudel, store, type InstrumentData, getInstrument, hasPart, getPart, type PartOctave } from '$lib';
 	import '../main.scss';
 	import Network from '../components/Network.svelte';
 	import Transport from '../components/Transport.svelte';
@@ -95,10 +95,11 @@
             </pre>
 			</div>
 		{/if}
-		{#snippet instrumentCard(instrumentData: IInstrumentData, index: number)}
+		{#snippet instrumentCard(instrumentData: InstrumentData, index: number)}
 			{#key instrumentData}
 			{@const instrument = getInstrument(instrumentData)}
-				<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
+			{@const octave = getPart<PartOctave>('octave',instrumentData)}
+			<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
 					<header class="card-header flex justify-between">
 						<span>{index} {instrumentData.instrumentName}</span>
 						<div>
@@ -110,10 +111,10 @@
 								
 							{/snippet}
 
-							{#if (hasOctave(instrumentData))}
-							<span>octave {instrumentData.octave}</span>
-							{@render btn(ChevronUp, () => (instrumentData.octave)++)}
-							{@render btn(ChevronDown, () => (instrumentData.octave)++)}
+							{#if (octave)}
+							<span>octave {octave.octave}</span>
+							{@render btn(ChevronUp, () => (octave.octave)++)}
+							{@render btn(ChevronDown, () => (octave.octave)--)}
 							
 							{/if}
 							<button

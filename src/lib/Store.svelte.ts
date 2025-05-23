@@ -93,11 +93,11 @@ class AppStore {
         this.host = host;
     }
     preset() {
-        this.instrumentsData.instrumentsData.push(createInstrument({
-            instrumentName: "PianoScale",
+        this.instrumentsData.instrumentsData.push(createInstrument(
+            'PianoScale',
             //  notes: [1, 2, 3,undefined,4,5,3,undefined]
-        }));
-        this.instrumentsData.instrumentsData.push(createInstrument({ instrumentName: "Drum" }));
+        ));
+        this.instrumentsData.instrumentsData.push(createInstrument("Drum"));
 
     }
     setInstrument(index: number, data: IInstrumentData) {
