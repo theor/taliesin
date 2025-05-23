@@ -34,6 +34,12 @@ export interface IInstrument{
     randomize(data: IInstrumentData): IInstrumentData;
 
 }
+export interface IInstrumentDataOctave extends IInstrumentData{
+    octave: number;
+}
+export function  hasOctave(x:IInstrumentData): x is IInstrumentDataOctave {
+    return "octave" in x;
+}
 export abstract  class Instrument<T extends IInstrumentData> implements IInstrument {
     randomize(data: IInstrumentData): IInstrumentData {
         return this._randomize(data as T);
@@ -60,6 +66,7 @@ export interface IInstrumentData {
 }
 
 export interface PianoScaleData extends IInstrumentData {
+    octave: number;
     notes: (number|undefined)[];
 };
 export class PianoScale extends Instrument<PianoScaleData> {
@@ -71,12 +78,33 @@ export class PianoScale extends Instrument<PianoScaleData> {
         return data;
     }
     protected generate_(data: PianoScaleData): string {
-        return `n("${data.notes.join(' ')}").scale("C2:minor").sound("sawtooth").n(4)`;
+        return `n("${data.notes.map(x => x ?? "~").join(' ')}").scale("C${data.octave}:minor").sound("sawtooth").n(4)`;
     }
     name: string = 'PianoScale';
     // notes = [1,2,3,4,5,6,7].map(x => x.toString());
     createData_() {
-        return {notes:[1, 2, 3, 4]};
+        return {
+            notes:new Array(8).fill(undefined),
+            octave: 4,
+        } as PianoScaleData;
+    }
+    constructor() {
+        super();
+        this.sequencer = new NoteSequencer();;
+    }
+}
+
+class NoteSequencer implements ISequencer {
+    tracks(): string[] {
+        return [1,2,3,4,5,6,7].map(x => x.toString());
+    }
+    getCell(data: IInstrumentData, track: string, step: number): boolean {
+        if (step < 0 || step >= (data as PianoScaleData).notes.length) return false;
+        return (data as PianoScaleData).notes[step] == parseInt(track);
+    }
+    setCell(data: IInstrumentData, track: string, step: number, value: boolean): void {
+        if (step < 0 || step >= (data as PianoScaleData).notes.length) return;
+        (data as PianoScaleData).notes[step] = value ? parseInt(track) : undefined;
     }
 }
 
@@ -118,10 +146,6 @@ export class Drum extends Instrument<DrumData> {
     protected _randomize(data: DrumData): DrumData {
         return data;
     }
-    // notes = Object.values(DrumNote);
-    // sequencer(data: IInstrumentData): ISequencer|undefined {
-    //     return new DrumSequencer(data as DrumData);
-    // }
     protected generate_(data: DrumData): string {
         const joined = Object.entries(data.notes).map(t => {
             const [k, v] = t;
@@ -131,9 +155,6 @@ export class Drum extends Instrument<DrumData> {
         return `s("${joined}")`;
     }
     name: string = 'Drum';
-    /**
-     *
-     */
     constructor() {
         super();
         this.sequencer = new DrumSequencer();

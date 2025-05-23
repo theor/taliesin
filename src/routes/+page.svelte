@@ -2,13 +2,14 @@
 	import { AppBar, Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Menu from '@lucide/svelte/icons/menu';
 
-	import { strudel, store, type IInstrumentData } from '$lib';
+	import { strudel, store, type IInstrumentData, createInstrument, getInstrument, hasOctave } from '$lib';
 	import '../main.scss';
 	import Network from '../components/Network.svelte';
 	import Transport from '../components/Transport.svelte';
 	import PianoScaleView from '../instruments/PianoScaleView.svelte';
-	import { X, Dices } from '@lucide/svelte';
+	import { X, Dices, ChevronUp,ChevronDown } from '@lucide/svelte';
 	import { setGlobalContext } from '$lib/context';
+	import { type Component } from 'svelte';
 
 	const params = new URLSearchParams(window.location.search);
 	const isHost = params.getAll('join').length == 0;
@@ -96,10 +97,25 @@
 		{/if}
 		{#snippet instrumentCard(instrumentData: IInstrumentData, index: number)}
 			{#key instrumentData}
+			{@const instrument = getInstrument(instrumentData)}
 				<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
 					<header class="card-header flex justify-between">
 						<span>{index} {instrumentData.instrumentName}</span>
 						<div>
+							{#snippet btn(icon: Component, onclick: () => void)}
+							{@const IconComp = icon}
+							<button
+							class="btn preset-filled px-2 py-1"
+							onclick={onclick}><IconComp size={16}/></button>
+								
+							{/snippet}
+
+							{#if (hasOctave(instrumentData))}
+							<span>octave {instrumentData.octave}</span>
+							{@render btn(ChevronUp, () => (instrumentData.octave)++)}
+							{@render btn(ChevronDown, () => (instrumentData.octave)++)}
+							
+							{/if}
 							<button
 								class="btn preset-filled mr-4 px-2 py-1"
 								onclick={() => store.randomize(index)}><Dices size={16} /></button
