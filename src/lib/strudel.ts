@@ -11,12 +11,14 @@ initAudioOnFirstClick();
 registerSynthSounds();
 
 const initPromise = evalScope(import('@strudel/core'), import('@strudel/mini'), import('@strudel/webaudio'), import('@strudel/tonal'));
-
+await initPromise;
 const repls = repl({
   defaultOutput: webaudioOutput,
   getTime: () => ctx.currentTime,
   transpiler,
 });
+console.log(repls);
+
 console.log('Strudel initialized!');
 
 if (import.meta.hot) {

@@ -36,7 +36,7 @@
 			store.preset();
 		}
 	}
-	let title = 'Rave';
+	let title = 'Taliesin';
 
 	const instrumentsData = store.instrumentsData;
 	// console.log($instrumentsData.instrumentsData);

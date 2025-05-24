@@ -3,7 +3,7 @@ import { joinRoom } from 'trystero/nostr';
 import { selfId, type ActionSender, type JsonValue } from 'trystero'
 
 const config = {
-    appId: 'rave',
+    appId: 'taliesin',
     // relayUrls: ["wss://192.168.1.82:3334"]
 }
 const room = joinRoom(config, 'room1');
