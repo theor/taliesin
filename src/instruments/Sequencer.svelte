@@ -41,7 +41,7 @@
 			
 			<div class="flex flex-row gap-1">
 				<div class="w-4 mr-1 flex-none">{track}</div>
-				{#each { length: 8 }, i}
+				{#each { length: seq.length() }, i}
 					{@const cell = seq.getCell(instrumentData,index, i)}
 					<button aria-label="seq-{index}-{i}" onclick={() => toggleCell(index, i)} class="btn flex-1 {cell ? buttonClassOn : buttonClassOff}" ></button>
 				{/each}

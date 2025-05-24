@@ -1,4 +1,4 @@
-import { createInstrument, getInstrument, type PianoScaleData, type IInstrumentData, type IInstrumentViewProps, Status } from "./interfaces";
+import { createInstrument, getInstrument,  type IInstrumentViewProps, Status, type InstrumentData } from "./interfaces";
 import { joinRoom } from 'trystero/nostr';
 import { selfId, type ActionSender, type JsonValue } from 'trystero'
 
@@ -8,23 +8,10 @@ const config = {
 }
 const room = joinRoom(config, 'room1');
 
-// export interface ICommand {
-//     name: string;
-// }
-
-type PlayCommand = {
-    name: "play";
-    value: boolean;
-}
-type SetDataCommand = {
-    name: "setData";
-    index: number;
-    value: Partial<IInstrumentData>;
-}
-type Command = SetDataCommand | PlayCommand;
+type InstrumentDataJsonValue = InstrumentData & {[key: string]: JsonValue};
 type WrappedInstrument = {
     index: number;
-    instrument: IInstrumentData & {[key: string]: JsonValue};
+    instrument: InstrumentDataJsonValue;
 }
 class AppStore {
 	randomize(index: number) {
@@ -38,7 +25,7 @@ class AppStore {
     clearCommands() {
         // this.synchedStore.commands.splice(0, this.synchedStore.commands.length);
     }
-    instrumentsData = $state({ instrumentsData: [] as IInstrumentData[] });
+    instrumentsData = $state({ instrumentsData: [] as InstrumentData[] });
     code = () => {
         return this.instrumentsData.instrumentsData.map((i) => {
             const instr = getInstrument(i);
@@ -56,17 +43,17 @@ class AppStore {
     peerJoined(peerId: string) {
         console.log("peer joined", peerId);
         if (this.host)
-            this.sendState(this.instrumentsData.instrumentsData, peerId);
+            this.sendState(this.instrumentsData.instrumentsData as InstrumentDataJsonValue[], peerId);
     }
     peerLeft(peerId: string) {
         console.log("peer left", peerId);
     }
 
-    sendState: ActionSender<IInstrumentData[]>;
+    sendState: ActionSender<InstrumentDataJsonValue[]>;
     sendInstrument: ActionSender<WrappedInstrument>;
   
     constructor() {
-        const [sendState, onReceiveState] = room.makeAction<IInstrumentData[]>("state");
+        const [sendState, onReceiveState] = room.makeAction<InstrumentDataJsonValue[]>("state");
         const [sendInstrument, onReceiveInstrument] = room.makeAction<WrappedInstrument>("instrument");
         this.sendState = sendState;
         this.sendInstrument = sendInstrument;
@@ -101,13 +88,13 @@ class AppStore {
         this.instrumentsData.instrumentsData.push(createInstrument("Drum"));
 
     }
-    setInstrument(index: number, data: IInstrumentData) {
+    setInstrument(index: number, data: InstrumentData) {
         console.log("setInstrument", index, $state.snapshot(data));
         const snapshot = $state.snapshot(data);
         this.instrumentsData.instrumentsData.splice(index, 1, snapshot);
-        this.sendInstrument({index,instrument: snapshot})
+        this.sendInstrument({index,instrument: snapshot as InstrumentDataJsonValue})
     };
-    setInstrumentPartial = (index: number, data: Partial<IInstrumentData>) => {
+    setInstrumentPartial = (index: number, data: Partial<InstrumentData>) => {
 
         // this.instrumentsData[index] = Object.assign(this.instrumentsData[index], data);
 

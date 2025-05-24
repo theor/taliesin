@@ -2,14 +2,25 @@
 	import { AppBar, Tabs } from '@skeletonlabs/skeleton-svelte';
 	import Menu from '@lucide/svelte/icons/menu';
 
-	import { strudel, store, type InstrumentData, getInstrument, hasPart, getPart, type PartOctave } from '$lib';
+	import {
+		strudel,
+		store,
+		type InstrumentData,
+		getInstrument,
+		hasPart,
+		getPart,
+		type PartOctave,
+		type InstrumentPart,
+		type IPartViewProps
+	} from '$lib';
 	import '../main.scss';
 	import Network from '../components/Network.svelte';
 	import Transport from '../components/Transport.svelte';
 	import PianoScaleView from '../instruments/PianoScaleView.svelte';
-	import { X, Dices, ChevronUp,ChevronDown } from '@lucide/svelte';
+	import { X, Dices, ChevronUp, ChevronDown } from '@lucide/svelte';
 	import { setGlobalContext } from '$lib/context';
 	import { type Component } from 'svelte';
+	import PartOctaveView from '../components/PartOctaveView.svelte';
 
 	const params = new URLSearchParams(window.location.search);
 	const isHost = params.getAll('join').length == 0;
@@ -97,26 +108,30 @@
 		{/if}
 		{#snippet instrumentCard(instrumentData: InstrumentData, index: number)}
 			{#key instrumentData}
-			{@const instrument = getInstrument(instrumentData)}
-			{@const octave = getPart<PartOctave>('octave',instrumentData)}
-			<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
-					<header class="card-header flex justify-between">
+				{@const instrument = getInstrument(instrumentData)}
+				{@const octave = getPart<PartOctave>('octave', instrumentData)}
+				<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
+					<header class="card-header flex justify-between instrument-header">
 						<span>{index} {instrumentData.instrumentName}</span>
 						<div>
-							{#snippet btn(icon: Component, onclick: () => void)}
-							{@const IconComp = icon}
-							<button
-							class="btn preset-filled px-2 py-1"
-							onclick={onclick}><IconComp size={16}/></button>
-								
+							{#snippet btnSnippet(icon: Component, onclick: () => void)}
+								{@const IconComp = icon}
+								<button class="btn preset-filled px-2 py-1" {onclick}><IconComp size={16} /></button
+								>
+							{/snippet}
+							{#snippet renderOptionalPart<TPart extends InstrumentPart>(
+								partName: TPart['type'],
+								component: Component<IPartViewProps<TPart>>
+							)}
+								{@const part = getPart(partName, instrumentData)}
+								{@const ViewComp = component}
+								{#if part}
+									<ViewComp {part} {btnSnippet} />
+								{/if}
 							{/snippet}
 
-							{#if (octave)}
-							<span>octave {octave.octave}</span>
-							{@render btn(ChevronUp, () => (octave.octave)++)}
-							{@render btn(ChevronDown, () => (octave.octave)--)}
-							
-							{/if}
+							{@render renderOptionalPart<PartOctave>('octave', PartOctaveView)}
+						
 							<button
 								class="btn preset-filled mr-4 px-2 py-1"
 								onclick={() => store.randomize(index)}><Dices size={16} /></button

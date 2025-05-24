@@ -1,9 +1,15 @@
+import type { Component, Snippet } from "svelte";
+
 export enum Status {
     disconnected = 'disconnected',
     connecting = 'connecting',
     connected = 'connected',
 }
 
+export interface IPartViewProps<T extends InstrumentPart> {
+    part: T;
+    btnSnippet: Snippet<[Component, () => void]>;
+}
 
 // class InstanceLoader<T> {
 //     constructor(private context: Object) {
@@ -33,6 +39,7 @@ export enum Status {
 
 // export const network: INetwork = new TestNetwork();
 export interface ISequencer {
+	length(): number;
     tracks: string[];
     
     getCell(data:InstrumentData,track: number, step: number) : boolean ;
@@ -41,6 +48,7 @@ export interface ISequencer {
 }
 class Sequencer<TTrack, T extends InstrumentPart> implements ISequencer {
     tracks: string[];
+    length(): number {return this.partSequencer.length}
     constructor(private partSequencer: PartSequencer<TTrack, T>, private partType: T["type"]) {
         this.partSequencer = partSequencer;
         this.tracks = this.partSequencer.tracks.map(x => `${x}`);
@@ -54,6 +62,7 @@ class Sequencer<TTrack, T extends InstrumentPart> implements ISequencer {
 }
 export interface PartSequencer<TTrack, T extends InstrumentPart> {
     tracks: TTrack[];
+	length: number;
     getCell(part: T, track: TTrack, step: number): boolean;
     setCell(part: T, track: TTrack, step: number, value: boolean): void;
 }
@@ -96,7 +105,7 @@ interface MonoSequence {
     notes:(number|undefined)[];
 
 }
-type InstrumentPart = PartOctave | PartTrackNotes | MonoSequence;
+export type InstrumentPart = PartOctave | PartTrackNotes | MonoSequence;
 export interface InstrumentData {
     instrumentName: string;
     parts: InstrumentPart[]
@@ -120,7 +129,7 @@ export class PianoScale extends Instrument {
     public generate(data: InstrumentData): string {
         const notes = getPart<MonoSequence>('notes', data)!;
         const octave = getPart<PartOctave>('octave', data)?.octave ?? 4;
-        return `n("${notes.notes.map(x => x ?? "~").join(' ')}").scale("C${octave}:minor").sound("sawtooth").n(4)`;
+        return `n("${notes.notes.slice(0, this.sequencer?.length() ?? -1).map(x => x ?? "~").join(' ')}").scale("C${octave}:minor").sound("sawtooth").n(4)`;
     }
     name: string = 'PianoScale';
     // notes = [1,2,3,4,5,6,7].map(x => x.toString());
@@ -138,6 +147,7 @@ export class PianoScale extends Instrument {
 
 class MonoSequenceSequencer implements PartSequencer<number, MonoSequence> {
     tracks: number[] =[0,1,2,3,4,5,6,7];
+    length = 4;
     getCell(part: MonoSequence, track: number, step: number): boolean {
         if (!part || step < 0 || step >= part.notes.length) return false;
         return part.notes[step] == track;
@@ -149,7 +159,7 @@ class MonoSequenceSequencer implements PartSequencer<number, MonoSequence> {
 }
 
 class TrackSequencer implements PartSequencer<string, PartTrackNotes> {
-
+    length = 8;
     tracks = Object.values(DrumNote);
     getCell(part: PartTrackNotes, track: string, step: number): boolean {
         if(!part) return false;
@@ -162,7 +172,7 @@ class TrackSequencer implements PartSequencer<string, PartTrackNotes> {
         if(!part) return;
         let trackData = part.notes[track as DrumNote];
         if(!trackData) {
-            trackData = new Array(8).fill(0);
+            trackData = new Array(this.length).fill(0);
         }
         trackData[step] = value ? 1 : 0;
         part.notes[track as DrumNote] = trackData;
