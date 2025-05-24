@@ -1,10 +1,10 @@
 <script lang="ts">
 	import {
-		getInstrument,
 		store,
 		type IInstrument,
 		type IInstrumentViewProps
 	} from '$lib';
+    import { getInstrument } from '$lib/Store.svelte';
 
 	const props: IInstrumentViewProps = $props();
 	const instrumentData = $state.snapshot(props.instrumentData);

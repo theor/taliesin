@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { createInstrument, getInstrument, getInstrumentIcon, store } from '$lib';
+  import {store } from '$lib';
   import { Navigation } from '@skeletonlabs/skeleton-svelte';
   import { Plus } from '@lucide/svelte';
+    import { getInstrumentIcon } from '$lib/Store.svelte';
 
   let {
     drawerClose,

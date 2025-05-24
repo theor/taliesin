@@ -1,9 +1,9 @@
 <script lang="ts">
-	import type { IPartPartialViewProps, Steps } from '$lib';
+	import type { IPartViewProps, PartSteps } from '$lib';
 	import { ChevronDown, ChevronUp } from '@lucide/svelte';
 	// import { type Component } from 'svelte';
 
-	const { part, btnSnippet }: IPartPartialViewProps<Steps> = $props();
+	const { part, btnSnippet }: IPartViewProps<PartSteps> = $props();
 </script>
 
 <span>steps {part.stepsPerMeasure} x {part.measures}</span>

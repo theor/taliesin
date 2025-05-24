@@ -1,6 +1,12 @@
-import { createInstrument, getInstrument,  type IInstrumentViewProps, Status, type InstrumentData, Instrument } from "./interfaces";
+import {  Status } from "./interfaces";
 import { joinRoom } from 'trystero/nostr';
 import { selfId, type ActionSender, type JsonValue } from 'trystero'
+import type { IInstrument, Instrument, InstrumentData } from "./instruments";
+import { PianoScale } from "./instruments/MonoSynth";
+import { Drum } from "./instruments/Drum";
+import type { Component } from "svelte";
+import { DrumIcon, KeyboardMusic, Music } from "@lucide/svelte";
+import type { InstrumentPart } from "./parts";
 
 const config = {
     appId: 'taliesin',
@@ -112,3 +118,46 @@ class AppStore {
 export const store = new AppStore();
 room.onPeerJoin(peerId => store.peerJoined(peerId));
 room.onPeerLeave(peerId => store.peerLeft(peerId));
+
+
+const instrumentMap: { [key: string]: IInstrument } = {
+    PianoScale: new PianoScale(),
+    Drum: new Drum()
+  };
+  export function getInstrumentIcon(name: string): Component {
+    switch (name) {
+      case 'PianoScale':
+        return KeyboardMusic;
+      case 'Drum':
+        return DrumIcon;
+      default:
+        return Music;
+    }
+  }
+  export function getInstrument(data: InstrumentData): Instrument | undefined {
+    if (!data) return undefined;
+    const instr = instrumentMap[data.instrumentName];
+    if (instr) {
+      return instr as Instrument;
+    } else {
+      console.error('Instrument not found', data);
+      return undefined;
+      // throw new Error(`Instrument ${name} not found`);
+    }
+  }
+  export function createInstrument(
+    n: Instrument['name'],
+    d?: Partial<InstrumentPart>[]
+  ): InstrumentData {
+    console.log('createInstrument', n, d);
+    var instr = instrumentMap[n];
+    var baseData = instr.createData();
+    if (d) {
+      console.error('not implemented yet', n);
+      // baseData.parts
+      // var data = { ...baseData, ...d };
+      // return data;
+    }
+    // else
+    return baseData;
+  }

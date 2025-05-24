@@ -1,11 +1,10 @@
 <script lang="ts">
 	import {
-	getInstrument,
-	store,
 		type IInstrument,
 		type IInstrumentViewProps,
 	} from '$lib';
 	import { getGlobalContext } from '$lib/context';
+    import { getInstrument } from '$lib/Store.svelte';
 	import Sequencer from './Sequencer.svelte';
 
 	const ctx = getGlobalContext();

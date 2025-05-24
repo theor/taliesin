@@ -1,32 +1,27 @@
 <script lang="ts">
-  import { AppBar, Tabs } from '@skeletonlabs/skeleton-svelte';
+  import { AppBar,  } from '@skeletonlabs/skeleton-svelte';
   import Menu from '@lucide/svelte/icons/menu';
 
   import {
     strudel,
     store,
     type InstrumentData,
-    getInstrument,
     hasPart,
     getPart,
     type PartOctave,
     type InstrumentPart,
     type IPartViewProps,
-
-    getInstrumentIcon,
-
     type PartTrackNotes,
+    type MonoSequence,
 
-    type MonoSequence
-
-
+    type PartSteps
 
   } from '$lib';
   import '../main.scss';
   import Network from '../components/Network.svelte';
   import Transport from '../components/Transport.svelte';
   import PianoScaleView from '../instruments/PianoScaleView.svelte';
-  import { X, Dices, ChevronUp, ChevronDown } from '@lucide/svelte';
+  import { X, Dices } from '@lucide/svelte';
   import { setGlobalContext } from '$lib/context';
   import { type Component } from 'svelte';
   import PartOctaveView from '../components/PartOctaveView.svelte';
@@ -82,7 +77,8 @@
 
   import { Modal } from '@skeletonlabs/skeleton-svelte';
   import AppMenu from '../components/AppMenu.svelte';
-    import PartStepsView from '../components/PartStepsView.svelte';
+  import PartStepsView from '../components/PartStepsView.svelte';
+    import { getInstrumentIcon } from '$lib/Store.svelte';
 
   let drawerState = $state(false);
 
@@ -158,10 +154,14 @@
       {/if}
       {#snippet instrumentCard(instrumentData: InstrumentData, index: number)}
         {#key instrumentData}
-		{@const Icon = getInstrumentIcon(instrumentData.instrumentName)}
+          {@const Icon = getInstrumentIcon(instrumentData.instrumentName)}
           <div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
-            <header class="card-header instrument-header flex justify-between flex-row portrait:flex-col">
-              <span class="flex gap-2 border-b-2 border-indigo-600"><Icon size=24/> {instrumentData.instrumentName}</span>
+            <header
+              class="card-header instrument-header flex flex-row justify-between portrait:flex-col"
+            >
+              <span class="flex gap-2 border-b-2 border-secondary-500 mb-2"
+                ><Icon size="24" /> {instrumentData.instrumentName}</span
+              >
               <div>
                 {#snippet btnSnippet(icon: Component, onclick: () => void)}
                   {@const IconComp = icon}
@@ -181,8 +181,7 @@
                 {/snippet}
 
                 {@render renderOptionalPart<PartOctave>('octave', PartOctaveView)}
-                {@render renderOptionalPart<PartTrackNotes>('trackNotes', PartStepsView)}
-                {@render renderOptionalPart<MonoSequence>('notes', PartStepsView)}
+                {@render renderOptionalPart<PartSteps>('steps', PartStepsView)}
 
                 <button
                   class="btn preset-filled mr-4 px-2 py-1"
