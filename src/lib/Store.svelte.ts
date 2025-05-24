@@ -91,6 +91,7 @@ class AppStore {
     }
     init(host: boolean) {
         this.host = host;
+        this.preset();
     }
     preset() {
         this.instrumentsData.instrumentsData.push(createInstrument(

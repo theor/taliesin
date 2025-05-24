@@ -1,9 +1,7 @@
 <script lang="ts">
 	import {
-		DrumNote,
 		getInstrument,
 		store,
-		type DrumData,
 		type IInstrument,
 		type IInstrumentViewProps
 	} from '$lib';
@@ -16,9 +14,9 @@
 	const buttonClassOn = 'preset-filled-primary-500';
     const buttonClassOff = 'preset-outlined-primary-500';
 
-	function toggleCell(note: string, i: number): any {
-        seq.setCell(instrumentData,note, i, !seq.getCell(instrumentData, note, i));
-		// let track = instrumentData.notes[note as DrumNote];
+	function toggleCell(track: number, i: number): any {
+        seq.setCell(instrumentData,track, i, !seq.getCell(instrumentData, track, i));
+		// let track = instrumentData.notes[track as DrumNote];
 		// if (track) {
 		// 	const cell = track[i];
 		// 	if (cell === 1) {
@@ -31,7 +29,7 @@
         //     track = new Array(8).fill(0);
         //     track[i] = 1;
         // }
-		// 	instrumentData.notes[note as DrumNote] = track;
+		// 	instrumentData.notes[track as DrumNote] = track;
         //     console.log(instrumentData.notes);
             store.setInstrument(props.index, instrumentData);
 	}
@@ -39,13 +37,13 @@
 
 {#if instr}
 	<div class="flex flex-col gap-1">
-		{#each seq.tracks() as track, index}
+		{#each seq.tracks as track, index}
 			
 			<div class="flex flex-row gap-1">
 				<div class="w-4 mr-1 flex-none">{track}</div>
 				{#each { length: 8 }, i}
-					{@const cell = seq.getCell(instrumentData,track, i)}
-					<button aria-label="seq-{index}-{i}" onclick={() => toggleCell(track, i)} class="btn flex-1 {cell ? buttonClassOn : buttonClassOff}" ></button>
+					{@const cell = seq.getCell(instrumentData,index, i)}
+					<button aria-label="seq-{index}-{i}" onclick={() => toggleCell(index, i)} class="btn flex-1 {cell ? buttonClassOn : buttonClassOff}" ></button>
 				{/each}
 			</div>
 		{/each}

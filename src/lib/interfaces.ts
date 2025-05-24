@@ -4,6 +4,20 @@ export enum Status {
     connected = 'connected',
 }
 
+
+// class InstanceLoader<T> {
+//     constructor(private context: Object) {
+//     }
+
+//     getInstance(name: string, ...args: any[]) : T {
+//         var instance = Object.create((this.context as any)[name].prototype);
+//         instance.constructor.apply(instance, args);
+//         return <T> instance;
+//     }
+// }
+
+// var partLoader = new InstanceLoader<InstrumentPart>(window);
+
 // export interface INetwork {
 //     status: Status;
 //     id: string;
@@ -19,11 +33,29 @@ export enum Status {
 
 // export const network: INetwork = new TestNetwork();
 export interface ISequencer {
-    tracks(): string[];
+    tracks: string[];
     
-    getCell(data:InstrumentData,track: string, step: number) : boolean ;
-    setCell(data:InstrumentData,track: string,step: number, value: boolean): void;
+    getCell(data:InstrumentData,track: number, step: number) : boolean ;
+    setCell(data:InstrumentData,track: number,step: number, value: boolean): void;
     
+}
+class Sequencer<TTrack, T extends InstrumentPart> implements ISequencer {
+    tracks: string[];
+    constructor(private partSequencer: PartSequencer<TTrack, T>, private partType: T["type"]) {
+        this.partSequencer = partSequencer;
+        this.tracks = this.partSequencer.tracks.map(x => `${x}`);
+    }
+    getCell(data: InstrumentData, track: number, step: number): boolean {
+        return this.partSequencer.getCell(getPart(this.partType, data)!, this.partSequencer.tracks[track], step);
+    }
+    setCell(data: InstrumentData, track: number, step: number, value: boolean): void {
+        this.partSequencer.setCell(getPart(this.partType, data)!, this.partSequencer.tracks[track], step, value);
+    }
+}
+export interface PartSequencer<TTrack, T extends InstrumentPart> {
+    tracks: TTrack[];
+    getCell(part: T, track: TTrack, step: number): boolean;
+    setCell(part: T, track: TTrack, step: number, value: boolean): void;
 }
 export interface IInstrument{
     name: string;
@@ -34,12 +66,6 @@ export interface IInstrument{
     randomize(data: InstrumentData): InstrumentData;
 
 }
-// export interface IInstrumentDataOctave extends IInstrumentData{
-//     octave: number;
-// }
-// export function  hasOctave(x:IInstrumentData): x is IInstrumentDataOctave {
-//     return "octave" in x;
-// }
 export abstract  class Instrument
 // <T extends InstrumentData>
  implements IInstrument {
@@ -65,12 +91,12 @@ interface PartTrackNotes {
     notes:{[key in DrumNote]: (0|1)[]};
 
 }
-interface PartNotes {
+interface MonoSequence {
     type: 'notes';
     notes:(number|undefined)[];
 
 }
-type InstrumentPart = PartOctave | PartTrackNotes | PartNotes;
+type InstrumentPart = PartOctave | PartTrackNotes | MonoSequence;
 export interface InstrumentData {
     instrumentName: string;
     parts: InstrumentPart[]
@@ -81,17 +107,10 @@ export function getPart<T extends InstrumentPart>(key: T["type"], data: Instrume
 export function hasPart<T extends InstrumentPart>(key: T["type"], data: InstrumentData) : boolean{
     return data.parts.some(x => x.type === key);
 }
-// export interface IInstrumentData {
-//     instrumentName: string;
-// }
 
-// export interface PianoScaleData extends IInstrumentData {
-//     octave: number;
-//     notes: (number|undefined)[];
-// };
 export class PianoScale extends Instrument {
     public randomize(data: InstrumentData): InstrumentData {
-        const part = getPart<PartNotes>('notes', data)!
+        const part = getPart<MonoSequence>('notes', data)!
         const notes = part.notes.map(() => {
 			return Math.floor( Math.random() * 7);
 		});
@@ -99,7 +118,7 @@ export class PianoScale extends Instrument {
         return data;
     }
     public generate(data: InstrumentData): string {
-        const notes = getPart<PartNotes>('notes', data)!;
+        const notes = getPart<MonoSequence>('notes', data)!;
         const octave = getPart<PartOctave>('octave', data)?.octave ?? 4;
         return `n("${notes.notes.map(x => x ?? "~").join(' ')}").scale("C${octave}:minor").sound("sawtooth").n(4)`;
     }
@@ -113,23 +132,40 @@ export class PianoScale extends Instrument {
     }
     constructor() {
         super();
-        this.sequencer = new NoteSequencer();;
+        this.sequencer = new Sequencer(new MonoSequenceSequencer(), 'notes');;
     }
 }
 
-class NoteSequencer implements ISequencer {
-    tracks(): string[] {
-        return [0,1,2,3,4,5,6,7].map(x => x.toString());
+class MonoSequenceSequencer implements PartSequencer<number, MonoSequence> {
+    tracks: number[] =[0,1,2,3,4,5,6,7];
+    getCell(part: MonoSequence, track: number, step: number): boolean {
+        if (!part || step < 0 || step >= part.notes.length) return false;
+        return part.notes[step] == track;
     }
-    getCell(data: InstrumentData, track: string, step: number): boolean {
-        const trackNotes = getPart<PartNotes>('notes', data);
-        if (!trackNotes || step < 0 || step >= trackNotes.notes.length) return false;
-        return trackNotes.notes[step] == parseInt(track);
+    setCell(part: MonoSequence, track: number, step: number, value: boolean): void {
+        if (!part || step < 0 || step >= part.notes.length) return;
+        part.notes[step] = value ? track : undefined;
     }
-    setCell(data: InstrumentData, track: string, step: number, value: boolean): void {
-        const trackNotes = getPart<PartNotes>('notes', data);
-        if (!trackNotes || step < 0 || step >= trackNotes.notes.length) return;
-        trackNotes.notes[step] = value ? parseInt(track) : undefined;
+}
+
+class TrackSequencer implements PartSequencer<string, PartTrackNotes> {
+
+    tracks = Object.values(DrumNote);
+    getCell(part: PartTrackNotes, track: string, step: number): boolean {
+        if(!part) return false;
+        const trackData = part.notes[track as DrumNote];
+        if(!trackData) return false;
+        if(step < 0 || step >= trackData.length) return false;
+        return trackData[step] == 1;
+    }
+    setCell(part: PartTrackNotes, track: string, step: number, value: boolean): void {
+        if(!part) return;
+        let trackData = part.notes[track as DrumNote];
+        if(!trackData) {
+            trackData = new Array(8).fill(0);
+        }
+        trackData[step] = value ? 1 : 0;
+        part.notes[track as DrumNote] = trackData;
     }
 }
 
@@ -143,33 +179,6 @@ export enum DrumNote {
     highTom = 'ht',
     medTom = 'mt',
     lowTom = 'lt',
-}
-// export interface DrumData extends IInstrumentData {
-//     notes: {[key in DrumNote]: (0|1)[]};
-// };
-
-class DrumSequencer implements ISequencer {
-    tracks(): string[] {
-        return Object.values(DrumNote);
-    }
-    getCell(data:InstrumentData, track: string, step: number): boolean {
-        const trackNotes = getPart<PartTrackNotes>('trackNotes', data);
-        if(!trackNotes) return false;
-        const trackData = trackNotes.notes[track as DrumNote];
-        if(!trackData) return false;
-        if(step < 0 || step >= trackData.length) return false;
-        return trackData[step] == 1;
-    }
-    setCell(data:InstrumentData,track: string, step: number, value: boolean): void {
-        const trackNotes = getPart<PartTrackNotes>('trackNotes', data);
-        if(!trackNotes) return;
-        let trackData = trackNotes.notes[track as DrumNote];
-        if(!trackData) {
-            trackData = new Array(8).fill(0);
-        }
-        trackData[step] = value ? 1 : 0;
-        trackNotes.notes[track as DrumNote] = trackData;
-    }
 }
 export class Drum extends Instrument {
     public randomize(data: InstrumentData): InstrumentData {
@@ -187,7 +196,9 @@ export class Drum extends Instrument {
     name: string = 'Drum';
     constructor() {
         super();
-        this.sequencer = new DrumSequencer();
+        // this.sequencer = new DrumSequencer();
+        this.sequencer = new Sequencer(new TrackSequencer(), 'trackNotes');;
+
     }
     createData_() {
         let o = {notes: {}} as {notes:{[key in DrumNote]: (0|1)[]}};
