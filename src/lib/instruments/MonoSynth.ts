@@ -1,5 +1,6 @@
 import { Instrument,getPart,type InstrumentData } from "$lib/instruments";
 import type { InstrumentPart, MonoSequence, PartOctave } from "$lib/parts";
+import { Sequencer, MonoSequenceSequencer } from "$lib/sequencer";
 
 
 export class PianoScale extends Instrument {
@@ -30,6 +31,8 @@ export class PianoScale extends Instrument {
     }
     constructor() {
       super();
+      this.sequencer = new Sequencer(new MonoSequenceSequencer(), 'notes');
+
     }
   }
   

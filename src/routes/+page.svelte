@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AppBar,  } from '@skeletonlabs/skeleton-svelte';
+  import { AppBar } from '@skeletonlabs/skeleton-svelte';
   import Menu from '@lucide/svelte/icons/menu';
 
   import {
@@ -13,9 +13,7 @@
     type IPartViewProps,
     type PartTrackNotes,
     type MonoSequence,
-
     type PartSteps
-
   } from '$lib';
   import '../main.scss';
   import Network from '../components/Network.svelte';
@@ -78,7 +76,7 @@
   import { Modal } from '@skeletonlabs/skeleton-svelte';
   import AppMenu from '../components/AppMenu.svelte';
   import PartStepsView from '../components/PartStepsView.svelte';
-    import { getInstrumentIcon } from '$lib/Store.svelte';
+  import { getInstrumentIcon } from '$lib/Store.svelte';
 
   let drawerState = $state(false);
 
@@ -159,7 +157,7 @@
             <header
               class="card-header instrument-header flex flex-row justify-between portrait:flex-col"
             >
-              <span class="flex gap-2 border-b-2 border-secondary-500 mb-2"
+              <span class="border-secondary-500 mb-2 flex gap-2 border-b-2"
                 ><Icon size="24" /> {instrumentData.instrumentName}</span
               >
               <div>
