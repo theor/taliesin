@@ -1,4 +1,4 @@
-import { createInstrument, getInstrument,  type IInstrumentViewProps, Status, type InstrumentData } from "./interfaces";
+import { createInstrument, getInstrument,  type IInstrumentViewProps, Status, type InstrumentData, Instrument } from "./interfaces";
 import { joinRoom } from 'trystero/nostr';
 import { selfId, type ActionSender, type JsonValue } from 'trystero'
 
@@ -77,9 +77,15 @@ class AppStore {
         this.instrumentsData.instrumentsData.push(createInstrument(
             'PianoScale',
             //  notes: [1, 2, 3,undefined,4,5,3,undefined]
-        ));
+        ));    
         this.instrumentsData.instrumentsData.push(createInstrument("Drum"));
 
+    }
+    createInstrument(name: string) {
+        this.instrumentsData.instrumentsData.push(createInstrument(
+            name,
+            //  notes: [1, 2, 3,undefined,4,5,3,undefined]
+        ));
     }
     setInstrument(index: number, data: InstrumentData) {
         console.log("setInstrument", index, $state.snapshot(data));

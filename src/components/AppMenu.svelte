@@ -1,22 +1,55 @@
 <script lang="ts">
-    const { drawerClose }: {
-        drawerClose?: () => void;
-    } = $props();
+  import { createInstrument, getInstrument, getInstrumentIcon, store } from '$lib';
+  import { Navigation } from '@skeletonlabs/skeleton-svelte';
+  import { Plus } from '@lucide/svelte';
+
+  let {
+    drawerClose,
+    selectedIndex = $bindable()
+  }: {
+    drawerClose?: () => void;
+    selectedIndex: number;
+  } = $props();
+  const instrumentsData = store.instrumentsData;
+
+  function onValueChange(x: string) {
+    let i = parseInt(x);
+    if (isNaN(i) || i < 0 || i >= instrumentsData.instrumentsData.length) {
+      i = instrumentsData.instrumentsData.length - 1;
+    }
+    console.log('selectedIndex', i);
+
+    selectedIndex = i;
+  }
+  function onAdd() {
+    store.createInstrument('PianoScale');
+    selectedIndex = instrumentsData.instrumentsData.length - 1;
+  }
 </script>
-<header class="flex justify-between">
-    <h2 class="h2">Drawer Example</h2>
-</header>
-<article>
-    <p class="opacity-60">
-        Lorem ipsum dolor sit amet consectetur adipisicing elit. Nam, ab adipisci. Libero
-        cumque sunt quis error veritatis amet, expedita voluptatem. Quos repudiandae
-        consequuntur voluptatem et dicta quas, reprehenderit velit excepturi?
-    </p>
-</article>
-<footer>
-    {#if drawerClose}
-    <button type="button" class="btn preset-filled" onclick={drawerClose}
-        >Close Drawer</button
-    >
-    {/if}
-</footer>
+
+<!-- <header class="flex justify-between">
+	<h2 class="h2">Drawer Example</h2>
+</header> -->
+<Navigation.Rail expanded={true} value={selectedIndex.toString()} {onValueChange}>
+  {#snippet tiles()}
+    {#each instrumentsData.instrumentsData as instrumentData, index}
+      {@const Icon = getInstrumentIcon(instrumentData.instrumentName)}
+      <Navigation.Tile labelExpanded={instrumentData.instrumentName} id={index.toString()}>
+        <Icon size={24} />
+      </Navigation.Tile>
+    {/each}
+  {/snippet}
+
+  {#snippet footer()}
+    <Navigation.Tile labelExpanded="Add" title="Add" onclick={onAdd}><Plus /></Navigation.Tile>`
+    <div class="flex w-full flex-row gap-4">
+      {#if drawerClose}
+        <button
+          type="button"
+          class="rounded-container preset-outlined-primary-500 flex items-center gap-4 p-4 py-3"
+          onclick={drawerClose}>Close Drawer</button
+        >
+      {/if}
+    </div>
+  {/snippet}
+</Navigation.Rail>

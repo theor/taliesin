@@ -1,182 +1,212 @@
 <script lang="ts">
-	import { AppBar, Tabs } from '@skeletonlabs/skeleton-svelte';
-	import Menu from '@lucide/svelte/icons/menu';
+  import { AppBar, Tabs } from '@skeletonlabs/skeleton-svelte';
+  import Menu from '@lucide/svelte/icons/menu';
 
-	import {
-		strudel,
-		store,
-		type InstrumentData,
-		getInstrument,
-		hasPart,
-		getPart,
-		type PartOctave,
-		type InstrumentPart,
-		type IPartViewProps
-	} from '$lib';
-	import '../main.scss';
-	import Network from '../components/Network.svelte';
-	import Transport from '../components/Transport.svelte';
-	import PianoScaleView from '../instruments/PianoScaleView.svelte';
-	import { X, Dices, ChevronUp, ChevronDown } from '@lucide/svelte';
-	import { setGlobalContext } from '$lib/context';
-	import { type Component } from 'svelte';
-	import PartOctaveView from '../components/PartOctaveView.svelte';
+  import {
+    strudel,
+    store,
+    type InstrumentData,
+    getInstrument,
+    hasPart,
+    getPart,
+    type PartOctave,
+    type InstrumentPart,
+    type IPartViewProps,
 
-	const params = new URLSearchParams(window.location.search);
-	const isHost = params.getAll('join').length == 0;
-	const isDebug = params.getAll('debug').length > 0;
-	setGlobalContext({
-		host: isHost,
-		debug: isDebug
-	});
-	store.init(isHost);
+    getInstrumentIcon,
 
-	function onKeyDown(event: KeyboardEvent) {
-		// console.log(event.key, event.code);
+    type PartTrackNotes,
 
-		if (event.code === 'Space') {
-			// console.log(strudel.isPlaying)
-			// if (strudel.isPlaying) strudel.stop();
-			// else
-			strudel.toggle();
-		}
-		if (event.code === 'Escape') {
-			strudel.stop();
-		}
-		if (event.code === 'KeyA') {
-			store.preset();
-		}
-	}
-	let title = 'Taliesin';
+    type MonoSequence
 
-	const instrumentsData = store.instrumentsData;
-	// console.log($instrumentsData.instrumentsData);
-	let code = $state(store.code());
-	let group = $state('0');
-	$effect(() => {
-		// console.log('store changed', $state.snapshot(instrumentsData.instrumentsData), instrumentsData.instrumentsData[0]);
-		code = store.code();
-		strudel.evaluate(code);
-	});
 
-	import { Modal } from '@skeletonlabs/skeleton-svelte';
-	import AppMenu from '../components/AppMenu.svelte';
 
-	let drawerState = $state(false);
+  } from '$lib';
+  import '../main.scss';
+  import Network from '../components/Network.svelte';
+  import Transport from '../components/Transport.svelte';
+  import PianoScaleView from '../instruments/PianoScaleView.svelte';
+  import { X, Dices, ChevronUp, ChevronDown } from '@lucide/svelte';
+  import { setGlobalContext } from '$lib/context';
+  import { type Component } from 'svelte';
+  import PartOctaveView from '../components/PartOctaveView.svelte';
 
-	function drawerClose() {
-		drawerState = false;
-	}
+  const params = new URLSearchParams(window.location.search);
+  const isHost = params.getAll('join').length == 0;
+  const isDebug = params.getAll('debug').length > 0;
+  setGlobalContext({
+    host: isHost,
+    debug: isDebug
+  });
+  store.init(isHost);
 
-	// $inspect(store);
+  function onKeyDown(event: KeyboardEvent) {
+    // console.log(event.key, event.code);
 
-	// $effect(() => {
-	// 	const commandsSnapshot = $state.snapshot($commands.commands);
-	// 	console.log('commands changed', commands);
-	// 	commandsSnapshot.forEach((command) => {
-	// 		if (command.name === 'setData') {
-	// 			console.warn('cmd', $state.snapshot(command.value));
-	// 			store.setInstrumentPartial(command.index, command.value);
-	// 		}
-	// 	});
-	// 	store.clearCommands();
-	// });
+    switch (event.code) {
+      case 'Backquote':
+        drawerState = !drawerState;
+        break;
+      case 'Space':
+        strudel.toggle();
+        break;
+      case 'Escape':
+        strudel.stop();
+        break;
+      case 'KeyA':
+        store.preset();
+        break;
+      default:
+        break;
+    }
+  }
+  let title = 'Taliesin';
+
+  const instrumentsData = store.instrumentsData;
+  // console.log($instrumentsData.instrumentsData);
+  let code = $state(store.code());
+  // let group = $state('0');
+  let selectedIndex = $state(0);
+  let currentInstrument = $derived(instrumentsData.instrumentsData[selectedIndex]);
+  $effect(() => {
+    // console.log('store changed', $state.snapshot(instrumentsData.instrumentsData), instrumentsData.instrumentsData[0]);
+    code = store.code();
+    strudel.evaluate(code);
+    if (selectedIndex >= instrumentsData.instrumentsData.length) {
+      selectedIndex = instrumentsData.instrumentsData.length - 1;
+    }
+    if (selectedIndex < 0) {
+      selectedIndex = 0;
+    }
+  });
+
+  import { Modal } from '@skeletonlabs/skeleton-svelte';
+  import AppMenu from '../components/AppMenu.svelte';
+    import PartStepsView from '../components/PartStepsView.svelte';
+
+  let drawerState = $state(false);
+
+  function drawerClose() {
+    drawerState = false;
+  }
+
+  // $inspect(store);
+
+  // $effect(() => {
+  // 	const commandsSnapshot = $state.snapshot($commands.commands);
+  // 	console.log('commands changed', commands);
+  // 	commandsSnapshot.forEach((command) => {
+  // 		if (command.name === 'setData') {
+  // 			console.warn('cmd', $state.snapshot(command.value));
+  // 			store.setInstrumentPartial(command.index, command.value);
+  // 		}
+  // 	});
+  // 	store.clearCommands();
+  // });
 </script>
 
 <div class="flex h-screen flex-col">
-	<AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block">
-		{#snippet lead()}
-			<!-- <ArrowLeft size={24} /> -->
-			<Network />
-		{/snippet}
-		{#snippet trail()}
-			<div class="hidden space-x-4 sm:flex">
-				<Transport />
-			</div>
-			<div class="block md:hidden">
-				<Modal
-					open={drawerState}
-					onOpenChange={(e) => (drawerState = e.open)}
-					triggerBase="btn preset-tonal"
-					contentBase="bg-surface-100-900 p-4 space-y-4 shadow-xl w-[480px] h-screen"
-					positionerJustify="justify-start"
-					positionerAlign=""
-					positionerPadding=""
-					transitionsPositionerIn={{ x: -480, duration: 200 }}
-					transitionsPositionerOut={{ x: -480, duration: 200 }}
-				>
-					{#snippet trigger()}<Menu size={20} />{/snippet}
-					{#snippet content()}
-						<AppMenu {drawerClose} />
-					{/snippet}
-				</Modal>
-				
-			</div>
-		{/snippet}
-		<span>{title}</span>
-	</AppBar>
+  <AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block" toolbarClasses="">
+    {#snippet lead()}
+      <!-- <ArrowLeft size={24} /> -->
+      <Network />
+    {/snippet}
+    {#snippet trail()}
+      <div class="hidden space-x-4 sm:flex">
+        <Transport />
+      </div>
+      <div class="block md:hidden">
+        <Modal
+          open={drawerState}
+          onOpenChange={(e) => (drawerState = e.open)}
+          triggerBase="btn preset-tonal"
+          contentBase="card border-surface-100-900 border-[1px] space-y-4 shadow-xl  h-screen"
+          positionerJustify="justify-start"
+          positionerAlign=""
+          positionerPadding=""
+          closeOnInteractOutside={true}
+          transitionsPositionerIn={{ x: -480, duration: 200 }}
+          transitionsPositionerOut={{ x: -480, duration: 200 }}
+        >
+          {#snippet trigger()}<Menu size={20} />{/snippet}
+          {#snippet content()}
+            <AppMenu {drawerClose} bind:selectedIndex />
+          {/snippet}
+        </Modal>
+      </div>
+    {/snippet}
+    <span>{title}</span>
+  </AppBar>
 
+  <div class="flex h-full flex-row">
+    <div class="card border-surface-100-900 hidden flex-col border-[1px] md:flex">
+      <AppMenu bind:selectedIndex />
+    </div>
 
-	<div class="flex flex-row">
-	<div class="hidden md:flex max-w-48 flex-col p-4">
-	<AppMenu />
-</div>
-
-	<div class="flex-1 gap-4 p-4">
-		{#if isDebug}
-			<div
-				class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden space-y-5 p-5 lg:flex"
-			>
-				Code
-				<button class="btn preset-filled ml-4" onclick={() => store.clearCommands()}>Clear</button>
-				<pre>
+    <div class="flex-1 gap-4 p-4">
+      {#if isDebug}
+        <div
+          class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden space-y-5 p-5 lg:flex"
+        >
+          Code
+          <button class="btn preset-filled ml-4" onclick={() => store.clearCommands()}>Clear</button
+          >
+          <pre>
 {code}
             </pre>
-			</div>
-		{/if}
-		{#snippet instrumentCard(instrumentData: InstrumentData, index: number)}
-			{#key instrumentData}
-				<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
-					<header class="card-header instrument-header flex justify-between">
-						<span>{index} {instrumentData.instrumentName}</span>
-						<div>
-							{#snippet btnSnippet(icon: Component, onclick: () => void)}
-								{@const IconComp = icon}
-								<button class="btn preset-filled px-2 py-1" {onclick}><IconComp size={16} /></button
-								>
-							{/snippet}
-							{#snippet renderOptionalPart<TPart extends InstrumentPart>(
-								partName: TPart['type'],
-								component: Component<IPartViewProps<TPart>>
-							)}
-								{@const part = getPart(partName, instrumentData)}
-								{@const ViewComp = component}
-								{#if part}
-									<ViewComp {part} {btnSnippet} />
-								{/if}
-							{/snippet}
+        </div>
+      {/if}
+      {#snippet instrumentCard(instrumentData: InstrumentData, index: number)}
+        {#key instrumentData}
+		{@const Icon = getInstrumentIcon(instrumentData.instrumentName)}
+          <div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
+            <header class="card-header instrument-header flex justify-between flex-row portrait:flex-col">
+              <span class="flex gap-2 border-b-2 border-indigo-600"><Icon size=24/> {instrumentData.instrumentName}</span>
+              <div>
+                {#snippet btnSnippet(icon: Component, onclick: () => void)}
+                  {@const IconComp = icon}
+                  <button class="btn preset-filled px-2 py-1" {onclick}
+                    ><IconComp size={16} /></button
+                  >
+                {/snippet}
+                {#snippet renderOptionalPart<TPart extends InstrumentPart>(
+                  partName: TPart['type'],
+                  component: Component<IPartViewProps<TPart>>
+                )}
+                  {@const part = getPart(partName, instrumentData)}
+                  {@const ViewComp = component}
+                  {#if part}
+                    <ViewComp {part} {btnSnippet} />
+                  {/if}
+                {/snippet}
 
-							{@render renderOptionalPart<PartOctave>('octave', PartOctaveView)}
+                {@render renderOptionalPart<PartOctave>('octave', PartOctaveView)}
+                {@render renderOptionalPart<PartTrackNotes>('trackNotes', PartStepsView)}
+                {@render renderOptionalPart<MonoSequence>('notes', PartStepsView)}
 
-							<button
-								class="btn preset-filled mr-4 px-2 py-1"
-								onclick={() => store.randomize(index)}><Dices size={16} /></button
-							>
+                <button
+                  class="btn preset-filled mr-4 px-2 py-1"
+                  onclick={() => store.randomize(index)}><Dices size={16} /></button
+                >
 
-							<button
-								class="btn btn-xs preset-outlined-error-500 rounded-lg px-2 py-1"
-								onclick={() => store.removeInstrument(index)}><X size="16" /></button
-							>
-						</div>
-					</header>
-					<PianoScaleView {instrumentData} {index} />
-				</div>
-			{/key}
-		{/snippet}
-		<!-- {#each instrumentsData.instrumentsData as instrumentData, index}
+                <button
+                  class="btn btn-xs preset-outlined-error-500 rounded-lg px-2 py-1"
+                  onclick={() => store.removeInstrument(index)}><X size="16" /></button
+                >
+              </div>
+            </header>
+            <PianoScaleView {instrumentData} {index} />
+          </div>
+        {/key}
+      {/snippet}
+      {#if currentInstrument}
+        {@render instrumentCard(currentInstrument, selectedIndex)}
+      {/if}
+
+      <!-- {#each instrumentsData.instrumentsData as instrumentData, index}
 			{@render instrumentCard(instrumentData, index)}
 		{/each} -->
-		<Tabs value={group} onValueChange={(e) => (group = e.value)}>
+      <!-- <Tabs value={group} onValueChange={(e) => (group = e.value)}>
 			{#snippet list()}
 				{#each instrumentsData.instrumentsData as instrumentData, index}
 					<Tabs.Control value={index.toString()}>{instrumentData.instrumentName}</Tabs.Control>
@@ -189,10 +219,10 @@
 					</Tabs.Panel>
 				{/each}
 			{/snippet}
-		</Tabs>
-	</div>
-</div>
-	<!-- <footer class=" h-10% p-4">(footer)</footer> -->
+		</Tabs> -->
+    </div>
+  </div>
+  <!-- <footer class=" h-10% p-4">(footer)</footer> -->
 </div>
 
 <svelte:window on:keydown={onKeyDown} />
