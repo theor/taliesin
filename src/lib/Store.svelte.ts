@@ -67,18 +67,11 @@ class AppStore {
             console.log("receiveInstrument", data, peerId);
             this.instrumentsData.instrumentsData.splice(data.index, 1,data.instrument);
         });
-        // this.webrtcProvider.on("synced", x => console.error("synced", x, $state.snapshot(this.synchedStore)));
-        // this.webrtcProvider.awareness.on('update', (x:any) => console.log("update awareness", x));
-        // this.webrtcProvider.awareness.on('change', (x:any) => console.log("change awareness", x));
-        // this.webrtcProvider.on('synced', x => console.error("synced", x, this.doc));
-        // this.doc.on('load', x => console.error("loaded", this.doc));
-        // this.doc.on('update', x => console.error("updateed", this.doc));
-
-        // this.webrtcProvider.connect();
     }
     init(host: boolean) {
         this.host = host;
-        this.preset();
+        if(this.instrumentsData.instrumentsData.length === 0)
+            this.preset();
     }
     preset() {
         this.instrumentsData.instrumentsData.push(createInstrument(

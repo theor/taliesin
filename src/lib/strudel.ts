@@ -1,25 +1,36 @@
-import { initStrudel } from '@strudel/web';
+import { initStrudel,evaluate } from '@strudel/web';
 import { repl, evalScope } from '@strudel/core';
 import { getAudioContext, webaudioOutput, initAudioOnFirstClick, registerSynthSounds,  } from '@strudel/webaudio';
 import { transpiler } from '@strudel/transpiler';
 import { writable, type Writable } from 'svelte/store';
+import {  webaudioRepl } from '@strudel/webaudio';
+
 // initStrudel({
 //     prebake: () => samples('github:tidalcycles/dirt-samples'),
 //   });
 const ctx = getAudioContext();
 initAudioOnFirstClick();
-registerSynthSounds();
 
-const initPromise = evalScope(import('@strudel/core'), import('@strudel/mini'), import('@strudel/webaudio'), import('@strudel/tonal'));
-await initPromise;
-const repls = repl({
-  defaultOutput: webaudioOutput,
-  getTime: () => ctx.currentTime,
-  transpiler,
+const repls: webaudioRepl = await initStrudel({
+  prebake: () => samples('github:tidalcycles/dirt-samples'),
 });
-console.log(repls);
 
-console.log('Strudel initialized!');
+// let repls : Repl;
+
+// async function initStrudel() {
+
+
+//     await evalScope(import('@strudel/core'), import('@strudel/mini'), import('@strudel/webaudio'), import('@strudel/tonal'));
+//     repls = repl({
+
+//       defaultOutput: webaudioOutput,
+//       getTime: () => ctx.currentTime,
+//       transpiler,
+//     });
+//     console.log(repls);
+    
+//     console.log('Strudel initialized!');
+// }
 
 if (import.meta.hot) {
     // HMR specific stuff...
@@ -32,14 +43,13 @@ if (import.meta.hot) {
         repls.stop();
       })
   }
-
 class StrudelWrapper {
     evaluate(code: string): Promise<void> { 
         if(code === "")
             return Promise.resolve();
         console.log("Strudel evaluate!", code);
         // console.log(
-        return repls.evaluate(`samples('github:tidalcycles/dirt-samples')\n${code}`)
+        return evaluate(`samples('github:tidalcycles/dirt-samples')\n${code}`)
         // return repls.evaluate(`${code}`)
     // );
  }

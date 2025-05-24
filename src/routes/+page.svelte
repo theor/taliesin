@@ -38,7 +38,7 @@
 			// console.log(strudel.isPlaying)
 			// if (strudel.isPlaying) strudel.stop();
 			// else
-			strudel.evaluate(code);
+			strudel.toggle();
 		}
 		if (event.code === 'Escape') {
 			strudel.stop();
@@ -108,8 +108,6 @@
 		{/if}
 		{#snippet instrumentCard(instrumentData: InstrumentData, index: number)}
 			{#key instrumentData}
-				{@const instrument = getInstrument(instrumentData)}
-				{@const octave = getPart<PartOctave>('octave', instrumentData)}
 				<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
 					<header class="card-header flex justify-between instrument-header">
 						<span>{index} {instrumentData.instrumentName}</span>
