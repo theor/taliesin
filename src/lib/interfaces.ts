@@ -93,7 +93,7 @@ export class PianoScale extends Instrument {
     public randomize(data: InstrumentData): InstrumentData {
         const part = getPart<PartNotes>('notes', data)!
         const notes = part.notes.map(() => {
-			return Math.floor(7 + Math.random() * 7);
+			return Math.floor( Math.random() * 7);
 		});
         part.notes = notes;
         return data;
@@ -119,7 +119,7 @@ export class PianoScale extends Instrument {
 
 class NoteSequencer implements ISequencer {
     tracks(): string[] {
-        return [1,2,3,4,5,6,7].map(x => x.toString());
+        return [0,1,2,3,4,5,6,7].map(x => x.toString());
     }
     getCell(data: InstrumentData, track: string, step: number): boolean {
         const trackNotes = getPart<PartNotes>('notes', data);
