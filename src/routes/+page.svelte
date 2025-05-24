@@ -59,7 +59,16 @@
 		strudel.evaluate(code);
 	});
 
-	$inspect(store);
+	import { Modal } from '@skeletonlabs/skeleton-svelte';
+	import AppMenu from '../components/AppMenu.svelte';
+
+	let drawerState = $state(false);
+
+	function drawerClose() {
+		drawerState = false;
+	}
+
+	// $inspect(store);
 
 	// $effect(() => {
 	// 	const commandsSnapshot = $state.snapshot($commands.commands);
@@ -84,17 +93,36 @@
 			<div class="hidden space-x-4 sm:flex">
 				<Transport />
 			</div>
-			<div class="block sm:hidden">
-				<Menu size={20} />
+			<div class="block md:hidden">
+				<Modal
+					open={drawerState}
+					onOpenChange={(e) => (drawerState = e.open)}
+					triggerBase="btn preset-tonal"
+					contentBase="bg-surface-100-900 p-4 space-y-4 shadow-xl w-[480px] h-screen"
+					positionerJustify="justify-start"
+					positionerAlign=""
+					positionerPadding=""
+					transitionsPositionerIn={{ x: -480, duration: 200 }}
+					transitionsPositionerOut={{ x: -480, duration: 200 }}
+				>
+					{#snippet trigger()}<Menu size={20} />{/snippet}
+					{#snippet content()}
+						<AppMenu {drawerClose} />
+					{/snippet}
+				</Modal>
+				
 			</div>
-		{/snippet}
-		{#snippet headline()}
-			<h2 class="h2">{title}</h2>
 		{/snippet}
 		<span>{title}</span>
 	</AppBar>
 
-	<div class="col-span-2 grid flex-1 gap-4 p-4">
+
+	<div class="flex flex-row">
+	<div class="hidden md:flex max-w-48 flex-col p-4">
+	<AppMenu />
+</div>
+
+	<div class="flex-1 gap-4 p-4">
 		{#if isDebug}
 			<div
 				class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden space-y-5 p-5 lg:flex"
@@ -109,7 +137,7 @@
 		{#snippet instrumentCard(instrumentData: InstrumentData, index: number)}
 			{#key instrumentData}
 				<div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
-					<header class="card-header flex justify-between instrument-header">
+					<header class="card-header instrument-header flex justify-between">
 						<span>{index} {instrumentData.instrumentName}</span>
 						<div>
 							{#snippet btnSnippet(icon: Component, onclick: () => void)}
@@ -129,7 +157,7 @@
 							{/snippet}
 
 							{@render renderOptionalPart<PartOctave>('octave', PartOctaveView)}
-						
+
 							<button
 								class="btn preset-filled mr-4 px-2 py-1"
 								onclick={() => store.randomize(index)}><Dices size={16} /></button
@@ -163,6 +191,7 @@
 			{/snippet}
 		</Tabs>
 	</div>
+</div>
 	<!-- <footer class=" h-10% p-4">(footer)</footer> -->
 </div>
 
