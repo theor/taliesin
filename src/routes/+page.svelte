@@ -84,19 +84,6 @@
     drawerState = false;
   }
 
-  // $inspect(store);
-
-  // $effect(() => {
-  // 	const commandsSnapshot = $state.snapshot($commands.commands);
-  // 	console.log('commands changed', commands);
-  // 	commandsSnapshot.forEach((command) => {
-  // 		if (command.name === 'setData') {
-  // 			console.warn('cmd', $state.snapshot(command.value));
-  // 			store.setInstrumentPartial(command.index, command.value);
-  // 		}
-  // 	});
-  // 	store.clearCommands();
-  // });
 </script>
 
 <div class="flex h-screen flex-col">
@@ -174,7 +161,7 @@
                   {#each instrumentData.parts as part, partIndex}
                     {#if part.type === partName}
                       {@const ViewComp = component}
-                      <ViewComp bind:part={instrumentData.parts[partIndex] as TPart} {btnSnippet} />
+                      <ViewComp part={$state.snapshot(instrumentData.parts[partIndex]) as TPart} {btnSnippet} onPartChanged={p => {store.setInstrumentPart(selectedIndex, partIndex, p)} } />
                     {/if}
                   {/each}
                   <!-- {@const part = getPart(partName, instrumentData)}

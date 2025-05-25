@@ -15,10 +15,11 @@ export class PianoScale extends Instrument {
     public generate(data: InstrumentData): string {
       const notes = getPart<MonoSequence>('notes', data)!;
       const octave = getPart<PartOctave>('octave', data)?.octave ?? 4;
-      return `n("${notes.notes
-        .slice(0, this.getLength(data) ?? -1)
+      console.log(`GEN ${this.name}`, notes.notes, this.getLength(data));
+      const length = this.getLength(data);
+      return `n("<${Array.from({length: length.stepsPerMeasure*length.measures}, (_,i) => notes.notes[i])
         .map((x) => x ?? '~')
-        .join(' ')}").scale("C${octave}:minor").sound("sawtooth").n(4)`;
+        .join(' ')}>*${length.stepsPerMeasure/length.measures}").scale("C${octave}:minor").sound("sawtooth").n(4)`;
     }
     name: string = 'PianoScale';
     // notes = [1,2,3,4,5,6,7].map(x => x.toString());

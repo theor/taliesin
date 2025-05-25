@@ -10,11 +10,12 @@ export class Drum extends Instrument {
     }
     public generate(data: InstrumentData): string {
       const notes = getPart<PartTrackNotes>('trackNotes', data)!;
+      const length = this.getLength(data);
       const joined = Object.entries(notes.notes)
         .map((t) => {
           const [k, v] = t;
-          var p = v.map((x) => (x == 1 ? k : '~')).join(' ');
-          return p;
+          var p = Array.from({length: length.stepsPerMeasure*length.measures}, (_,i) => v[i] == 1 ? k : '~').join(' ');
+          return `<${p}>*${length.stepsPerMeasure/length.measures}`;
         })
         .join(','); // `s("${data.notes.join(' ')}")`;
       return `s("${joined}")`;

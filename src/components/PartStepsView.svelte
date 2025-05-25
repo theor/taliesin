@@ -3,7 +3,7 @@
 	import { ChevronDown, ChevronUp } from '@lucide/svelte';
 	// import { type Component } from 'svelte';
 
-	const { part = $bindable(), btnSnippet }: IPartViewProps<PartSteps> = $props();
+	const { part , btnSnippet,onPartChanged }: IPartViewProps<PartSteps> = $props();
 	$effect(() => {
 		console.log('PartStepsView c', part);
 	});
@@ -16,5 +16,5 @@
 		<IconComp size={16} />
 	</button>
 {/snippet} -->
-{@render btnSnippet(ChevronUp, () => part.stepsPerMeasure++)}
-{@render btnSnippet(ChevronDown, () => part.stepsPerMeasure--)}
+{@render btnSnippet(ChevronUp, () => { part.stepsPerMeasure++; onPartChanged(part); })}
+{@render btnSnippet(ChevronDown, () => {part.stepsPerMeasure--; onPartChanged(part);})}

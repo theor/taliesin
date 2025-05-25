@@ -3,23 +3,27 @@ import type { ISequencer } from './sequencer';
 
 export interface IInstrument {
   name: string;
-  getLength(data: InstrumentData): number;
+  getLength(data: InstrumentData): Length;
   generate: (data: InstrumentData) => string;
   createData: () => InstrumentData;
   // sequencer(data: IInstrumentData): ISequencer|undefined ;
   sequencer: ISequencer | undefined;
   randomize(data: InstrumentData): InstrumentData;
 }
+interface Length {
+    stepsPerMeasure: number;
+    measures: number;
+}
 export abstract class Instrument
   // <T extends InstrumentData>
   implements IInstrument
 {
-  getLength(data: InstrumentData): number {
+  getLength(data: InstrumentData): Length {
     var steps = getPart<PartSteps>('steps', data);
     if (steps) {
-      return steps.stepsPerMeasure * steps.measures;
+      return steps;
     }
-    return 4;
+    return {stepsPerMeasure: 4, measures: 1};
   }
   abstract randomize(data: InstrumentData): InstrumentData;
   sequencer: ISequencer | undefined;

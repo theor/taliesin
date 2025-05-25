@@ -20,6 +20,10 @@ type WrappedInstrument = {
     instrument: InstrumentDataJsonValue;
 }
 class AppStore {
+    setInstrumentPart(selectedIndex: number, partIndex: number, p: InstrumentPart): void {
+        this.instrumentsData.instrumentsData[selectedIndex].parts.splice(partIndex, 1, p);
+        this.setInstrument(selectedIndex, this.instrumentsData.instrumentsData[selectedIndex]);
+    }
 	randomize(index: number) {
 		const instr = getInstrument(this.instrumentsData.instrumentsData[index]);
         if (instr) {
