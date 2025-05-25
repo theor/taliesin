@@ -9,6 +9,8 @@
 
   const buttonClassOn = 'preset-filled-primary-500';
   const buttonClassOff = 'preset-outlined-primary-500';
+  const buttonClassOnOdd = 'preset-filled-tertiary-500';
+  const buttonClassOffOdd = 'preset-outlined-tertiary-500';
 
   $effect(() => {
     console.log('SEQ instrumentData', instrumentData);
@@ -46,10 +48,11 @@
         <div class="mr-1 w-4 flex-none">{track}</div>
         {#each { length: length.measures * length.stepsPerMeasure }, i}
           {@const cell = seq.getCell(instrumentData, index, i)}
+		  {@const odd = Math.floor(i/length.stepsPerMeasure) % 2 === 1}
           <button
             aria-label="seq-{index}-{i}"
             onclick={() => toggleCell(index, i)}
-            class="btn flex-1 {cell ? buttonClassOn : buttonClassOff}"
+            class="btn flex-1 {cell ? (odd ? buttonClassOnOdd : buttonClassOn) : (odd ? buttonClassOffOdd : buttonClassOff)}"
           ></button>
         {/each}
       </div>

@@ -64,7 +64,8 @@
   $effect(() => {
     // console.log('store changed', $state.snapshot(instrumentsData.instrumentsData), instrumentsData.instrumentsData[0]);
     code = store.code();
-    strudel.evaluate(code);
+    if(isHost)
+        strudel.evaluate(code);
     if (selectedIndex >= instrumentsData.instrumentsData.length) {
       selectedIndex = instrumentsData.instrumentsData.length - 1;
     }
@@ -83,7 +84,6 @@
   function drawerClose() {
     drawerState = false;
   }
-
 </script>
 
 <div class="flex h-screen flex-col">
@@ -161,7 +161,17 @@
                   {#each instrumentData.parts as part, partIndex}
                     {#if part.type === partName}
                       {@const ViewComp = component}
-                      <ViewComp part={$state.snapshot(instrumentData.parts[partIndex]) as TPart} {btnSnippet} onPartChanged={p => {store.setInstrumentPart(selectedIndex, partIndex, p)} } />
+                      {@const part = $state.snapshot(instrumentData.parts[partIndex]) as TPart}
+                      <ViewComp
+                        {part}
+                        {btnSnippet}
+                        onPartChanged={(del) => {
+                          return () => {
+                            del();
+                            store.setInstrumentPart(selectedIndex, partIndex, part);
+                          };
+                        }}
+                      />
                     {/if}
                   {/each}
                   <!-- {@const part = getPart(partName, instrumentData)}
@@ -171,7 +181,7 @@
                   {/if} -->
                 {/snippet}
 
-                  {@render renderOptionalPart<PartOctave>('octave', PartOctaveView)}
+                {@render renderOptionalPart<PartOctave>('octave', PartOctaveView)}
                 {@render renderOptionalPart<PartSteps>('steps', PartStepsView)}
                 <button
                   class="btn preset-filled mr-4 px-2 py-1"
@@ -185,7 +195,7 @@
               </div>
             </header>
             <PianoScaleView {instrumentData} {index} />
-        </div>
+          </div>
         {/key}
       {/snippet}
       {#if currentInstrument}

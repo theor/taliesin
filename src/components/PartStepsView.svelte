@@ -16,5 +16,7 @@
 		<IconComp size={16} />
 	</button>
 {/snippet} -->
-{@render btnSnippet(ChevronUp, () => { part.stepsPerMeasure++; onPartChanged(part); })}
-{@render btnSnippet(ChevronDown, () => {part.stepsPerMeasure--; onPartChanged(part);})}
+{@render btnSnippet(ChevronUp, onPartChanged(() => part.stepsPerMeasure++))}
+{@render btnSnippet(ChevronDown, onPartChanged(() => part.stepsPerMeasure--))}
+{@render btnSnippet(ChevronUp, onPartChanged(() => part.measures++))}
+{@render btnSnippet(ChevronDown, onPartChanged(() => part.measures--))}

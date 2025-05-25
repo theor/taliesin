@@ -1,4 +1,4 @@
-import { getPart, Instrument, type InstrumentData } from "./instruments";
+import { getPart, Instrument, type InstrumentData, type Length } from "./instruments";
 import { DrumNote, type InstrumentPart, type MonoSequence, type PartTrackNotes } from "./parts";
 
 export interface ISequencer {
@@ -9,9 +9,6 @@ export interface ISequencer {
   }
   export class Sequencer<TTrack, T extends InstrumentPart> implements ISequencer {
     tracks: string[];
-    private length(data: InstrumentData): number {
-      return this.instrument.getLength(data);
-    }
     constructor(
         private instrument: Instrument,
       private partSequencer: PartSequencer<TTrack, T>,
@@ -50,7 +47,9 @@ export interface ISequencer {
       return part.notes[step] == track;
     }
     setCell(part: MonoSequence, track: number, step: number, value: boolean): void {
-      if (!part || step < 0 || step >= part.notes.length) return;
+      if (!part || step < 0) return;
+      if(step >= part.notes.length)
+        part.notes = [...part.notes, ...new Array(step - part.notes.length + 1).fill(undefined)];   
       part.notes[step] = value ? track : undefined;
     }
   }

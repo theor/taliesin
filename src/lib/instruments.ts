@@ -10,7 +10,7 @@ export interface IInstrument {
   sequencer: ISequencer | undefined;
   randomize(data: InstrumentData): InstrumentData;
 }
-interface Length {
+export interface Length {
     stepsPerMeasure: number;
     measures: number;
 }

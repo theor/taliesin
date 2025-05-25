@@ -11,7 +11,7 @@ export enum Status {
 export interface IPartViewProps<T extends InstrumentPart> {
   part: T;
   btnSnippet: Snippet<[Component, () => void]>;
-  onPartChanged: (part: T) => void;
+  onPartChanged: (x:() => void) => (() => void);
 }
 export interface IInstrumentViewProps {
   instrumentData: InstrumentData;

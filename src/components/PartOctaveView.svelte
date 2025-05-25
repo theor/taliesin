@@ -3,7 +3,7 @@
 	import { ChevronDown, ChevronUp } from '@lucide/svelte';
 	// import { type Component } from 'svelte';
 
-	const { part, btnSnippet }: IPartViewProps<PartOctave> = $props();
+	const { part, btnSnippet,onPartChanged }: IPartViewProps<PartOctave> = $props();
 </script>
 
 <span>octave {part.octave}</span>
@@ -13,5 +13,5 @@
 		<IconComp size={16} />
 	</button>
 {/snippet} -->
-{@render btnSnippet(ChevronUp, () => part.octave++)}
-{@render btnSnippet(ChevronDown, () => part.octave--)}
+{@render btnSnippet(ChevronUp, onPartChanged(() => part.octave++))}
+{@render btnSnippet(ChevronDown, onPartChanged(() => part.octave--))}
