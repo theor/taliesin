@@ -171,16 +171,21 @@
                   partName: TPart['type'],
                   component: Component<IPartViewProps<TPart>>
                 )}
-                  {@const part = getPart(partName, instrumentData)}
+                  {#each instrumentData.parts as part, partIndex}
+                    {#if part.type === partName}
+                      {@const ViewComp = component}
+                      <ViewComp bind:part={instrumentData.parts[partIndex] as TPart} {btnSnippet} />
+                    {/if}
+                  {/each}
+                  <!-- {@const part = getPart(partName, instrumentData)}
                   {@const ViewComp = component}
                   {#if part}
                     <ViewComp {part} {btnSnippet} />
-                  {/if}
+                  {/if} -->
                 {/snippet}
 
-                {@render renderOptionalPart<PartOctave>('octave', PartOctaveView)}
+                  {@render renderOptionalPart<PartOctave>('octave', PartOctaveView)}
                 {@render renderOptionalPart<PartSteps>('steps', PartStepsView)}
-
                 <button
                   class="btn preset-filled mr-4 px-2 py-1"
                   onclick={() => store.randomize(index)}><Dices size={16} /></button
@@ -193,7 +198,7 @@
               </div>
             </header>
             <PianoScaleView {instrumentData} {index} />
-          </div>
+        </div>
         {/key}
       {/snippet}
       {#if currentInstrument}

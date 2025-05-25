@@ -16,7 +16,7 @@ export class PianoScale extends Instrument {
       const notes = getPart<MonoSequence>('notes', data)!;
       const octave = getPart<PartOctave>('octave', data)?.octave ?? 4;
       return `n("${notes.notes
-        .slice(0, this.sequencer?.length() ?? -1)
+        .slice(0, this.getLength(data) ?? -1)
         .map((x) => x ?? '~')
         .join(' ')}").scale("C${octave}:minor").sound("sawtooth").n(4)`;
     }
@@ -31,7 +31,7 @@ export class PianoScale extends Instrument {
     }
     constructor() {
       super();
-      this.sequencer = new Sequencer(new MonoSequenceSequencer(), 'notes');
+      this.sequencer = new Sequencer(this,new MonoSequenceSequencer(), 'notes');
 
     }
   }

@@ -5,7 +5,7 @@
 	} from '$lib';
 	import { getGlobalContext } from '$lib/context';
     import { getInstrument } from '$lib/Store.svelte';
-	import Sequencer from './Sequencer.svelte';
+	import SequencerView from './SequencerView.svelte';
 
 	const ctx = getGlobalContext();
 
@@ -25,6 +25,6 @@
 	<pre class="whitespace-normal">data: {JSON.stringify(instrumentData)}</pre>
 	{/if}
 	{#if seq}
-	<Sequencer instrumentData={instrumentData} index={props.index} />
+	<SequencerView instrumentData={instrumentData} index={props.index} />
 	{/if}
 </div>

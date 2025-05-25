@@ -1,8 +1,7 @@
-import { getPart, type InstrumentData } from "./instruments";
+import { getPart, Instrument, type InstrumentData } from "./instruments";
 import { DrumNote, type InstrumentPart, type MonoSequence, type PartTrackNotes } from "./parts";
 
 export interface ISequencer {
-    length(): number;
     tracks: string[];
   
     getCell(data: InstrumentData, track: number, step: number): boolean;
@@ -10,10 +9,11 @@ export interface ISequencer {
   }
   export class Sequencer<TTrack, T extends InstrumentPart> implements ISequencer {
     tracks: string[];
-    length(): number {
-      return this.partSequencer.length;
+    private length(data: InstrumentData): number {
+      return this.instrument.getLength(data);
     }
     constructor(
+        private instrument: Instrument,
       private partSequencer: PartSequencer<TTrack, T>,
       private partType: T['type']
     ) {
@@ -38,7 +38,6 @@ export interface ISequencer {
   }
   export interface PartSequencer<TTrack, T extends InstrumentPart> {
     tracks: TTrack[];
-    length: number;
     getCell(part: T, track: TTrack, step: number): boolean;
     setCell(part: T, track: TTrack, step: number, value: boolean): void;
   }

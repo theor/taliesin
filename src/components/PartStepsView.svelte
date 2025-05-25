@@ -3,7 +3,10 @@
 	import { ChevronDown, ChevronUp } from '@lucide/svelte';
 	// import { type Component } from 'svelte';
 
-	const { part, btnSnippet }: IPartViewProps<PartSteps> = $props();
+	const { part = $bindable(), btnSnippet }: IPartViewProps<PartSteps> = $props();
+	$effect(() => {
+		console.log('PartStepsView c', part);
+	});
 </script>
 
 <span>steps {part.stepsPerMeasure} x {part.measures}</span>

@@ -23,7 +23,7 @@ export class Drum extends Instrument {
     constructor() {
       super();
       // this.sequencer = new DrumSequencer();
-      this.sequencer = new Sequencer(new TrackSequencer(), 'trackNotes');
+      this.sequencer = new Sequencer(this, new TrackSequencer(), 'trackNotes');
     }
     createData_() {
       let o = { notes: {} } as { notes: { [key in DrumNote]: (0 | 1)[] } };
