@@ -78,6 +78,7 @@
   import AppMenu from '../components/AppMenu.svelte';
   import PartStepsView from '../components/PartStepsView.svelte';
   import { getInstrumentIcon } from '$lib/Store.svelte';
+    import { Pane, ThemeUtils } from 'svelte-tweakpane-ui';
 
   let drawerState = $state(false);
 
@@ -138,7 +139,6 @@
         </div>
       {/if}
       {#snippet instrumentCard(instrumentData: InstrumentData, index: number)}
-        {#key instrumentData}
           {@const Icon = getInstrumentIcon(instrumentData.instrumentName)}
           <div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
             <header
@@ -147,7 +147,7 @@
               <span class="border-secondary-500 mb-2 flex gap-2 border-b-2"
                 ><Icon size="24" /> {instrumentData.instrumentName}</span
               >
-              <div>
+              <div class="flex portrait:flex-col gap-2">
                 {#snippet btnSnippet(icon: Component, onclick: () => void)}
                   {@const IconComp = icon}
                   <button class="btn preset-filled px-2 py-1" {onclick}
@@ -161,17 +161,15 @@
                   {#each instrumentData.parts as part, partIndex}
                     {#if part.type === partName}
                       {@const ViewComp = component}
-                      {@const part = $state.snapshot(instrumentData.parts[partIndex]) as TPart}
+                      <Pane position="inline" title={part.type} theme={ThemeUtils.presets.light} >
                       <ViewComp
-                        {part}
+                        bind:part={instrumentData.parts[partIndex] as TPart}
                         {btnSnippet}
-                        onPartChanged={(del) => {
-                          return () => {
-                            del();
+                        onPartChanged={(e) => {
                             store.setInstrumentPart(selectedIndex, partIndex, part);
-                          };
                         }}
                       />
+                    </Pane>
                     {/if}
                   {/each}
                   <!-- {@const part = getPart(partName, instrumentData)}
@@ -194,9 +192,12 @@
                 >
               </div>
             </header>
+                    {#key instrumentData}
+
+
             <PianoScaleView {instrumentData} {index} />
+            {/key}
           </div>
-        {/key}
       {/snippet}
       {#if currentInstrument}
         {@render instrumentCard(currentInstrument, selectedIndex)}

@@ -1,6 +1,7 @@
 import type { Component, Snippet } from 'svelte';
 import type { InstrumentPart } from './parts';
 import type { InstrumentData } from './instruments';
+import type { ValueChangeEvent } from 'svelte-tweakpane-ui';
 
 export enum Status {
   disconnected = 'disconnected',
@@ -11,7 +12,7 @@ export enum Status {
 export interface IPartViewProps<T extends InstrumentPart> {
   part: T;
   btnSnippet: Snippet<[Component, () => void]>;
-  onPartChanged: (x:() => void) => (() => void);
+  onPartChanged: (x:ValueChangeEvent<any>) => void;
 }
 export interface IInstrumentViewProps {
   instrumentData: InstrumentData;
