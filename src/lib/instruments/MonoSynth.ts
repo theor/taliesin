@@ -19,7 +19,7 @@ export class PianoScale extends Instrument {
       const length = this.getLength(data);
       return `n("<${Array.from({length: length.stepsPerMeasure*length.measures}, (_,i) => notes.notes[i])
         .map((x) => x ?? '~')
-        .join(' ')}>*${length.stepsPerMeasure/length.measures}").scale("C${octave}:minor").sound("sawtooth").n(4)`;
+        .join(' ')}>*${length.stepsPerMeasure}").scale("C${octave}:minor").sound("sawtooth").n(4)`;
     }
     name: string = 'PianoScale';
     // notes = [1,2,3,4,5,6,7].map(x => x.toString());

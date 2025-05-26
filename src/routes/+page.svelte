@@ -192,7 +192,9 @@
                 >
               </div>
             </header>
-            <PianoScaleView bind:instrumentData={instrumentData} {index} />
+
+
+            <PianoScaleView {instrumentData} {index} />
           </div>
       {/snippet}
       {#if currentInstrument}
