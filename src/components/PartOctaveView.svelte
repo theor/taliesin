@@ -4,7 +4,7 @@
     import { Slider } from 'svelte-tweakpane-ui';
 	// import { type Component } from 'svelte';
 
-	const { part = $bindable(), btnSnippet,onPartChanged }: IPartViewProps<PartOctave> = $props();
+	const { part = $bindable()  }: IPartViewProps<PartOctave> = $props();
 </script>
 
 <!-- on:change={onPartChanged}  -->

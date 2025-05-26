@@ -10,9 +10,9 @@
 	const ctx = getGlobalContext();
 
 	let {index, instrumentData = $bindable()}: IInstrumentViewProps = $props();
+
 	const instr: IInstrument | undefined = getInstrument(instrumentData);
 	const seq = instr?.sequencer;
-	console.log(seq);
 	
 
 </script>
@@ -26,6 +26,9 @@
 	<pre class="whitespace-normal">data: {JSON.stringify(instrumentData)}</pre>
 	{/if}
 	{#if seq}
+	<!-- TODO should not be keyed -->
+	{#key index}
 	<SequencerView bind:instrumentData={instrumentData} index={index} />
+	{/key}
 	{/if}
 </div>

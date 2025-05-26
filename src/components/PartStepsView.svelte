@@ -5,9 +5,9 @@
 	// import { type Component } from 'svelte';
 
 	const { part }: IPartViewProps<PartSteps> = $props();
-	$effect(() => {
-		console.log('PartStepsView c', part);
-	});
+	// $effect(() => {
+	// 	console.log('PartStepsView c', part);
+	// });
 	function formatSteps(value: number): string {
 		return  (part.oddSignature ? value.toString() : (1 << value).toString()) + "#";
 	}
