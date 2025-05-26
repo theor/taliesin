@@ -148,12 +148,6 @@
                 ><Icon size="24" /> {instrumentData.instrumentName}</span
               >
               <div class="flex portrait:flex-col gap-2">
-                {#snippet btnSnippet(icon: Component, onclick: () => void)}
-                  {@const IconComp = icon}
-                  <button class="btn preset-filled px-2 py-1" {onclick}
-                    ><IconComp size={16} /></button
-                  >
-                {/snippet}
                 {#snippet renderOptionalPart<TPart extends InstrumentPart>(
                   partName: TPart['type'],
                   component: Component<IPartViewProps<TPart>>
@@ -164,19 +158,10 @@
                       <Pane position="inline" title={part.type} theme={ThemeUtils.presets.light} >
                       <ViewComp
                         bind:part={instrumentData.parts[partIndex] as TPart}
-                        {btnSnippet}
-                        onPartChanged={(e) => {
-                            store.setInstrumentPart(selectedIndex, partIndex, part);
-                        }}
                       />
                     </Pane>
                     {/if}
                   {/each}
-                  <!-- {@const part = getPart(partName, instrumentData)}
-                  {@const ViewComp = component}
-                  {#if part}
-                    <ViewComp {part} {btnSnippet} />
-                  {/if} -->
                 {/snippet}
 
                 {@render renderOptionalPart<PartOctave>('octave', PartOctaveView)}

@@ -27,7 +27,7 @@ export class PianoScale extends Instrument {
       return [
         { type: 'octave', octave: 4 },
         { type: 'notes', notes: [1, 2, 3, undefined, 4, 5, 3, undefined] },
-        { type: 'steps', stepsPerMeasure: 8, measures: 2 }
+        { type: 'steps', stepsPerMeasure: 8, measures: 2,oddSignature: false, }
       ] as InstrumentPart[];
     }
     constructor() {

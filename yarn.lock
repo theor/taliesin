@@ -981,10 +981,10 @@
   dependencies:
     "@tweakpane/core" "^2.0.5"
 
-"@kitschpatrol/tweakpane-plugin-inputs@1.0.4-beta.4":
-  version "1.0.4-beta.4"
-  resolved "https://registry.yarnpkg.com/@kitschpatrol/tweakpane-plugin-inputs/-/tweakpane-plugin-inputs-1.0.4-beta.4.tgz#e757c983b40f519748cdcd4aecbc709ea74027f7"
-  integrity sha512-VRzvTTMCy6wRABJOkPDbguPTzRJytrxx0RUNMSJpx7H5L4XJ8BVzglQqatXLxHr3Nvy3ZovwqX11W7mu7QcX5A==
+"@kitschpatrol/tweakpane-plugin-inputs@1.0.4-beta.5":
+  version "1.0.4-beta.5"
+  resolved "https://registry.yarnpkg.com/@kitschpatrol/tweakpane-plugin-inputs/-/tweakpane-plugin-inputs-1.0.4-beta.5.tgz#7e3e21e7940fcaa51f9f5931893fad6ea0709b21"
+  integrity sha512-R6YRWWCGtyBn14KXofgUJH7bV3mD5Vjhw8QyFTMQD6q8R9R7jD7uCsIxbU9hcduQID2diBvxT8bnLtWkyhrhVw==
   dependencies:
     "@tweakpane/core" "^2.0.5"
 
@@ -8432,16 +8432,16 @@ svelte-preprocess@^5.1.1:
     sorcery "^0.11.0"
     strip-indent "^3.0.0"
 
-svelte-tweakpane-ui@^1.5.7:
-  version "1.5.7"
-  resolved "https://registry.yarnpkg.com/svelte-tweakpane-ui/-/svelte-tweakpane-ui-1.5.7.tgz#3fc8a91aba9d7b0fc9216e5bfe37b949d7b9a62c"
-  integrity sha512-C45AtZ492N7jbZivirGOFSmwLoL8vvT4vnSvYq+1xXDXLppbupd9MJjLmfAt6yxkyWmvcxcp1E2Nmup1FfCYog==
+svelte-tweakpane-ui@^1.5.8:
+  version "1.5.8"
+  resolved "https://registry.yarnpkg.com/svelte-tweakpane-ui/-/svelte-tweakpane-ui-1.5.8.tgz#a89760df6145f913ba549f1c3f4d0f7461403ac0"
+  integrity sha512-zMhIwhcTlMaaSqY+JjumWHFAdghZLnDYq7+gz0wr3hKOjl55Ez8J9fB18OKKJ45XHlSySZoznU1S0iQq9RR8Pg==
   dependencies:
     "@kitschpatrol/tweakpane-plugin-camerakit" "0.3.1-beta.3"
     "@kitschpatrol/tweakpane-plugin-essentials" "0.2.2-beta.3"
     "@kitschpatrol/tweakpane-plugin-file-import" "1.1.2-beta.2"
     "@kitschpatrol/tweakpane-plugin-image" "2.0.1-beta.6"
-    "@kitschpatrol/tweakpane-plugin-inputs" "1.0.4-beta.4"
+    "@kitschpatrol/tweakpane-plugin-inputs" "1.0.4-beta.5"
     "@kitschpatrol/tweakpane-plugin-profiler" "0.4.2-beta.3"
     "@kitschpatrol/tweakpane-plugin-rotation" "0.2.1-beta.2"
     "@kitschpatrol/tweakpane-plugin-textarea" "2.0.1-beta.2"

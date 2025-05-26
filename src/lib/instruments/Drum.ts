@@ -15,7 +15,7 @@ export class Drum extends Instrument {
         .map((t) => {
           const [k, v] = t;
           var p = Array.from({length: length.stepsPerMeasure*length.measures}, (_,i) => v[i] == 1 ? k : '~').join(' ');
-          return `<${p}>*${length.stepsPerMeasure/length.measures}`;
+          return `<${p}>*${length.stepsPerMeasure}`;
         })
         .join(','); // `s("${data.notes.join(' ')}")`;
       return `s("${joined}")`;
@@ -39,6 +39,7 @@ export class Drum extends Instrument {
       const steps: PartSteps = {
         type: 'steps',
         stepsPerMeasure: 4,
+        oddSignature: false,
         measures: 2
       };
       return [p, steps];

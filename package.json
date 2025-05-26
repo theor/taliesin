@@ -72,7 +72,7 @@
 		"@strudel/transpiler": "^1.2.0",
 		"@strudel/web": "^1.2.1",
 		"@strudel/webaudio": "^1.2.1",
-		"svelte-tweakpane-ui": "^1.5.7",
+		"svelte-tweakpane-ui": "^1.5.8",
 		"trystero": "^0.21.3"
 	}
 }

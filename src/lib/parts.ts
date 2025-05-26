@@ -19,6 +19,7 @@ export interface PartOctave {
       type: 'steps';
     stepsPerMeasure: number;
     measures: number;
+    oddSignature: boolean;
   }
   export interface PartTrackNotes {
     type: 'trackNotes';

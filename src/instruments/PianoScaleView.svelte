@@ -12,6 +12,8 @@
 	let {index, instrumentData = $bindable()}: IInstrumentViewProps = $props();
 	const instr: IInstrument | undefined = getInstrument(instrumentData);
 	const seq = instr?.sequencer;
+	console.log(seq);
+	
 
 </script>
 
