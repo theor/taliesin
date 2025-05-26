@@ -9,8 +9,7 @@
 
 	const ctx = getGlobalContext();
 
-	const props: IInstrumentViewProps = $props();
-	let instrumentData = props.instrumentData;
+	let {index, instrumentData = $bindable()}: IInstrumentViewProps = $props();
 	const instr: IInstrument | undefined = getInstrument(instrumentData);
 	const seq = instr?.sequencer;
 
@@ -25,6 +24,6 @@
 	<pre class="whitespace-normal">data: {JSON.stringify(instrumentData)}</pre>
 	{/if}
 	{#if seq}
-	<SequencerView instrumentData={instrumentData} index={props.index} />
+	<SequencerView bind:instrumentData={instrumentData} index={index} />
 	{/if}
 </div>

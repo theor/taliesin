@@ -2,8 +2,7 @@
   import { store, type IInstrument, type IInstrumentViewProps } from '$lib';
   import { getInstrument } from '$lib/Store.svelte';
 
-  const props: IInstrumentViewProps = $props();
-  const instrumentData = $state.snapshot(props.instrumentData);
+  const {index, instrumentData = $bindable()}: IInstrumentViewProps = $props();
   const instr: IInstrument | undefined = getInstrument(instrumentData);
   const seq = instr?.sequencer!;
 
@@ -36,7 +35,7 @@
     // }
     // 	instrumentData.notes[track as DrumNote] = track;
     //     console.log(instrumentData.notes);
-    store.setInstrument(props.index, instrumentData);
+    store.setInstrument(index, instrumentData);
   }
 </script>
 
