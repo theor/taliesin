@@ -3,6 +3,7 @@
   import { Navigation } from '@skeletonlabs/skeleton-svelte';
   import { Plus } from '@lucide/svelte';
     import { getInstrumentIcon } from '$lib/Store.svelte';
+    import { PianoScale } from '$lib/instruments/MonoSynth';
 
   let {
     drawerClose,
@@ -23,7 +24,7 @@
     selectedIndex = i;
   }
   function onAdd() {
-    store.createInstrument('PianoScale');
+    store.createInstrument(PianoScale);
     selectedIndex = instrumentsData.instrumentsData.length - 1;
   }
 </script>

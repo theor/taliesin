@@ -5,8 +5,8 @@ import type { Constructor, Instrument, InstrumentData } from "./instruments";
 import { PianoScale } from "./instruments/MonoSynth";
 import { Drum } from "./instruments/Drum";
 import type { Component } from "svelte";
-import { DrumIcon, KeyboardMusic, Music } from "@lucide/svelte";
-import { PartEffects, type InstrumentPart, MonoSequence, PartSteps, PartFilter } from "./parts.svelte";
+import { DrumIcon, KeyboardMusic, Music, Piano } from "@lucide/svelte";
+import { PartEffects, type InstrumentPart, MonoSequence, PartSteps, PartFilter, PartOctave } from "./parts.svelte";
 
 const config = {
     appId: 'taliesin',
@@ -85,7 +85,7 @@ class AppStore {
     }
     preset() {
         this.instrumentsData.instrumentsData.push(createInstrument(
-            'PianoScale',
+            PianoScale,
             [
                 new PartEffects({reverb: 1, }),
                 new MonoSequence({notes:[1, 2, 3, 0, 4, 5, 3, 0]}),
@@ -93,12 +93,19 @@ class AppStore {
                 new PartFilter({freq:700}),
             ]
         ));    
-        this.instrumentsData.instrumentsData.push(createInstrument("Drum", [
+        this.instrumentsData.instrumentsData.push(createInstrument(PianoScale, [
+            new PartEffects({reverb: 0.5}),
+            new MonoSequence({notes:[1, 2, 3, undefined, 4, 5, 3, undefined]}),
+            new PartSteps(8, 2, false),
+            new PartOctave(2),
+        ]));
+
+        this.instrumentsData.instrumentsData.push(createInstrument(Drum, [
             new PartEffects({reverb: 0.2})
         ]));
 
     }
-    createInstrument(name: string) {
+    createInstrument<T extends Instrument>(name: Constructor<T>) {
         this.instrumentsData.instrumentsData.push(createInstrument(
             name,
             //  notes: [1, 2, 3,undefined,4,5,3,undefined]
@@ -156,12 +163,12 @@ const instrumentMap: { [key: string]: Instrument } = {
       // throw new Error(`Instrument ${name} not found`);
     }
   }
-  export function createInstrument(
-    n: Instrument['name'],
+  export function createInstrument<TInstr extends Instrument>(
+    n: Constructor<TInstr>,
     d?: InstrumentPart[]
   ): InstrumentData {
     console.log('createInstrument', n, d);
-    var instr = instrumentMap[n];
+    var instr = instrumentMap[n.name];
     var baseData = instr.createData();
     if (d) {
         d.forEach((t, index) => {
