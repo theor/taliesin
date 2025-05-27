@@ -19,7 +19,7 @@ export class Drum extends Instrument {
           return `<${p}>*${length.stepsPerMeasure}`;
         })
         .join(','); // `s("${data.notes.join(' ')}")`;
-      return `s("${joined}")${effects?.generate()}`;
+      return `s("${joined}")${effects?.generate() || ''}`;
     }
     override name: string = 'Drum';
     constructor() {

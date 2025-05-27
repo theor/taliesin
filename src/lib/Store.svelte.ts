@@ -19,7 +19,25 @@ type WrappedInstrument = {
     index: number;
     instrument: InstrumentDataJsonValue;
 }
+export const presets: {name:string, instrument: Constructor<Instrument>, parts: InstrumentPart[]}[] = [
+    { name: 'Piano',  instrument: PianoScale,parts:[] },
+    { name: 'Drum',  instrument: Drum, parts:[] },
+    {name: 'Bass', instrument: PianoScale, parts: [
+            new PartEffects({reverb: 0.5}),
+            new MonoSequence({notes:[1, 2, 3, undefined, 4, 5, 3, undefined]}),
+            new PartSteps(8, 2, false),
+            new PartOctave(2),
+]}
+];
 class AppStore {
+    createInstrumentPreset(preset: { name: string; instrument: Constructor<Instrument>; parts: InstrumentPart[]; }) {
+        const { instrument, parts } = preset;
+        this.instrumentsData.instrumentsData.push(createInstrument(
+            instrument,
+            parts,
+            preset.name
+        ));
+    }
     setInstrumentPart(selectedIndex: number, partIndex: number, p: InstrumentPart): void {
         this.instrumentsData.instrumentsData[selectedIndex].parts.splice(partIndex, 1, p);
         this.setInstrument(selectedIndex, this.instrumentsData.instrumentsData[selectedIndex]);
@@ -165,11 +183,12 @@ const instrumentMap: { [key: string]: Instrument } = {
   }
   export function createInstrument<TInstr extends Instrument>(
     n: Constructor<TInstr>,
-    d?: InstrumentPart[]
+    d?: InstrumentPart[],
+    name?: string
   ): InstrumentData {
     console.log('createInstrument', n, d);
     var instr = instrumentMap[n.name];
-    var baseData = instr.createData();
+    var baseData = instr.createData(name);
     if (d) {
         d.forEach((t, index) => {
             let existingPart = baseData.parts.find(p => p instanceof t.constructor);

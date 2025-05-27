@@ -1,8 +1,8 @@
 <script lang="ts">
   import {store } from '$lib';
-  import { Navigation } from '@skeletonlabs/skeleton-svelte';
+  import { Modal, Navigation } from '@skeletonlabs/skeleton-svelte';
   import { Plus } from '@lucide/svelte';
-    import { getInstrumentIcon } from '$lib/Store.svelte';
+    import { getInstrumentIcon, presets } from '$lib/Store.svelte';
     import { PianoScale } from '$lib/instruments/MonoSynth';
 
   let {
@@ -24,26 +24,64 @@
     selectedIndex = i;
   }
   function onAdd() {
-    store.createInstrument(PianoScale);
-    selectedIndex = instrumentsData.instrumentsData.length - 1;
+    addModalOpened = true;
+  }
+  let addModalOpened = $state(false);
+  function modalClose() {
+    addModalOpened = false;
   }
 </script>
 
 <!-- <header class="flex justify-between">
 	<h2 class="h2">Drawer Example</h2>
 </header> -->
+<Modal
+  open={addModalOpened}
+  onOpenChange={(e) => (addModalOpened = e.open)}
+  contentBase="card bg-surface-100-900 p-4 space-y-4 shadow-xl max-w-screen-sm"
+  backdropClasses="backdrop-blur-sm"
+>
+  {#snippet content()}
+    <header class="flex justify-between">
+      <h2 class="h2">Add instrument</h2>
+    </header>
+    <article>
+     <div>
+      {#each presets as preset}
+      {@const Icon = getInstrumentIcon(preset.instrument.name)}
+      <button
+          type="button"
+          class="btn  w-full justify-start"
+          onclick={() => {
+            store.createInstrumentPreset(preset);
+            selectedIndex = instrumentsData.instrumentsData.length - 1;
+            addModalOpened = false;
+          }}
+        >
+          <Icon size={24} />
+          {preset.name}
+        </button>
+      {/each}
+     </div>
+    </article>
+    <footer class="flex justify-end gap-4">
+      <button type="button" class="btn preset-tonal" onclick={() => addModalOpened = false}>Cancel</button>
+    </footer>
+  {/snippet}
+</Modal>
 <Navigation.Rail expanded={true} value={selectedIndex.toString()} {onValueChange}>
   {#snippet tiles()}
     {#each instrumentsData.instrumentsData as instrumentData, index}
       {@const Icon = getInstrumentIcon(instrumentData.instrumentName)}
-      <Navigation.Tile labelExpanded={instrumentData.instrumentName} id={index.toString()}>
+      <Navigation.Tile labelExpanded={instrumentData.name} id={index.toString()}>
         <Icon size={24} />
       </Navigation.Tile>
     {/each}
+    <Navigation.Tile labelExpanded="Add" title="Add" background="preset-secondary" onclick={onAdd}><Plus /></Navigation.Tile>`
   {/snippet}
 
   {#snippet footer()}
-    <Navigation.Tile labelExpanded="Add" title="Add" onclick={onAdd}><Plus /></Navigation.Tile>`
+    
     <div class="flex w-full flex-row gap-4">
       {#if drawerClose}
         <button

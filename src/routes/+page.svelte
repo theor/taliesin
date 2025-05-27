@@ -76,9 +76,6 @@
 
   import { Modal } from '@skeletonlabs/skeleton-svelte';
   import AppMenu from '../components/AppMenu.svelte';
-  import PartStepsView from '../components/PartStepsView.svelte';
-  import { getInstrumentIcon } from '$lib/Store.svelte';
-    import { Pane, ThemeUtils } from 'svelte-tweakpane-ui';
     import InstrumentView from '../components/InstrumentView.svelte';
 
   let drawerState = $state(false);

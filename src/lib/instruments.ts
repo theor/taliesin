@@ -22,13 +22,14 @@ export abstract class Instrument
   name: string = this.constructor.name;
 
   abstract createData_(): InstrumentPart[];
-  createData(): InstrumentData {
-    return { parts: this.createData_(), instrumentName: this.name };
+  createData(name?: string): InstrumentData {
+    return { parts: this.createData_(), instrumentName: this.name, name: name || this.name  };
   }
   abstract generate(data: InstrumentData): string;
 }
 export type Constructor<T> = new (...args: any[]) => T;
 export interface InstrumentData {
+  name: string;
   instrumentName: string;
   parts: InstrumentPart[];
 }

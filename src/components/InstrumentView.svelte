@@ -1,5 +1,5 @@
 <script lang="ts">
-  import {PartFilter, PartOctave, PartSteps, type  Constructor,type IInstrumentViewProps,type InstrumentPart,type IPartViewProps } from '$lib';
+  import {PartEffects, PartFilter, PartOctave, PartSteps, type  Constructor,type IInstrumentViewProps,type InstrumentPart,type IPartViewProps } from '$lib';
   import { getInstrumentIcon, store } from '$lib/Store.svelte';
     import { type Component } from 'svelte';
     import { Pane, ThemeUtils } from 'svelte-tweakpane-ui';
@@ -8,6 +8,7 @@
     import { Dices, X } from '@lucide/svelte';
     import PianoScaleView from '../instruments/PianoScaleView.svelte';
     import PartFilterView from './PartFilterView.svelte';
+    import PartEffectsView from './PartEffectsView.svelte';
   let { index, instrumentData = $bindable() }: IInstrumentViewProps = $props();
   
   let Icon = getInstrumentIcon(instrumentData.instrumentName);
@@ -36,6 +37,7 @@
       {@render renderOptionalPart(PartFilter, PartFilterView)}
       {@render renderOptionalPart(PartOctave, PartOctaveView)}
       {@render renderOptionalPart(PartSteps, PartStepsView)}
+      {@render renderOptionalPart(PartEffects, PartEffectsView)}
       <button class="btn preset-filled mr-4 px-2 py-1" onclick={() => store.randomize(index)}
         ><Dices size={16} /></button
       >
