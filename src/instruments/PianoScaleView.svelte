@@ -26,7 +26,7 @@
 	<pre class="whitespace-normal">data: {JSON.stringify(instrumentData)}</pre>
 	{/if}
 	{#if seq}
-	<!-- TODO should not be keyed -->
+	<!-- TODO should not be keyed ? at least index is better than instrument data -->
 	{#key index}
 	<SequencerView bind:instrumentData={instrumentData} index={index} />
 	{/key}
