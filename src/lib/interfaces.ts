@@ -1,4 +1,4 @@
-import type { InstrumentPart } from './parts';
+import type { InstrumentPart } from './parts.svelte';
 import type { InstrumentData } from './instruments';
 
 export enum Status {

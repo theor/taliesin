@@ -1,12 +1,12 @@
 import {  Status } from "./interfaces";
 import { joinRoom } from 'trystero/nostr';
 import { selfId, type ActionSender, type JsonValue } from 'trystero'
-import type { Instrument, InstrumentData } from "./instruments";
+import type { Constructor, Instrument, InstrumentData } from "./instruments";
 import { PianoScale } from "./instruments/MonoSynth";
 import { Drum } from "./instruments/Drum";
 import type { Component } from "svelte";
 import { DrumIcon, KeyboardMusic, Music } from "@lucide/svelte";
-import type { InstrumentPart } from "./parts";
+import { PartEffects, type InstrumentPart, MonoSequence, PartSteps, PartFilter } from "./parts.svelte";
 
 const config = {
     appId: 'taliesin',
@@ -27,7 +27,7 @@ class AppStore {
 	randomize(index: number) {
 		const instr = getInstrument(this.instrumentsData.instrumentsData[index]);
         if (instr) {
-            const data = instr.randomize($state.snapshot(this.instrumentsData.instrumentsData[index]));
+            const data = instr.randomize(this.instrumentsData.instrumentsData[index]);
             this.setInstrumentPartial(index, data);
         }
 	}
@@ -86,9 +86,16 @@ class AppStore {
     preset() {
         this.instrumentsData.instrumentsData.push(createInstrument(
             'PianoScale',
-            //  notes: [1, 2, 3,undefined,4,5,3,undefined]
+            [
+                new PartEffects({reverb: 1, }),
+                new MonoSequence({notes:[1, 2, 3, 0, 4, 5, 3, 0]}),
+                new PartSteps(8, 1, false),
+                new PartFilter({freq:700}),
+            ]
         ));    
-        this.instrumentsData.instrumentsData.push(createInstrument("Drum"));
+        this.instrumentsData.instrumentsData.push(createInstrument("Drum", [
+            new PartEffects({reverb: 0.2})
+        ]));
 
     }
     createInstrument(name: string) {
@@ -98,8 +105,8 @@ class AppStore {
         ));
     }
     setInstrument(index: number, data: InstrumentData) {
-        console.log("setInstrument", index, $state.snapshot(data));
-        const snapshot = $state.snapshot(data);
+        // console.log("setInstrument", index, data);
+        const snapshot = data;
         this.instrumentsData.instrumentsData.splice(index, 1, snapshot);
         this.sendInstrument({index,instrument: snapshot as InstrumentDataJsonValue})
     };
@@ -151,17 +158,28 @@ const instrumentMap: { [key: string]: Instrument } = {
   }
   export function createInstrument(
     n: Instrument['name'],
-    d?: Partial<InstrumentPart>[]
+    d?: InstrumentPart[]
   ): InstrumentData {
     console.log('createInstrument', n, d);
     var instr = instrumentMap[n];
     var baseData = instr.createData();
     if (d) {
-      console.error('not implemented yet', n);
+        d.forEach((t, index) => {
+            let existingPart = baseData.parts.find(p => p instanceof t.constructor);
+            if (existingPart) {
+                // Update existing part
+                existingPart.assign(t);
+            } else {
+                // Add new part
+                baseData.parts.push(t);
+            }
+        });
       // baseData.parts
       // var data = { ...baseData, ...d };
       // return data;
     }
     // else
+    console.warn($state.snapshot(baseData));
+    
     return baseData;
   }

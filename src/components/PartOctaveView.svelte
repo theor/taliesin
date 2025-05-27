@@ -8,7 +8,7 @@
 </script>
 
 <!-- on:change={onPartChanged}  -->
-<Slider bind:value={part.octave} min={0} max={8} step={1} label="Octave"  />
+<Slider bind:value={part.data.octave} min={0} max={8} step={1} label="Octave"  />
 <!-- <span>octave {part.octave}</span>
 {@render btnSnippet(ChevronUp, onPartChanged(() => part.octave++))}
 {@render btnSnippet(ChevronDown, onPartChanged(() => part.octave--))} -->

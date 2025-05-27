@@ -1,39 +1,48 @@
 import { Instrument,getPart,type InstrumentData } from "$lib/instruments";
-import type { InstrumentPart, MonoSequence, PartOctave } from "$lib/parts";
+import { InstrumentPart, MonoSequence, PartEffects, PartFilter, PartOctave, PartSteps } from "$lib/parts.svelte";
 import { Sequencer, MonoSequenceSequencer } from "$lib/sequencer";
 
 
 export class PianoScale extends Instrument {
     public randomize(data: InstrumentData): InstrumentData {
-      const part = getPart<MonoSequence>('notes', data)!;
-      const notes = part.notes.map(() => {
+      const part = getPart(MonoSequence, data)!;
+      const length = this.getLength(data);
+
+      part.data.notes = Array.from({length: length.stepsPerMeasure * length.measures}, (_, i) => {
         return Math.floor(Math.random() * 7);
       });
-      part.notes = notes;
+      // const notes = part.data.notes.map(() => {
+      //   return Math.floor(Math.random() * 7);
+      // });
+      // part.data.notes = notes;
       return data;
     }
     public generate(data: InstrumentData): string {
-      const notes = getPart<MonoSequence>('notes', data)!;
-      const octave = getPart<PartOctave>('octave', data)?.octave ?? 4;
-      console.log(`GEN ${this.name}`, notes.notes, this.getLength(data));
+      const notes = getPart(MonoSequence, data)!;
+      const octave = getPart(PartOctave, data)?.data?.octave ?? 4;
+      // console.log(`GEN ${this.name}`, notes.data.notes, this.getLength(data));
       const length = this.getLength(data);
-      return `n("<${Array.from({length: length.stepsPerMeasure*length.measures}, (_,i) => notes.notes[i])
+      return `n("<${Array.from({length: length.stepsPerMeasure*length.measures}, (_,i) => notes.data.notes[i])
         .map((x) => x ?? '~')
-        .join(' ')}>*${length.stepsPerMeasure}").scale("C${octave}:minor").sound("sawtooth").n(4).room(0.2)
+        .join(' ')}>*${length.stepsPerMeasure}").scale("C${octave}:minor").sound("sawtooth").n(4)
+        ${getPart(PartFilter, data)?.generate() || ''}
+        ${getPart(PartEffects, data)?.generate() || ''}
         `;
     }
-    name: string = 'PianoScale';
+    override name: string = 'PianoScale';
     // notes = [1,2,3,4,5,6,7].map(x => x.toString());
-    createData_() {
+    override createData_(): InstrumentPart[] {
       return [
-        { type: 'octave', octave: 4 },
-        { type: 'notes', notes: [1, 2, 3, undefined, 4, 5, 3, undefined] },
-        { type: 'steps', stepsPerMeasure: 8, measures: 2,oddSignature: false, }
-      ] as InstrumentPart[];
+        new PartOctave(4),
+        new MonoSequence({notes:[1, 2, 3, undefined, 4, 5, 3, undefined]}),
+        new PartSteps(8, 2, false),
+        new PartEffects({ reverb: .2,  })
+      ];
     }
+     
     constructor() {
       super();
-      this.sequencer = new Sequencer(this,new MonoSequenceSequencer(), 'notes');
+      this.sequencer = new Sequencer(this,new MonoSequenceSequencer(), MonoSequence);
 
     }
   }

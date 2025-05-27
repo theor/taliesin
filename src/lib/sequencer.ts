@@ -1,5 +1,5 @@
-import { getPart, Instrument, type InstrumentData, type Length } from "./instruments";
-import { DrumNote, type InstrumentPart, type MonoSequence, type PartTrackNotes } from "./parts";
+import { getPart, Instrument, type Constructor, type InstrumentData, type Length } from "./instruments";
+import { DrumNote, type InstrumentPart, type MonoSequence, type PartTrackNotes } from "./parts.svelte";
 
 export interface ISequencer {
     tracks: string[];
@@ -12,7 +12,7 @@ export interface ISequencer {
     constructor(
         private instrument: Instrument,
       private partSequencer: PartSequencer<TTrack, T>,
-      private partType: T['type']
+      private partType: Constructor<T>
     ) {
       this.partSequencer = partSequencer;
       this.tracks = this.partSequencer.tracks.map((x) => `${x}`);
@@ -43,14 +43,14 @@ export interface ISequencer {
     tracks: number[] = [0, 1, 2, 3, 4, 5, 6, 7];
     length = 4;
     getCell(part: MonoSequence, track: number, step: number): boolean {
-      if (!part || step < 0 || step >= part.notes.length) return false;
-      return part.notes[step] == track;
+      if (!part || step < 0 || step >= part.data.notes.length) return false;
+      return part.data.notes[step] == track;
     }
     setCell(part: MonoSequence, track: number, step: number, value: boolean): void {
       if (!part || step < 0) return;
-      if(step >= part.notes.length)
-        part.notes = [...part.notes, ...new Array(step - part.notes.length + 1).fill(undefined)];   
-      part.notes[step] = value ? track : undefined;
+      if(step >= part.data.notes.length)
+        part.data.notes = [...part.data.notes, ...new Array(step - part.data.notes.length + 1).fill(undefined)];   
+      part.data.notes[step] = value ? track : undefined;
     }
   }
   
@@ -59,18 +59,18 @@ export interface ISequencer {
     tracks = Object.values(DrumNote);
     getCell(part: PartTrackNotes, track: string, step: number): boolean {
       if (!part) return false;
-      const trackData = part.notes[track as DrumNote];
+      const trackData = part.data.notes[track as DrumNote];
       if (!trackData) return false;
       if (step < 0 || step >= trackData.length) return false;
       return trackData[step] == 1;
     }
     setCell(part: PartTrackNotes, track: string, step: number, value: boolean): void {
       if (!part) return;
-      let trackData = part.notes[track as DrumNote];
+      let trackData = part.data.notes[track as DrumNote];
       if (!trackData) {
         trackData = new Array(this.length).fill(0);
       }
       trackData[step] = value ? 1 : 0;
-      part.notes[track as DrumNote] = trackData;
+      part.data.notes[track as DrumNote] = trackData;
     }
   }

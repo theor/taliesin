@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { IInstrumentViewProps, InstrumentPart, IPartViewProps, PartOctave, PartSteps } from '$lib';
+  import {PartFilter, PartOctave, PartSteps, type  Constructor,type IInstrumentViewProps,type InstrumentPart,type IPartViewProps } from '$lib';
   import { getInstrumentIcon, store } from '$lib/Store.svelte';
     import { type Component } from 'svelte';
     import { Pane, ThemeUtils } from 'svelte-tweakpane-ui';
@@ -7,6 +7,7 @@
     import PartStepsView from './PartStepsView.svelte';
     import { Dices, X } from '@lucide/svelte';
     import PianoScaleView from '../instruments/PianoScaleView.svelte';
+    import PartFilterView from './PartFilterView.svelte';
   let { index, instrumentData = $bindable() }: IInstrumentViewProps = $props();
   
   let Icon = getInstrumentIcon(instrumentData.instrumentName);
@@ -19,21 +20,22 @@
     >
     <div class="flex gap-2 portrait:flex-col">
       {#snippet renderOptionalPart<TPart extends InstrumentPart>(
-        partName: TPart['type'],
+        partType: Constructor<TPart>,
         component: Component<IPartViewProps<TPart>>
       )}
         {#each instrumentData.parts as part, partIndex}
-          {#if part.type === partName}
+          {#if part instanceof partType}
             {@const ViewComp = component}
-            <Pane position="inline" title={part.type} theme={ThemeUtils.presets.light} >
+            <Pane position="inline" title={partType.name} theme={ThemeUtils.presets.light} >
               <ViewComp bind:part={instrumentData.parts[partIndex] as TPart} />
             </Pane>
           {/if}
         {/each}
       {/snippet}
 
-      {@render renderOptionalPart<PartOctave>('octave', PartOctaveView)}
-      {@render renderOptionalPart<PartSteps>('steps', PartStepsView)}
+      {@render renderOptionalPart(PartFilter, PartFilterView)}
+      {@render renderOptionalPart(PartOctave, PartOctaveView)}
+      {@render renderOptionalPart(PartSteps, PartStepsView)}
       <button class="btn preset-filled mr-4 px-2 py-1" onclick={() => store.randomize(index)}
         ><Dices size={16} /></button
       >
@@ -45,5 +47,5 @@
     </div>
   </header>
 
-  <PianoScaleView {instrumentData} {index} />
+  <PianoScaleView bind:instrumentData={instrumentData} {index} />
 </div>

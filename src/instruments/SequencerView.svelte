@@ -2,7 +2,7 @@
   import { store, Instrument, type IInstrumentViewProps } from '$lib';
   import { getInstrument } from '$lib/Store.svelte';
 
-  const {index, instrumentData = $bindable()}: IInstrumentViewProps = $props();
+  const { index, instrumentData = $bindable() }: IInstrumentViewProps = $props();
   const instr: Instrument | undefined = getInstrument(instrumentData);
   const seq = instr?.sequencer!;
 
@@ -12,7 +12,7 @@
   const buttonClassOffOdd = 'preset-outlined-tertiary-500';
 
   $effect(() => {
-    console.log('SEQ instrumentData', instrumentData);
+    // console.log('SEQ instrumentData', instrumentData);
     // if (instr) {
     // 	instrumentData.notes = instr.getNotes(instrumentData);
     // }
@@ -20,21 +20,6 @@
 
   function toggleCell(track: number, i: number): any {
     seq.setCell(instrumentData, track, i, !seq.getCell(instrumentData, track, i));
-    // let track = instrumentData.notes[track as DrumNote];
-    // if (track) {
-    // 	const cell = track[i];
-    // 	if (cell === 1) {
-    // 		track[i] = 0;
-    // 	} else {
-    // 		track[i] = 1;
-    // 	}
-    // }
-    // else {
-    //     track = new Array(8).fill(0);
-    //     track[i] = 1;
-    // }
-    // 	instrumentData.notes[track as DrumNote] = track;
-    //     console.log(instrumentData.notes);
     store.setInstrument(index, instrumentData);
   }
 </script>
@@ -47,11 +32,17 @@
         <div class="mr-1 w-4 flex-none">{track}</div>
         {#each { length: length.measures * length.stepsPerMeasure }, i}
           {@const cell = seq.getCell(instrumentData, index, i)}
-		  {@const odd = Math.floor(i/length.stepsPerMeasure) % 2 === 1}
+          {@const odd = Math.floor(i / length.stepsPerMeasure) % 2 === 1}
           <button
             aria-label="seq-{index}-{i}"
             onclick={() => toggleCell(index, i)}
-            class="btn flex-1 {cell ? (odd ? buttonClassOnOdd : buttonClassOn) : (odd ? buttonClassOffOdd : buttonClassOff)}"
+            class="btn flex-1 {cell
+              ? odd
+                ? buttonClassOnOdd
+                : buttonClassOn
+              : odd
+                ? buttonClassOffOdd
+                : buttonClassOff}"
           ></button>
         {/each}
       </div>
