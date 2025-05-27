@@ -1,22 +1,12 @@
 import type { InstrumentPart, PartSteps } from './parts';
 import type { ISequencer } from './sequencer';
 
-export interface IInstrument {
-  name: string;
-  getLength(data: InstrumentData): Length;
-  generate: (data: InstrumentData) => string;
-  createData: () => InstrumentData;
-  // sequencer(data: IInstrumentData): ISequencer|undefined ;
-  sequencer: ISequencer | undefined;
-  randomize(data: InstrumentData): InstrumentData;
-}
+
 export interface Length {
     stepsPerMeasure: number;
     measures: number;
 }
 export abstract class Instrument
-  // <T extends InstrumentData>
-  implements IInstrument
 {
   getLength(data: InstrumentData): Length {
     var steps = getPart<PartSteps>('steps', data);

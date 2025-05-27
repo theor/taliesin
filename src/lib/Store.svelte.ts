@@ -1,7 +1,7 @@
 import {  Status } from "./interfaces";
 import { joinRoom } from 'trystero/nostr';
 import { selfId, type ActionSender, type JsonValue } from 'trystero'
-import type { IInstrument, Instrument, InstrumentData } from "./instruments";
+import type { Instrument, InstrumentData } from "./instruments";
 import { PianoScale } from "./instruments/MonoSynth";
 import { Drum } from "./instruments/Drum";
 import type { Component } from "svelte";
@@ -124,7 +124,7 @@ room.onPeerJoin(peerId => store.peerJoined(peerId));
 room.onPeerLeave(peerId => store.peerLeft(peerId));
 
 
-const instrumentMap: { [key: string]: IInstrument } = {
+const instrumentMap: { [key: string]: Instrument } = {
     PianoScale: new PianoScale(),
     Drum: new Drum()
   };

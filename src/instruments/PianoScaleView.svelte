@@ -1,6 +1,6 @@
 <script lang="ts">
 	import {
-		type IInstrument,
+		Instrument,
 		type IInstrumentViewProps,
 	} from '$lib';
 	import { getGlobalContext } from '$lib/context';
@@ -11,7 +11,7 @@
 
 	let {index, instrumentData = $bindable()}: IInstrumentViewProps = $props();
 
-	const instr: IInstrument | undefined = getInstrument(instrumentData);
+	const instr: Instrument | undefined = getInstrument(instrumentData);
 	const seq = instr?.sequencer;
 	
 

@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { store, type IInstrument, type IInstrumentViewProps } from '$lib';
+  import { store, Instrument, type IInstrumentViewProps } from '$lib';
   import { getInstrument } from '$lib/Store.svelte';
 
   const {index, instrumentData = $bindable()}: IInstrumentViewProps = $props();
-  const instr: IInstrument | undefined = getInstrument(instrumentData);
+  const instr: Instrument | undefined = getInstrument(instrumentData);
   const seq = instr?.sequencer!;
 
   const buttonClassOn = 'preset-filled-primary-500';
