@@ -1,16 +1,19 @@
 <script lang="ts">
   import {store } from '$lib';
   import { Modal, Navigation } from '@skeletonlabs/skeleton-svelte';
-  import { Plus } from '@lucide/svelte';
+  import { Plus, Volume } from '@lucide/svelte';
     import { getInstrumentIcon, presets } from '$lib/Store.svelte';
     import { PianoScale } from '$lib/instruments/MonoSynth';
 
   let {
     drawerClose,
-    selectedIndex = $bindable()
+    selectedIndex = $bindable(),
+    mixer = $bindable()
+
   }: {
     drawerClose?: () => void;
     selectedIndex: number;
+    mixer: boolean;
   } = $props();
   const instrumentsData = store.instrumentsData;
 
@@ -77,6 +80,7 @@
         <Icon size={24} />
       </Navigation.Tile>
     {/each}
+    <Navigation.Tile labelExpanded="Mixer" title="Mixer" background="preset-secondary" id={"-1"}><Volume /></Navigation.Tile>`
     <Navigation.Tile labelExpanded="Add" title="Add" background="preset-secondary" onclick={onAdd}><Plus /></Navigation.Tile>`
   {/snippet}
 

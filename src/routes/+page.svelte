@@ -69,9 +69,7 @@
     if (selectedIndex >= instrumentsData.instrumentsData.length) {
       selectedIndex = instrumentsData.instrumentsData.length - 1;
     }
-    if (selectedIndex < 0) {
-      selectedIndex = 0;
-    }
+   
   });
 
   import { Modal } from '@skeletonlabs/skeleton-svelte';

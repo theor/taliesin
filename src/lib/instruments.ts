@@ -23,15 +23,26 @@ export abstract class Instrument
 
   abstract createData_(): InstrumentPart[];
   createData(name?: string): InstrumentData {
-    return { parts: this.createData_(), instrumentName: this.name, name: name || this.name  };
+    return { parts: this.createData_(), 
+      instrumentName: this.name, 
+      name: name || this.name,
+    volume:1,
+  state:TrackState.Playing,  };
   }
   abstract generate(data: InstrumentData): string;
 }
 export type Constructor<T> = new (...args: any[]) => T;
+export enum TrackState {
+  Playing,
+  Muted,
+  Solo,
+}
 export interface InstrumentData {
   name: string;
   instrumentName: string;
   parts: InstrumentPart[];
+  volume?: number;
+  state: TrackState;
 }
 export function getPart<T extends InstrumentPart>(
   key: Constructor<T>,

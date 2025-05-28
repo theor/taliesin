@@ -12,3 +12,4 @@
 
 <Slider bind:value={part.data.delay} min={0} max={1} step={0.05} label="Delay"  />
 <Slider bind:value={part.data.reverb} min={0} max={1} step={0.05} label="Reverb"  />
+<Slider bind:value={part.data.chorus} min={0} max={.5} step={0.05} label="Chorus"  />

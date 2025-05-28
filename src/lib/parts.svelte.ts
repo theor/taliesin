@@ -52,7 +52,24 @@ export class PartSteps extends InstrumentPartTyped<{
     super({ stepsPerMeasure, measures, oddSignature });
   }
 }
+enum ArpeggiatorType {
+    up = 'up',
+    down = 'down',
+    upDown = 'upDown',
+    random = 'random'
+}
 
+export class PartArpeggiator extends InstrumentPartTyped<{
+  arpeggiator: boolean;
+  arpeggiatorType: ArpeggiatorType;
+}> {
+  override defaultData() {
+    return { arpeggiator: false, arpeggiatorType: ArpeggiatorType.up };
+  }
+  constructor(arpeggiator: boolean, arpeggiatorType: ArpeggiatorType) {
+    super({ arpeggiator, arpeggiatorType });
+  }
+}
 export class PartTrackNotes extends InstrumentPartTyped<{
   notes: { [key in DrumNote]: (0 | 1)[] };
 }> {
@@ -67,12 +84,13 @@ export class MonoSequence extends InstrumentPartTyped<{ notes: (number | undefin
   }
 }
 
-export class PartEffects extends InstrumentPartTyped<{ reverb: number; delay: number }> {
+export class PartEffects extends InstrumentPartTyped<{ reverb: number; delay: number, chorus:number }> {
   override defaultData() {
-    return { reverb: 0, delay: 0 };
+    return { reverb: 0, delay: 0, chorus:0 };
   }
   generate(): string {
-    return `.room(${this.data.reverb ?? 0}).delay(${this.data.delay ?? 0})`;
+    const chorus = this.data.chorus ? `.add(note(0, ${this.data.chorus}))` : '';
+    return `${chorus}.room(${this.data.reverb ?? 0}).delay(${this.data.delay ?? 0})`;
   }
 }
 
@@ -81,6 +99,6 @@ export class PartFilter extends InstrumentPartTyped<{freq:number, res:number}> {
     return { freq: 1000, res: 0.5 };
   }
   generate(): string {
-    return `.lpf("${this.data.freq}:${this.data.res}")`;
+    return `.lpf("${this.data.freq}:${this.data.res}").lpenv(4)`;
   }
 }
