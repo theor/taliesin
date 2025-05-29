@@ -9,16 +9,7 @@ export class Drum extends Instrument {
       return data;
     }
     public generate_(data: InstrumentData): string {
-      const notes = getPart(PartTrackNotes, data)!;
-      const length = this.getLength(data);
-      const joined = Object.entries(notes.data.notes)
-        .map((t) => {
-          const [k, v] = t;
-          var p = Array.from({length: length.stepsPerMeasure*length.measures}, (_,i) => v[i] == 1 ? k : '~').join(' ');
-          return `<${p}>*${length.stepsPerMeasure}`;
-        })
-        .join(','); // `s("${data.notes.join(' ')}")`;
-      return `s("${joined}")`;
+      return '';
     }
     override name: string = 'Drum';
     constructor() {

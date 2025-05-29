@@ -1,19 +1,18 @@
-import { PartEffects, PartFilter, PartSteps, type InstrumentPart } from './parts.svelte';
+import { PartChords, PartEffects, PartFilter, PartSteps, type InstrumentPart} from './parts.svelte';
 import type { ISequencer } from './sequencer';
 
 
 export interface Length {
-    stepsPerMeasure: number;
-    measures: number;
+  stepsPerMeasure: number;
+  measures: number;
 }
-export abstract class Instrument
-{
+export abstract class Instrument {
   getLength(data: InstrumentData): Length {
     var steps = getPart(PartSteps, data);
     if (steps) {
       return steps.data;
     }
-    return {stepsPerMeasure: 4, measures: 1};
+    return { stepsPerMeasure: 4, measures: 1 };
   }
   abstract randomize(data: InstrumentData): InstrumentData;
   sequencer: ISequencer | undefined;
@@ -23,21 +22,28 @@ export abstract class Instrument
 
   abstract createData_(): InstrumentPart[];
   createData(name?: string): InstrumentData {
-    return { parts: this.createData_(), 
-      instrumentName: this.name, 
+    return {
+      parts: this.createData_(),
+      instrumentName: this.name,
       name: name || this.name,
-    volume:1,
-  state:TrackState.Playing,  };
+      volume: 1,
+      state: TrackState.Playing,
+    };
   }
   protected abstract generate_(data: InstrumentData): string;
-  generate(data: InstrumentData): string{
-    return `${this.generate_(data)}
-  ${getPart(PartFilter, data)?.generate() || ''}
-  ${getPart(PartEffects, data)?.generate() || ''}
+  generate(data: InstrumentData): string {
+    const inputPart = data.parts.find((x) => x.isInput());
+    
+    const l = this.getLength(data);
+    return `${inputPart?.generate(data, l) || ''}
+  ${getPart(PartChords, data)?.generate(data, l) || ''}
+  ${getPart(PartFilter, data)?.generate(data, l) || ''}
+  ${getPart(PartEffects, data)?.generate(data, l) || ''}
+  ${this.generate_(data)}
   ${this.trackOptions(data)}`;
   }
 
-  protected trackOptions(data:InstrumentData): string {
+  protected trackOptions(data: InstrumentData): string {
     return `.gain(${data.volume})`;
   }
 }
@@ -59,7 +65,7 @@ export function getPart<T extends InstrumentPart>(
   data: InstrumentData
 ): T | undefined {
   // console.log('getPart', key.name, data.instrumentName, data.parts);
-  
+
   return data.parts.find((x) => x instanceof key) as T;
 }
 export function hasPart<T extends InstrumentPart>(

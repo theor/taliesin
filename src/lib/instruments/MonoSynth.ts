@@ -18,15 +18,7 @@ export class PianoScale extends Instrument {
       return data;
     }
     protected generate_(data: InstrumentData): string {
-      const notes = getPart(MonoSequence, data)!;
-      const octave = getPart(PartOctave, data)?.data?.octave ?? 4;
-      // console.log(`GEN ${this.name}`, notes.data.notes, this.getLength(data));
-      const length = this.getLength(data);
-      return `n("<${Array.from({length: length.stepsPerMeasure*length.measures}, (_,i) => notes.data.notes[i])
-        .map((x) => x ?? '~')
-        .join(' ')}>*${length.stepsPerMeasure}")
-  .scale("C${octave}:minor")
-  .sound("sawtooth").n(4)`;
+      return `.sound("sawtooth").n(4)`;
     }
     override name: string = 'PianoScale';
     // notes = [1,2,3,4,5,6,7].map(x => x.toString());

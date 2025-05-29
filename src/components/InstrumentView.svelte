@@ -1,5 +1,5 @@
 <script lang="ts">
-  import {PartEffects, PartFilter, PartOctave, PartSteps, type  Constructor,type IInstrumentViewProps,type InstrumentPart,type IPartViewProps } from '$lib';
+  import {PartChords, PartEffects, PartFilter, PartOctave, PartSteps, type  Constructor,type IInstrumentViewProps,type InstrumentPart,type IPartViewProps } from '$lib';
   import { getInstrumentIcon, store } from '$lib/Store.svelte';
     import { type Component } from 'svelte';
     import { Pane, ThemeUtils } from 'svelte-tweakpane-ui';
@@ -9,6 +9,7 @@
     import PianoScaleView from '../instruments/PianoScaleView.svelte';
     import PartFilterView from './PartFilterView.svelte';
     import PartEffectsView from './PartEffectsView.svelte';
+    import PartChordsView from './PartChordsView.svelte';
   let { index, instrumentData = $bindable() }: IInstrumentViewProps = $props();
   
   let Icon = getInstrumentIcon(instrumentData.instrumentName);
@@ -34,6 +35,7 @@
         {/each}
       {/snippet}
 
+      {@render renderOptionalPart(PartChords, PartChordsView)}
       {@render renderOptionalPart(PartFilter, PartFilterView)}
       {@render renderOptionalPart(PartOctave, PartOctaveView)}
       {@render renderOptionalPart(PartSteps, PartStepsView)}

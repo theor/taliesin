@@ -1,10 +1,12 @@
 import { initStrudel, evaluate } from '@strudel/web';
 import {
+  webaudioRepl,
   getAudioContext,
   initAudioOnFirstClick,
 } from '@strudel/webaudio';
+import {Pattern} from '@strudel/core';
 import { writable, type Writable } from 'svelte/store';
-import { webaudioRepl } from '@strudel/webaudio';
+
 
 // initStrudel({
 //     prebake: () => samples('github:tidalcycles/dirt-samples'),
@@ -12,6 +14,15 @@ import { webaudioRepl } from '@strudel/webaudio';
 const ctx = getAudioContext();
 initAudioOnFirstClick();
 
+
+// const asChords  = function(triads:any, pat:any) {
+//     return pat.fmap( (x:any)=> {
+//       const [pc,acc,oct] =  tokenizeNote(x.note)
+//       const {note,  ...prev} = x;
+//       return {...prev, chord:pc+acc+triads, anchor: x.note}
+//     })
+//   }
+// Pattern.prototype.asChords = function(...args:any[])  { return asChords(...args,this);  }
 // let repls : Repl;
 
 // async function initStrudel() {
@@ -41,11 +52,22 @@ if (import.meta.hot) {
 }
 class StrudelWrapper {
   repls: webaudioRepl;
-  evaluate(code: string): Promise<void> {
+  async evaluate(code: string): Promise<void> {
     if (code === '') return Promise.resolve();
-    console.log('Strudel evaluate!', code);
     // console.log(
-    return evaluate(`samples('github:tidalcycles/dirt-samples')\n${code}`);
+console.log('Strudel evaluate!', this.repls);
+await this.repls.evaluate(`samples('github:tidalcycles/dirt-samples')
+const asChords = register("asChords", function(triads, pat) {
+  return pat.fmap( x=> {
+    const [pc,acc,oct] =  tokenizeNote(x.note)
+    const {note,  ...prev} = x;
+    return {...prev, chord:pc+acc+triads, anchor: x.note}
+  })
+});
+Pattern.prototype.asChords = function(...args)  { return asChords(...args,this);  }
+${code}`);
+
+console.log('Strudel evaluate!', this.repls.state.code);
     // return repls.evaluate(`${code}`)
     // );
   }

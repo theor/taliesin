@@ -6,7 +6,7 @@ import { PianoScale } from "./instruments/MonoSynth";
 import { Drum } from "./instruments/Drum";
 import type { Component } from "svelte";
 import { DrumIcon, KeyboardMusic, Music, Piano } from "@lucide/svelte";
-import { PartEffects, type InstrumentPart, MonoSequence, PartSteps, PartFilter, PartOctave } from "./parts.svelte";
+import { PartEffects, type InstrumentPart, MonoSequence, PartSteps, PartFilter, PartOctave, PartChords } from "./parts.svelte";
 
 export const mixerIndex = -1;
 
@@ -22,8 +22,15 @@ type WrappedInstrument = {
     index: number;
     instrument: InstrumentDataJsonValue;
 }
-export const presets: {name:string, instrument: Constructor<Instrument>, parts: InstrumentPart[]}[] = [
-    { name: 'Piano',  instrument: PianoScale,parts:[] },
+
+type Preset = {
+    name: string;
+    instrument: Constructor<Instrument>;
+    parts: InstrumentPart[];
+};
+
+export const presets: Preset[] = [
+    { name: 'Piano',  instrument: PianoScale,parts:[new PartChords()] },
     { name: 'Drum',  instrument: Drum, parts:[] },
     {name: 'Bass', instrument: PianoScale, parts: [
             new PartEffects({reverb: 0.5}),
@@ -33,6 +40,10 @@ export const presets: {name:string, instrument: Constructor<Instrument>, parts: 
 ]}
 ];
 class AppStore {
+    getPreset(name: string): Preset | undefined {
+        const preset = presets.find(p => p.name === name);
+        return preset;
+    }
     createInstrumentPreset(preset: { name: string; instrument: Constructor<Instrument>; parts: InstrumentPart[]; }) {
         const { instrument, parts } = preset;
         this.instrumentsData.instrumentsData.push(createInstrument(
@@ -105,25 +116,9 @@ class AppStore {
             this.preset();
     }
     preset() {
-        this.instrumentsData.instrumentsData.push(createInstrument(
-            PianoScale,
-            [
-                new PartEffects({reverb: 1, }),
-                new MonoSequence({notes:[1, 2, 3, 0, 4, 5, 3, 0]}),
-                new PartSteps(8, 1, false),
-                new PartFilter({freq:700}),
-            ]
-        ));    
-        this.instrumentsData.instrumentsData.push(createInstrument(PianoScale, [
-            new PartEffects({reverb: 0.5}),
-            new MonoSequence({notes:[1, 2, 3, undefined, 4, 5, 3, undefined]}),
-            new PartSteps(8, 2, false),
-            new PartOctave(2),
-        ]));
-
-        this.instrumentsData.instrumentsData.push(createInstrument(Drum, [
-            new PartEffects({reverb: 0.2})
-        ]));
+        this.createInstrumentPreset(this.getPreset("Piano")!);
+        this.createInstrumentPreset(this.getPreset("Bass")!);
+        this.createInstrumentPreset(this.getPreset("Drum")!);
 
     }
     createInstrument<T extends Instrument>(name: Constructor<T>) {
