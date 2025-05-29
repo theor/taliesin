@@ -1,4 +1,4 @@
-import { PartSteps, type InstrumentPart } from './parts.svelte';
+import { PartEffects, PartFilter, PartSteps, type InstrumentPart } from './parts.svelte';
 import type { ISequencer } from './sequencer';
 
 
@@ -29,7 +29,17 @@ export abstract class Instrument
     volume:1,
   state:TrackState.Playing,  };
   }
-  abstract generate(data: InstrumentData): string;
+  protected abstract generate_(data: InstrumentData): string;
+  generate(data: InstrumentData): string{
+    return `${this.generate_(data)}
+  ${getPart(PartFilter, data)?.generate() || ''}
+  ${getPart(PartEffects, data)?.generate() || ''}
+  ${this.trackOptions(data)}`;
+  }
+
+  protected trackOptions(data:InstrumentData): string {
+    return `.gain(${data.volume})`;
+  }
 }
 export type Constructor<T> = new (...args: any[]) => T;
 export enum TrackState {
@@ -41,7 +51,7 @@ export interface InstrumentData {
   name: string;
   instrumentName: string;
   parts: InstrumentPart[];
-  volume?: number;
+  volume: number;
   state: TrackState;
 }
 export function getPart<T extends InstrumentPart>(

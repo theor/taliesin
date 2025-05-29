@@ -75,6 +75,8 @@
   import { Modal } from '@skeletonlabs/skeleton-svelte';
   import AppMenu from '../components/AppMenu.svelte';
     import InstrumentView from '../components/InstrumentView.svelte';
+	import { mixerIndex } from '$lib/Store.svelte';
+	import Mixer from '../components/Mixer.svelte';
 
   let drawerState = $state(false);
 
@@ -135,7 +137,9 @@
         </div>
       {/if}
       
-      {#if currentInstrument}
+	  {#if selectedIndex === mixerIndex}
+	  <Mixer />
+	  {:else if currentInstrument}
       <InstrumentView bind:instrumentData={currentInstrument} index={selectedIndex} />
         <!-- {@render instrumentCard(currentInstrument, selectedIndex)} -->
       {/if}

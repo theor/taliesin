@@ -27,7 +27,7 @@
         {#each instrumentData.parts as part, partIndex}
           {#if part instanceof partType}
             {@const ViewComp = component}
-            <Pane position="inline" title={partType.name} theme={ThemeUtils.presets.light} >
+            <Pane position="inline" title={partType.name}  >
               <ViewComp bind:part={instrumentData.parts[partIndex] as TPart} />
             </Pane>
           {/if}

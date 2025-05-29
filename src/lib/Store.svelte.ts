@@ -8,6 +8,9 @@ import type { Component } from "svelte";
 import { DrumIcon, KeyboardMusic, Music, Piano } from "@lucide/svelte";
 import { PartEffects, type InstrumentPart, MonoSequence, PartSteps, PartFilter, PartOctave } from "./parts.svelte";
 
+export const mixerIndex = -1;
+
+
 const config = {
     appId: 'taliesin',
     // relayUrls: ["wss://192.168.1.82:3334"]

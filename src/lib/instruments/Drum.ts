@@ -8,9 +8,8 @@ export class Drum extends Instrument {
     public randomize(data: InstrumentData): InstrumentData {
       return data;
     }
-    public generate(data: InstrumentData): string {
+    public generate_(data: InstrumentData): string {
       const notes = getPart(PartTrackNotes, data)!;
-      const effects = getPart(PartEffects, data);
       const length = this.getLength(data);
       const joined = Object.entries(notes.data.notes)
         .map((t) => {
@@ -19,7 +18,7 @@ export class Drum extends Instrument {
           return `<${p}>*${length.stepsPerMeasure}`;
         })
         .join(','); // `s("${data.notes.join(' ')}")`;
-      return `s("${joined}")${effects?.generate() || ''}`;
+      return `s("${joined}")`;
     }
     override name: string = 'Drum';
     constructor() {

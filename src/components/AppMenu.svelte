@@ -2,19 +2,18 @@
   import {store } from '$lib';
   import { Modal, Navigation } from '@skeletonlabs/skeleton-svelte';
   import { Plus, Volume } from '@lucide/svelte';
-    import { getInstrumentIcon, presets } from '$lib/Store.svelte';
+    import { getInstrumentIcon, mixerIndex, presets } from '$lib/Store.svelte';
     import { PianoScale } from '$lib/instruments/MonoSynth';
 
   let {
     drawerClose,
     selectedIndex = $bindable(),
-    mixer = $bindable()
 
   }: {
     drawerClose?: () => void;
     selectedIndex: number;
-    mixer: boolean;
   } = $props();
+
   const instrumentsData = store.instrumentsData;
 
   function onValueChange(x: string) {
@@ -30,9 +29,6 @@
     addModalOpened = true;
   }
   let addModalOpened = $state(false);
-  function modalClose() {
-    addModalOpened = false;
-  }
 </script>
 
 <!-- <header class="flex justify-between">
@@ -72,15 +68,16 @@
     </footer>
   {/snippet}
 </Modal>
-<Navigation.Rail expanded={true} value={selectedIndex.toString()} {onValueChange}>
+<Navigation.Rail expanded={true} >
   {#snippet tiles()}
     {#each instrumentsData.instrumentsData as instrumentData, index}
+      {@const instrIndex = index}
       {@const Icon = getInstrumentIcon(instrumentData.instrumentName)}
-      <Navigation.Tile labelExpanded={instrumentData.name} id={index.toString()}>
+      <Navigation.Tile labelExpanded={instrumentData.name} onclick={() => {console.log(instrIndex); selectedIndex = instrIndex}} selected={selectedIndex === instrIndex}>
         <Icon size={24} />
       </Navigation.Tile>
     {/each}
-    <Navigation.Tile labelExpanded="Mixer" title="Mixer" background="preset-secondary" id={"-1"}><Volume /></Navigation.Tile>`
+    <Navigation.Tile labelExpanded="Mixer" title="Mixer" background="preset-secondary" onclick={() => selectedIndex = mixerIndex} selected={selectedIndex === mixerIndex} ><Volume /></Navigation.Tile>`
     <Navigation.Tile labelExpanded="Add" title="Add" background="preset-secondary" onclick={onAdd}><Plus /></Navigation.Tile>`
   {/snippet}
 
@@ -95,5 +92,6 @@
         >
       {/if}
     </div>
+    {selectedIndex}
   {/snippet}
 </Navigation.Rail>
