@@ -6,7 +6,7 @@ import { PianoScale } from "./instruments/MonoSynth";
 import { Drum } from "./instruments/Drum";
 import type { Component } from "svelte";
 import { DrumIcon, KeyboardMusic, Music, Piano } from "@lucide/svelte";
-import { PartEffects, type InstrumentPart, MonoSequence, PartSteps, PartFilter, PartOctave, PartChords } from "./parts.svelte";
+import { PartEffects, type InstrumentPart, MonoSequence, PartSteps, PartFilter, PartOctave, PartChords, PartArpeggiator } from "./parts.svelte";
 
 export const mixerIndex = -1;
 
@@ -30,7 +30,7 @@ type Preset = {
 };
 
 export const presets: Preset[] = [
-    { name: 'Piano',  instrument: PianoScale,parts:[new PartChords()] },
+    { name: 'Piano',  instrument: PianoScale,parts:[new PartChords(), new PartArpeggiator()] },
     { name: 'Drum',  instrument: Drum, parts:[] },
     {name: 'Bass', instrument: PianoScale, parts: [
             new PartEffects({reverb: 0.5}),

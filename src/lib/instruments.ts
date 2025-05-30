@@ -1,4 +1,4 @@
-import { PartChords, PartEffects, PartFilter, PartSteps, type InstrumentPart} from './parts.svelte';
+import { PartChords, PartEffects, PartFilter, PartSteps, type InstrumentPart, PartArpeggiator} from './parts.svelte';
 import type { ISequencer } from './sequencer';
 
 
@@ -37,6 +37,8 @@ export abstract class Instrument {
     const l = this.getLength(data);
     return `${inputPart?.generate(data, l) || ''}
   ${getPart(PartChords, data)?.generate(data, l) || ''}
+  ${getPart(PartArpeggiator, data)?.generate(data, l) || ''}
+  // .fast(${this.getLength(data)})
   ${getPart(PartFilter, data)?.generate(data, l) || ''}
   ${getPart(PartEffects, data)?.generate(data, l) || ''}
   ${this.generate_(data)}

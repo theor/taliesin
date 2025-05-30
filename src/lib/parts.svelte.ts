@@ -74,7 +74,7 @@ export class PartChords extends InstrumentPartTyped<{ enabled: boolean; mode:Voi
     return this.data.enabled ? `.asChords("<M m7>*2").mode('${this.data.mode}').voicing()` : '';
   }
 }
-enum ArpeggiatorType {
+export enum ArpeggiatorType {
   up = 'up',
   down = 'down',
   upDown = 'upDown',
@@ -82,14 +82,16 @@ enum ArpeggiatorType {
 }
 
 export class PartArpeggiator extends InstrumentPartTyped<{
-  arpeggiator: boolean;
+  enabled: boolean;
   arpeggiatorType: ArpeggiatorType;
 }> {
   override defaultData() {
-    return { arpeggiator: false, arpeggiatorType: ArpeggiatorType.up };
+    return { enabled: false, arpeggiatorType: ArpeggiatorType.up };
   }
-  constructor(arpeggiator: boolean, arpeggiatorType: ArpeggiatorType) {
-    super({ arpeggiator, arpeggiatorType });
+  
+  override generate(data: InstrumentData, length: Length): string {
+    const seq = "<0 1 2 3>"
+    return `${this.data.enabled ? `.arp("${seq}")` : ''}`;
   }
 }
 export class PartTrackNotes extends InstrumentPartTyped<{
