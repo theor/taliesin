@@ -1,4 +1,7 @@
+import { derived } from "svelte/store";
+import { getGlobalContext } from "./context";
 import { getPart, type InstrumentData, type Length } from "./instruments";
+import { strudel } from "./strudel";
 
 export enum DrumNote {
   kick = 'bd',
@@ -51,6 +54,8 @@ export class PartSteps extends InstrumentPartTyped<{
   measures: number;
   oddSignature: boolean;
 }> {
+	time = derived(strudel.time, (x:number) => (x/this.data.measures) %1);
+
   override isInput(): boolean { return true; }
   override defaultData() {
     return { stepsPerMeasure: 4, measures: 1, oddSignature: false };
@@ -71,7 +76,7 @@ export class PartChords extends InstrumentPartTyped<{ enabled: boolean; mode:Voi
     return { enabled: false, mode: VoicingMode.root };
   }
   override generate(data: InstrumentData, length: Length): string {
-    return this.data.enabled ? `.asChords("<M m7>*2").mode('${this.data.mode}').voicing()` : '';
+    return this.data.enabled ? `.asChords("<m m7>*2").mode('${this.data.mode}').voicing()` : '';
   }
 }
 export enum ArpeggiatorType {
@@ -83,14 +88,15 @@ export enum ArpeggiatorType {
 
 export class PartArpeggiator extends InstrumentPartTyped<{
   enabled: boolean;
+  speed: number;
   arpeggiatorType: ArpeggiatorType;
 }> {
   override defaultData() {
-    return { enabled: false, arpeggiatorType: ArpeggiatorType.up };
+    return { enabled: false, arpeggiatorType: ArpeggiatorType.up, speed: 1 };
   }
   
   override generate(data: InstrumentData, length: Length): string {
-    const seq = "<0 1 2 3>"
+    const seq = `[0 1 2 3] * ${this.data.speed}`;
     return `${this.data.enabled ? `.arp("${seq}")` : ''}`;
   }
 }
@@ -106,7 +112,7 @@ export class PartTrackNotes extends InstrumentPartTyped<{
       .map((t) => {
         const [k, v] = t;
         var p = Array.from({ length: length.stepsPerMeasure * length.measures }, (_, i) => v[i] == 1 ? k : '~').join(' ');
-        return `<${p}>*${length.stepsPerMeasure}`;
+        return `<${p}>`;
       })
       .join(','); // `s("${data.notes.join(' ')}")`;
     return `s("${joined}")`;
@@ -121,11 +127,13 @@ export class MonoSequence extends InstrumentPartTyped<{ notes: (number | undefin
   override generate(data: InstrumentData, length: Length): string {
     const notes = getPart(MonoSequence, data)!;
     const octave = getPart(PartOctave, data)?.data?.octave ?? 4;
+const ctx = getGlobalContext();
+
     // console.log(`GEN ${this.name}`, notes.data.notes, this.getLength(data));
     return `n("<${Array.from({ length: length.stepsPerMeasure * length.measures }, (_, i) => notes.data.notes[i])
       .map((x) => x ?? '~')
-      .join(' ')}>*${length.stepsPerMeasure}")
- .scale("C${octave}:minor")`;
+      .join(' ')}>")
+ .scale("${ctx.scaleKey}${octave}:${ctx.scaleMode}")`;
   }
 }
 

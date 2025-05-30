@@ -18,13 +18,6 @@
 </script>
 
 <div>
-	<!--     <pre>
-        {instrument.generate()}
-    </pre> -->
-	{#if ctx.debug}
-	<!-- <p>notes: {instrumentData.notes.length}</p> -->
-	<pre class="whitespace-normal">data: {JSON.stringify(instrumentData)}</pre>
-	{/if}
 	{#if seq}
 	<!-- TODO should not be keyed ? at least index is better than instrument data -->
 	{#key index}

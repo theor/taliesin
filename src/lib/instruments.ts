@@ -19,6 +19,7 @@ export abstract class Instrument {
   // abstract sequencer(data: InstrumentData): ISequencer|undefined ;
   notes: string[] = [];
   name: string = this.constructor.name;
+  progress(data:InstrumentData) { return getPart(PartSteps, data)?.time!; }
 
   abstract createData_(): InstrumentPart[];
   createData(name?: string): InstrumentData {
@@ -38,7 +39,7 @@ export abstract class Instrument {
     return `${inputPart?.generate(data, l) || ''}
   ${getPart(PartChords, data)?.generate(data, l) || ''}
   ${getPart(PartArpeggiator, data)?.generate(data, l) || ''}
-  // .fast(${this.getLength(data)})
+  .fast(${this.getLength(data).stepsPerMeasure})
   ${getPart(PartFilter, data)?.generate(data, l) || ''}
   ${getPart(PartEffects, data)?.generate(data, l) || ''}
   ${this.generate_(data)}

@@ -1,19 +1,13 @@
 import { initStrudel, evaluate } from '@strudel/web';
-import {
-  webaudioRepl,
-  getAudioContext,
-  initAudioOnFirstClick,
-} from '@strudel/webaudio';
-import {Pattern} from '@strudel/core';
+import { webaudioRepl, getAudioContext, initAudioOnFirstClick } from '@strudel/webaudio';
+import { Pattern } from '@strudel/core';
 import { writable, type Writable } from 'svelte/store';
-
 
 // initStrudel({
 //     prebake: () => samples('github:tidalcycles/dirt-samples'),
 //   });
 const ctx = getAudioContext();
 initAudioOnFirstClick();
-
 
 // const asChords  = function(triads:any, pat:any) {
 //     return pat.fmap( (x:any)=> {
@@ -39,6 +33,14 @@ initAudioOnFirstClick();
 //     console.log('Strudel initialized!');
 // }
 
+let clear: NodeJS.Timeout;
+function setupInterval() {
+  clear = setInterval(() => {
+    strudel.updateTime();
+  }, 250);
+}
+setupInterval();
+
 if (import.meta.hot) {
   // HMR specific stuff...
   console.log('Strudel HMR enabled!', import.meta.hot);
@@ -48,15 +50,19 @@ if (import.meta.hot) {
     // increment the value on HMR update (for illustration purpose)
     // NOTE mutate the passed data object
     strudel.repls.stop();
+    clearInterval(clear);
+    setupInterval();
   });
 }
 class StrudelWrapper {
   repls: webaudioRepl;
+  private initPromise: Promise<void>;
   async evaluate(code: string): Promise<void> {
     if (code === '') return Promise.resolve();
+    await this.initPromise;
     // console.log(
-console.log('Strudel evaluate!', this.repls);
-await this.repls.evaluate(`samples('github:tidalcycles/dirt-samples')
+    console.log('Strudel evaluate!', this.repls);
+    await this.repls.evaluate(`samples('github:tidalcycles/dirt-samples')
 const asChords = register("asChords", function(triads, pat) {
   return pat.fmap( x=> {
     const [pc,acc,oct] =  tokenizeNote(x.note)
@@ -67,7 +73,7 @@ const asChords = register("asChords", function(triads, pat) {
 Pattern.prototype.asChords = function(...args)  { return asChords(...args,this);  }
 ${code}`);
 
-console.log('Strudel evaluate!', this.repls.state.code);
+    console.log('Strudel evaluate!', this.repls.state.code);
     // return repls.evaluate(`${code}`)
     // );
   }
@@ -76,11 +82,23 @@ console.log('Strudel evaluate!', this.repls.state.code);
    *
    */
   constructor() {
-    (async () => {
-        this.repls = await initStrudel({
-            prebake: () => samples('github:tidalcycles/dirt-samples')
-          });
+    this.initPromise = (async () => {
+      this.repls = await initStrudel({
+        prebake: () => samples('github:tidalcycles/dirt-samples')
+      });
+      console.log('Strudel initialized!', this.repls);
     })();
+  }
+  time = writable(0);
+  updateTime() {
+    // return ctx.currentTime;
+    const sched = this.repls.scheduler;
+    const duration = sched.clock.duration;
+    const seconds_since_cps_change = sched.num_ticks_since_cps_change * duration;
+    const num_cycles_since_cps_change = seconds_since_cps_change * sched.cps;
+    this.time.set(num_cycles_since_cps_change);
+    // return this.repls.scheduler.clock.getPhase();
+    // return this.repls.scheduler.getTime();
   }
 
   stop() {

@@ -29,12 +29,14 @@
   const isDebug = params.getAll('debug').length > 0;
   setGlobalContext({
     host: isHost,
-    debug: isDebug
+    debug: isDebug,
+    scaleKey: "A",
+    scaleMode: "minor",
   });
   store.init(isHost);
 
   function onKeyDown(event: KeyboardEvent) {
-    // console.log(event.key, event.code);
+    console.log(event, event.code);
 
     switch (event.code) {
       case 'Backquote':

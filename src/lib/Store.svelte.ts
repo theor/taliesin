@@ -29,6 +29,16 @@ type Preset = {
     parts: InstrumentPart[];
 };
 
+export const parts: { part: Constructor<InstrumentPart> }[] = [
+    { part: PartEffects},
+    { part: PartFilter},
+    { part: PartSteps},
+    { part: PartChords},
+    { part: PartArpeggiator},
+    { part: MonoSequence},
+    { part: PartOctave }
+];
+
 export const presets: Preset[] = [
     { name: 'Piano',  instrument: PianoScale,parts:[new PartChords(), new PartArpeggiator()] },
     { name: 'Drum',  instrument: Drum, parts:[] },
@@ -67,7 +77,7 @@ class AppStore {
     clearCommands() {
         // this.synchedStore.commands.splice(0, this.synchedStore.commands.length);
     }
-    instrumentsData = $state({ instrumentsData: [] as InstrumentData[] });
+    instrumentsData = $state({ instrumentsData: [] as InstrumentData[], volume: 0.8 });
     code = () => {
         return this.instrumentsData.instrumentsData.map((i) => {
             const instr = getInstrument(i);

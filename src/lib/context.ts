@@ -3,6 +3,8 @@ import { getContext, setContext } from "svelte";
 interface GlobalContext {
     host: boolean;
     debug: boolean;
+    scaleKey: string;
+    scaleMode: string;
 }
 
 const key = "globalContext";
