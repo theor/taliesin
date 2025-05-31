@@ -23,6 +23,10 @@ export default defineConfig({
 		tailwindcss(),
 		sveltekit()
 	],
+	esbuild: {
+		minifyIdentifiers: false,
+		keepNames: true,
+	  },
 	test: {
 		workspace: [
 			{
