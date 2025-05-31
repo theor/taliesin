@@ -6,7 +6,6 @@ import { writable, type Writable } from 'svelte/store';
 // initStrudel({
 //     prebake: () => samples('github:tidalcycles/dirt-samples'),
 //   });
-const ctx = getAudioContext();
 initAudioOnFirstClick();
 
 // const asChords  = function(triads:any, pat:any) {
@@ -33,11 +32,13 @@ initAudioOnFirstClick();
 //     console.log('Strudel initialized!');
 // }
 
+export const VITEST = import.meta.env?.VITEST || false;
 let clear: NodeJS.Timeout;
 function setupInterval() {
-  clear = setInterval(() => {
-    strudel.updateTime();
-  }, 250);
+  if (!VITEST)
+    clear = setInterval(() => {
+      strudel.updateTime();
+    }, 250);
 }
 setupInterval();
 
@@ -119,4 +120,6 @@ ${code}`);
     }
   }
 }
-export const strudel = new StrudelWrapper();
+export const strudel = VITEST ? {
+  time: writable(0),
+} as StrudelWrapper : new StrudelWrapper();

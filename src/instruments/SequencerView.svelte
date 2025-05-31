@@ -2,7 +2,7 @@
   import { store, Instrument, type IInstrumentViewProps } from '$lib';
   import { getInstrument } from '$lib/Store.svelte';
     import { Progress } from '@skeletonlabs/skeleton-svelte';
-    import { derived } from 'svelte/store';
+    import { derived, writable } from 'svelte/store';
 
   const { index, instrumentData = $bindable() }: IInstrumentViewProps = $props();
   const instr: Instrument | undefined = getInstrument(instrumentData);
@@ -12,7 +12,7 @@
   const buttonClassOff = 'preset-outlined-primary-500';
   const buttonClassOnOdd = 'preset-filled-tertiary-500';
   const buttonClassOffOdd = 'preset-outlined-tertiary-500';
-  let progress = derived(instr?.progress(instrumentData)!, (x:number) => Number.isNaN(x) ? 0 : x!*100)!;
+  let progress = writable(0);//derived(instr?.progress(instrumentData)!, (x:number) => Number.isNaN(x) ? 0 : x!*100)!;
 
   $effect(() => {
     // console.log('SEQ instrumentData', instrumentData);

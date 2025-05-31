@@ -7,7 +7,7 @@
 </script>
 
 <div>
-  <button on:click={() => strudel.toggle()}>
+  <button onclick={() => strudel.toggle()}>
     {#if $isPlaying}
       <Square size={20} />
     {:else}
@@ -15,6 +15,6 @@
     {/if}
   </button>
   <!-- stop -->
-  <button on:click={() => strudel.stop()}><Ban size={20} /></button>
+  <button onclick={() => strudel.stop()}><Ban size={20} /></button>
   <span>{$time.toFixed(2)}</span>
 </div>

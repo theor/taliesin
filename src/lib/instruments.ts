@@ -1,5 +1,6 @@
 import { PartChords, PartEffects, PartFilter, PartSteps, type InstrumentPart, PartArpeggiator} from './parts.svelte';
 import type { ISequencer } from './sequencer';
+import { strudel } from './strudel';
 
 
 export interface Length {
@@ -19,7 +20,7 @@ export abstract class Instrument {
   // abstract sequencer(data: InstrumentData): ISequencer|undefined ;
   notes: string[] = [];
   name: string = this.constructor.name;
-  progress(data:InstrumentData) { return getPart(PartSteps, data)?.time!; }
+  // progress(data:InstrumentData) { return getPart(PartSteps, data)?.time(strudel.time)!; }
 
   abstract createData_(): InstrumentPart[];
   createData(name?: string): InstrumentData {

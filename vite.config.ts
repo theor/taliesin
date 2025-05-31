@@ -1,18 +1,23 @@
 import { svelteTesting } from '@testing-library/svelte/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig } from 'vite';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/experimental-addon-test/vitest-plugin';
 import tailwindcss from '@tailwindcss/vite'
 import mkcert from 'vite-plugin-mkcert'
-
+import { defineConfig } from 'vitest/config';
 
 const dirname =
 	typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
 // More info at: https://storybook.js.org/docs/writing-tests/test-addon
 export default defineConfig({
+	// Tell Vitest to use the `browser` entry points in `package.json` files, even though it's running in Node
+	resolve: process.env.VITEST
+		? {
+				conditions: ['browser']
+			}
+		: undefined,
 	plugins: [
 		mkcert(),
 		tailwindcss(),

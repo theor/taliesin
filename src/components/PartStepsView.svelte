@@ -6,7 +6,7 @@
 	// import { type Component } from 'svelte';
 
 	const props: IPartViewProps<PartSteps> = $props();
-	const part = $state.snapshot(props.part);
+	const part = props.part;// $state.snapshot(props.part);
 	// $effect(() => {
 	// 	console.log('PartStepsView c', part);
 	// });
@@ -26,7 +26,7 @@
 		}
 		part.data.stepsPerMeasure = value;
 	}
-	let time = part.time;// derived(strudel.time, (x:number) => (x/part.data.measures) %1);
+	let time = derived(strudel.time, x => props.part.time(x));// derived(strudel.time, (x:number) => (x/part.data.measures) %1);
 	console.warn('steps', part.data)
 </script>
 

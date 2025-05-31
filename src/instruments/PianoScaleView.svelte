@@ -7,8 +7,6 @@
     import { getInstrument } from '$lib/Store.svelte';
 	import SequencerView from './SequencerView.svelte';
 
-	const ctx = getGlobalContext();
-
 	let {index, instrumentData = $bindable()}: IInstrumentViewProps = $props();
 
 	const instr: Instrument | undefined = getInstrument(instrumentData);

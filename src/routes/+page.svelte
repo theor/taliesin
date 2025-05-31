@@ -128,15 +128,16 @@
     <div class="flex-1 gap-4 p-4">
       {#if isDebug}
         <div
-          class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden space-y-5 p-5 lg:flex"
+          class="card flex-col preset-outlined-surface-200-800 bg-surface-50-950 hidden space-y-5 p-5 lg:flex"
         >
           Code
-          <button class="btn preset-filled ml-4" onclick={() => store.clearCommands()}>Clear</button
-          >
+          <div class="flex flex-row">
+          <button class="btn preset-outlined ml-4" onclick={() => store.cycle()}>Cycle</button>
+        </div>
           <pre>
 {code}
             </pre>
-            <pre>{store.serialized()}</pre>
+            <!-- <pre>{store.serialized()}</pre> -->
         </div>
       {/if}
       

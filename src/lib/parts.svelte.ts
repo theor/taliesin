@@ -58,7 +58,7 @@ export class PartSteps extends InstrumentPartTyped<{
   measures: number;
   oddSignature: boolean;
 }> {
-	time = derived(strudel.time, (x:number) => (x/this.data.measures) %1);
+	time(x:number):number {return (x/this.data.measures) %1; };
 
   override isInput(): boolean { return true; }
   override defaultData() {

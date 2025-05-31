@@ -21,8 +21,13 @@ import {
   PartArpeggiator,
   PartTrackNotes
 } from './parts.svelte';
+import { VITEST } from './strudel';
 
 export const mixerIndex = -1;
+
+if(VITEST){
+
+}
 
 const config: BaseRoomConfig & RelayConfig = {
   appId: 'taliesin',
@@ -33,7 +38,14 @@ const config: BaseRoomConfig & RelayConfig = {
 
   // relayUrls: ["wss://192.168.1.82:3334"]
 };
-const room = joinRoom(config, 'room1');
+const room = VITEST ? {
+    makeAction: () => [() => {}, () => {}],
+    onPeerJoin: () => {},
+    onPeerLeave: () => {},
+    doc: { clientID: 'test' },
+    sendState: () => {},
+    sendInstrument: () => {},
+} : joinRoom(config, 'room1');
 
 type WrappedInstrument = {
   index: number;
@@ -99,8 +111,11 @@ class AppStore {
     }
   }
 
-  clearCommands() {
-    // this.synchedStore.commands.splice(0, this.synchedStore.commands.length);
+  cycle() {
+    console.log("cycle");
+    const json = this.serialized();
+    console.warn(json)
+    this.instrumentsData.instrumentsData = (JSON.parse(json) as InstrumentDataJsonValue[]).map(this.deserializeInstrumentData);
   }
   instrumentsData = $state({ instrumentsData: [] as InstrumentData[], volume: 0.8 });
   serialized(): string {
@@ -145,18 +160,21 @@ class AppStore {
           console.error('Unknown instrument part type', data.parts);
           return undefined!; // Fallback to original data
         }
-        return new type(data);
+        let newPart = new type(data);
+        console.log('deserializeInstrumentData', part, newPart);
+        // newPart.assign(part as InstrumentPart);
+        return newPart;
     }).filter(x => x)};
-    console.log('deserializeInstrumentData', data, res);
+    // console.log('deserializeInstrumentData', data, res);
     return res;
     
   }
-  serializeInstrumentData(data: InstrumentData): InstrumentDataJsonValue {
+  serializeInstrumentData(dataOrReactive: InstrumentData): InstrumentDataJsonValue {
+    const data = $state.snapshot(dataOrReactive) as InstrumentData;
     console.log('serializeInstrumentData', data);
-    
     return {
       ...data,
-      parts: data.parts.map((part) => {return {...part.serialize(), name: part.constructor.name}})
+      parts: data.parts.map((part, index) => {return {...dataOrReactive.parts[index].serialize(), name: dataOrReactive.parts[index].constructor.name}})
     };
   }
 
@@ -191,6 +209,7 @@ class AppStore {
         //  notes: [1, 2, 3,undefined,4,5,3,undefined]
       )
     );
+    return this.instrumentsData.instrumentsData[this.instrumentsData.instrumentsData.length - 1];
   }
   setInstrument(index: number, data: InstrumentData) {
     // console.log("setInstrument", index, data);
