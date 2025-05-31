@@ -1,6 +1,6 @@
 <script lang="ts">
-  import {PartArpeggiator, PartChords, PartEffects, PartFilter, PartOctave, PartSteps, type  Constructor,type IInstrumentViewProps,type InstrumentPart,type IPartViewProps } from '$lib';
-  import { getInstrumentIcon, store } from '$lib/Store.svelte';
+  import { PartArpeggiator, PartChords, PartEffects, PartFilter, PartOctave, PartSteps, type  Constructor,type IInstrumentViewProps,type InstrumentPartTyped,type IPartViewProps, type PartType } from '$lib';
+  import { getInstrumentIcon, getPartType, store } from '$lib/Store.svelte';
     import { type Component } from 'svelte';
     import { Pane, ThemeUtils } from 'svelte-tweakpane-ui';
     import PartOctaveView from './PartOctaveView.svelte';
@@ -22,26 +22,28 @@
       ><Icon size="24" /> {instrumentData.instrumentName}</span
     >
     <div class="flex gap-2 portrait:flex-col">
-      {#snippet renderOptionalPart<TPart extends InstrumentPart>(
+      {#snippet renderOptionalPart<TPart extends InstrumentPartTyped<any>>(
         partType: Constructor<TPart>,
         component: Component<IPartViewProps<TPart>>
       )}
         {#each instrumentData.parts as part, partIndex}
-          {#if part instanceof partType}
+          {#if part.partName === partType.name}
             {@const ViewComp = component}
             <Pane position="inline" title={partType.name}  >
-              <ViewComp bind:part={instrumentData.parts[partIndex] as TPart} />
+              <ViewComp part={getPartType(part.partName) as TPart} bind:partData={instrumentData.parts[partIndex] as PartType<TPart>} />
             </Pane>
           {/if}
         {/each}
       {/snippet}
 
+      {#key index}
       {@render renderOptionalPart(PartChords, PartChordsView)}
       {@render renderOptionalPart(PartArpeggiator, PartArpView)}
       {@render renderOptionalPart(PartFilter, PartFilterView)}
       {@render renderOptionalPart(PartOctave, PartOctaveView)}
       {@render renderOptionalPart(PartSteps, PartStepsView)}
       {@render renderOptionalPart(PartEffects, PartEffectsView)}
+      {/key}
       <button class="btn preset-filled mr-4 px-2 py-1" onclick={() => store.randomize(index)}
         ><Dices size={16} /></button
       >

@@ -5,25 +5,12 @@
   import {
     strudel,
     store,
-    type InstrumentData,
-    hasPart,
-    getPart,
-    type PartOctave,
-    type InstrumentPart,
-    type IPartViewProps,
-    type PartTrackNotes,
-    type MonoSequence,
-    type PartSteps
   } from '$lib';
   import '../main.scss';
   import Network from '../components/Network.svelte';
   import Transport from '../components/Transport.svelte';
-  import PianoScaleView from '../instruments/PianoScaleView.svelte';
-  import { X, Dices } from '@lucide/svelte';
   import { setGlobalContext } from '$lib/context';
-  import { type Component } from 'svelte';
-  import PartOctaveView from '../components/PartOctaveView.svelte';
-
+  
   const params = new URLSearchParams(window.location.search);
   const isHost = params.getAll('join').length == 0;
   const isDebug = params.getAll('debug').length > 0;

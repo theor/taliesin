@@ -3,13 +3,13 @@
 	import { Checkbox, Slider,List, type ListOptions } from 'svelte-tweakpane-ui';
 	// import { type Component } from 'svelte';
 
-	const { part }: IPartViewProps<PartChords> = $props();
+	const { part,partData }: IPartViewProps<PartChords> = $props();
 	// $effect(() => {
 	// 	console.log('PartEffectsView c', part);
 	// });
 	const options: ListOptions<string> =VoicingMode;
 </script>
 
-<Checkbox bind:value={part.data.enabled} label="Enabled"  />
-<List bind:value={part.data.mode as string} label="Chords" {options}/>
+<Checkbox bind:value={partData.enabled} label="Enabled"  />
+<List bind:value={partData.mode as string} label="Chords" {options}/>
 	

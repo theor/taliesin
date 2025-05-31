@@ -46,7 +46,7 @@ export abstract class Instrument {
   generate(data: InstrumentData): string {
     const generatePart = (x:Constructor<InstrumentPartTyped<any>>) => {
       const part = getPartTypeAndData(x, data);
-      console.log(`Generating part ${x.name}`, part);
+      // console.log(`Generating part ${x.name}`, part);
       if (part.part && part.data) {
         
         return part.part.generate(data, part.data, this.getLength(data));
@@ -54,7 +54,7 @@ export abstract class Instrument {
       return '';
     }
     const inputPart = findPartTypeAndData(data, (x) => x.isInput());
-console.warn(`Generating instrument ${this.name} with input part:`, inputPart?.part, inputPart?.data, data);
+// console.warn(`Generating instrument ${this.name} with input part:`, inputPart?.part, inputPart?.data, data);
 
     const l = this.getLength(data);
     return `${inputPart?.part.generate(data, inputPart.data, l) || ''}
@@ -91,13 +91,7 @@ export function getPart<T extends InstrumentPartTyped<any>>(
 ): PartType<T> | undefined {
   return data.parts.find((x) => x.partName === key.name) as PartType<T>;
 }
-export function getPartInstance<T extends InstrumentPartTyped<any>>(
-  key: Constructor<T>,
-  data: InstrumentData
-): T | undefined {
-  const partData = getPart(key, data);
-  return new key(partData) as T;
-}
+
 export function hasPart<T extends InstrumentPart>(
   key: Constructor<T>,
   data: InstrumentData

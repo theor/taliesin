@@ -297,7 +297,7 @@ export function createInstrument<TInstr extends Instrument>(
   d?: InstrumentPartData[],
   name?: string
 ): InstrumentData {
-  // console.log('createInstrument', n, d);
+  console.log('createInstrument', n, d);
   var instr = instrumentMap[n.name];
   var baseData = instr.createData(name);
   if (d) {

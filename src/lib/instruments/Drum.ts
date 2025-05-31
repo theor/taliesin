@@ -24,10 +24,6 @@ export class Drum extends Instrument {
       o.notes[DrumNote.kick] = [1, 0, 0, 0, 1, 0, 0, 0];
       o.notes[DrumNote.snare] = [0, 0, 1, 0, 0, 0, 1, 0];
       o.notes[DrumNote.hiHat] = [1, 1, 1, 1, 1, 1, 1, 1];
-        // TODO PARTS
-
-      // const p: PartTrackNotes = new PartTrackNotes({notes:o.notes});
-      // const steps: PartSteps = new PartSteps(4, 2, false);
       return [
         makePartData(PartTrackNotes, o),
         makePartData(PartSteps, { stepsPerMeasure: 4, measures: 2, oddSignature: false }),

@@ -176,11 +176,9 @@ export class MonoSequence extends InstrumentPartTyped<{ notes: (number | undefin
     length: Length
   ): string {
     const octave = getPart(PartOctave, data)?.octave ?? 4;
-    console.log(`GEN ${this}`, selfData, length);
+    // console.log(`GEN ${this}`, selfData, length);
 
     const ctx = getGlobalContext();
-
-    // console.log(`GEN ${this.name}`, notes.data.notes, this.getLength(data));
     return `n("<${Array.from(
       { length: length.stepsPerMeasure * length.measures },
       (_, i) => selfData.notes[i]

@@ -4,10 +4,10 @@
     import { Slider, Wheel } from 'svelte-tweakpane-ui';
 	// import { type Component } from 'svelte';
 
-	const { part = $bindable()  }: IPartViewProps<PartFilter> = $props();
-	let logVal = $state(Math.log2(part.data.freq));
+	const { partData = $bindable()  }: IPartViewProps<PartFilter> = $props();
+	let logVal = $state(Math.log2(partData.freq));
 	$effect(() => {
-		part.data.freq = Math.pow(2, logVal);
+		partData.freq = Math.pow(2, logVal);
 	})
 </script>
 

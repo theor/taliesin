@@ -26,7 +26,7 @@
 		}
 		part.stepsPerMeasure = value;
 	}
-	let time = derived(strudel.time, x => props.part.time(part, x));// derived(strudel.time, (x:number) => (x/part.measures) %1);
+	// let time = derived(strudel.time, x => props.part.time(part, x));// derived(strudel.time, (x:number) => (x/part.measures) %1);
 	console.warn('steps', part)
 </script>
 
@@ -34,7 +34,7 @@
 <Stepper bind:value={getSteps, setSteps} min={part.oddSignature ? 1 : 0} max={16} step={1} label="Steps per measure" format={formatSteps}  />
 <!-- <Slider bind:value={getSteps, setSteps} min={part.oddSignature ? 1 : 0} max={16} step={1} label="Steps per measure" format={e => "asde"}  /> -->
 <Stepper bind:value={part.measures} min={0} max={16} step={1} label="Measures"  />
-<Slider disabled value={$time} min={0} max={1} step={0.01} label="Progress"/>
+<!-- <Slider disabled value={$time} min={0} max={1} step={0.01} label="Progress"/> -->
 <!-- {@render btnSnippet(ChevronUp, onPartChanged(() => part.stepsPerMeasure++))}
 {@render btnSnippet(ChevronDown, onPartChanged(() => part.stepsPerMeasure--))}
 {@render btnSnippet(ChevronUp, onPartChanged(() => part.measures++))}

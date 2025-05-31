@@ -62,7 +62,7 @@ class StrudelWrapper {
     if (code === '') return Promise.resolve();
     await this.initPromise;
     // console.log(
-    console.log('Strudel evaluate!', this.repls);
+    // console.log('Strudel evaluate!', this.repls);
     await this.repls.evaluate(`samples('github:tidalcycles/dirt-samples')
 const asChords = register("asChords", function(triads, pat) {
   return pat.fmap( x=> {
@@ -74,7 +74,7 @@ const asChords = register("asChords", function(triads, pat) {
 Pattern.prototype.asChords = function(...args)  { return asChords(...args,this);  }
 ${code}`);
 
-    console.log('Strudel evaluate!', this.repls.state.code);
+    // console.log('Strudel evaluate!', this.repls.state.code);
     // return repls.evaluate(`${code}`)
     // );
   }
