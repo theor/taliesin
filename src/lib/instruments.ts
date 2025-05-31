@@ -63,6 +63,8 @@ export interface InstrumentData {
   volume: number;
   state: TrackState;
 }
+export type InstrumentDataJsonValue = Omit<InstrumentData, 'parts'> & {parts: {name:string}[]};
+
 export function getPart<T extends InstrumentPart>(
   key: Constructor<T>,
   data: InstrumentData

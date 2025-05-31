@@ -5,7 +5,8 @@
     import { derived } from 'svelte/store';
 	// import { type Component } from 'svelte';
 
-	const { part }: IPartViewProps<PartSteps> = $props();
+	const props: IPartViewProps<PartSteps> = $props();
+	const part = $state.snapshot(props.part);
 	// $effect(() => {
 	// 	console.log('PartStepsView c', part);
 	// });
@@ -26,6 +27,7 @@
 		part.data.stepsPerMeasure = value;
 	}
 	let time = part.time;// derived(strudel.time, (x:number) => (x/part.data.measures) %1);
+	console.warn('steps', part.data)
 </script>
 
 <Checkbox bind:value={part.data.oddSignature} label="Odd signature" />

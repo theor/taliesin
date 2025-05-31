@@ -136,6 +136,7 @@
           <pre>
 {code}
             </pre>
+            <pre>{store.serialized()}</pre>
         </div>
       {/if}
       

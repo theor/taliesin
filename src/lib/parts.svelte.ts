@@ -15,6 +15,7 @@ export enum DrumNote {
   lowTom = 'lt'
 }
 export abstract class InstrumentPart {
+  abstract serialize(): ({ [key: string]: any }); 
   abstract assign(other: InstrumentPart): void;
   isInput(): boolean { return false; }
   generate(data: InstrumentData, length: Length): string {
@@ -24,6 +25,9 @@ export abstract class InstrumentPart {
 
 abstract class InstrumentPartTyped<T> extends InstrumentPart {
   data = $state<T>({} as T);
+  override serialize(): { [key: string]: any } {
+    return $state.snapshot(this.data) as { [key: string]: any };
+  }
   abstract defaultData(): T;
   override assign(other: InstrumentPartTyped<T>): void {
     if (!other || !(other instanceof this.constructor)) {

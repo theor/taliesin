@@ -12,7 +12,7 @@
   const buttonClassOff = 'preset-outlined-primary-500';
   const buttonClassOnOdd = 'preset-filled-tertiary-500';
   const buttonClassOffOdd = 'preset-outlined-tertiary-500';
-  let progress = derived(instr?.progress(instrumentData)!, (x:number) => x!*100)!;
+  let progress = derived(instr?.progress(instrumentData)!, (x:number) => Number.isNaN(x) ? 0 : x!*100)!;
 
   $effect(() => {
     // console.log('SEQ instrumentData', instrumentData);
