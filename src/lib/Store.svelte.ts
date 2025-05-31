@@ -119,6 +119,22 @@ export const presets: Preset[] = [
   }
 ];
 class AppStore {
+  updatePart<TPart extends InstrumentPartData>(instrumentIndex:number, partIndex: number, partData: TPart) {
+    const instrument = this.instrumentsData.instrumentsData[instrumentIndex];
+    if (!instrument) {
+      console.error('Instrument not found', instrumentIndex);
+      return;
+    }
+    const part = instrument.parts[partIndex];
+    if (!part) {
+      console.error('Part not found', partIndex);
+      return;
+    }
+    // Update the part data
+    Object.assign(part, partData);
+    // Update the instrument
+    this.setInstrument(instrumentIndex, instrument);
+  }
   getPreset(name: string): Preset | undefined {
     const preset = presets.find((p) => p.name === name);
     return preset;
@@ -143,7 +159,7 @@ class AppStore {
     console.log("cycle");
     const json = this.serialized();
     console.warn(json)
-    // this.instrumentsData.instrumentsData = (JSON.parse(json) as InstrumentDataJsonValue[]).map(this.deserializeInstrumentData);
+    this.instrumentsData.instrumentsData = (JSON.parse(json) as InstrumentDataJsonValue[]);
   }
   instrumentsData = $state({ instrumentsData: [] as InstrumentData[], volume: 0.8 });
   serialized(): string {
@@ -174,8 +190,8 @@ class AppStore {
   peerJoined(peerId: string) {
     console.log('peer joined', peerId);
     // TODO PARTS
-    // if (this.host)
-      // this.sendState(this.instrumentsData.instrumentsData.map(this.serializeInstrumentData), peerId);
+    if (this.host)
+      this.sendState(this.instrumentsData.instrumentsData, peerId);
   }
   peerLeft(peerId: string) {
     console.log('peer left', peerId);
@@ -208,6 +224,7 @@ class AppStore {
   //     parts: data.parts.map((part, index) => {return {...dataOrReactive.parts[index].serialize(), name: dataOrReactive.parts[index].constructor.name}})
   //   };
   // }
+  isReceiving = false;
 
   constructor() {
     const [sendState, onReceiveState] = room.makeAction<InstrumentDataJsonValue[]>('state');
@@ -221,7 +238,13 @@ class AppStore {
     });
     onReceiveInstrument((data, peerId) => {
       console.log('receiveInstrument', data, peerId);
-      this.instrumentsData.instrumentsData.splice(data.index, 1, data.instrument);
+      this.isReceiving = true;
+      try {
+        this.instrumentsData.instrumentsData.splice(data.index, 1, data.instrument);
+        
+      } catch (error) {
+        this.isReceiving = false;
+      }
     });
   }
   init(host: boolean) {
@@ -243,19 +266,18 @@ class AppStore {
     return this.instrumentsData.instrumentsData[this.instrumentsData.instrumentsData.length - 1];
   }
   setInstrument(index: number, data: InstrumentData) {
-    // console.log("setInstrument", index, data);
+    console.log("setInstrument", index, data);
     const snapshot = data;
     this.instrumentsData.instrumentsData.splice(index, 1, snapshot);
-    this.sendInstrument({ index, instrument: snapshot});
+    if(!this.isReceiving)
+      this.sendInstrument({ index, instrument: snapshot});
   }
+  // TODO send
   setInstrumentPartial = (index: number, data: Partial<InstrumentData>) => {
-    // this.instrumentsData[index] = Object.assign(this.instrumentsData[index], data);
-
     this.instrumentsData.instrumentsData[index] = {
       ...this.instrumentsData.instrumentsData[index],
       ...data
     };
-    // this.synchedStore.instrumentsData = [...this.synchedStore.instrumentsData];
     console.log('setInstrumentPartial', index, data, $state.snapshot(this.instrumentsData));
   };
   removeInstrument(index: number): any {

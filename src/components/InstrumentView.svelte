@@ -11,9 +11,15 @@
     import PartEffectsView from './PartEffectsView.svelte';
     import PartChordsView from './PartChordsView.svelte';
     import PartArpView from './PartArpView.svelte';
+    import InstrumentPartView from './InstrumentPartView.svelte';
   let { index, instrumentData = $bindable() }: IInstrumentViewProps = $props();
   
   let Icon = getInstrumentIcon(instrumentData.instrumentName);
+
+  $effect(() => {
+    console.log('InstrumentView c', instrumentData.parts);
+    // console.log('InstrumentView index', index);
+  });
 </script>
 
 <div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
@@ -28,10 +34,13 @@
       )}
         {#each instrumentData.parts as part, partIndex}
           {#if part.partName === partType.name}
-            {@const ViewComp = component}
-            <Pane position="inline" title={partType.name}  >
-              <ViewComp part={getPartType(part.partName) as TPart} bind:partData={instrumentData.parts[partIndex] as PartType<TPart>} />
-            </Pane>
+            <InstrumentPartView
+            instrumentIndex={index}
+            instrumentData={instrumentData}
+            {partIndex}
+              PartComponent={component as Component<IPartViewProps<InstrumentPartTyped<any>>>}
+              bind:partData={instrumentData.parts[partIndex] as PartType<TPart>}/>
+            
           {/if}
         {/each}
       {/snippet}

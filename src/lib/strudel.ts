@@ -1,12 +1,11 @@
-import { initStrudel, evaluate } from '@strudel/web';
-import { webaudioRepl, getAudioContext, initAudioOnFirstClick } from '@strudel/webaudio';
-import { Pattern } from '@strudel/core';
+import { initStrudel  } from '@strudel/web';
+// import { webaudioRepl,  initAudioOnFirstClick } from '@strudel/webaudio';
 import { writable, type Writable } from 'svelte/store';
 
 // initStrudel({
 //     prebake: () => samples('github:tidalcycles/dirt-samples'),
 //   });
-initAudioOnFirstClick();
+// initAudioOnFirstClick();
 
 // const asChords  = function(triads:any, pat:any) {
 //     return pat.fmap( (x:any)=> {

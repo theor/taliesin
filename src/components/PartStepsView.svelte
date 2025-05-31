@@ -1,41 +1,29 @@
 <script lang="ts">
-	import { strudel, type IPartViewProps, type PartSteps } from '$lib';
-	import { ChevronDown, ChevronUp } from '@lucide/svelte';
-    import { Checkbox, Slider, Stepper } from 'svelte-tweakpane-ui';
-    import { derived } from 'svelte/store';
-	// import { type Component } from 'svelte';
+	import { type IPartViewProps, type PartSteps } from '$lib';
+	import { Checkbox, Stepper } from 'svelte-tweakpane-ui';
 
-	const props: IPartViewProps<PartSteps> = $props();
-	const part = props.partData;// $state.snapshot(props.part);
-	// $effect(() => {
-	// 	console.log('PartStepsView c', part);
-	// });
+	const {partData = $bindable()}: IPartViewProps<PartSteps> = $props();
 	function formatSteps(value: number): string {
-		return  (part.oddSignature ? value.toString() : (1 << value).toString()) + "#";
+		return  (partData.oddSignature ? value.toString() : (1 << value).toString()) + "#";
 	}
 
 
     function getSteps(): number {
-		return part.oddSignature ? part.stepsPerMeasure : Math.log2(part.stepsPerMeasure);
+		return partData.oddSignature ? partData.stepsPerMeasure : Math.log2(partData.stepsPerMeasure);
     }
 	function setSteps(value: number): void {
-		if (part.oddSignature) {
-			part.stepsPerMeasure = value;
+		if (partData.oddSignature) {
+			partData.stepsPerMeasure = value;
 		} else {
 			value = 1 << value;
 		}
-		part.stepsPerMeasure = value;
+		partData.stepsPerMeasure = value;
 	}
-	// let time = derived(strudel.time, x => props.part.time(part, x));// derived(strudel.time, (x:number) => (x/part.measures) %1);
-	console.warn('steps', part)
+	// let time = derived(strudel.time, x => props.partData.time(part, x));// derived(strudel.time, (x:number) => (x/partData.measures) %1);
+	// console.warn('steps', part)
 </script>
 
-<Checkbox bind:value={part.oddSignature} label="Odd signature" />
-<Stepper bind:value={getSteps, setSteps} min={part.oddSignature ? 1 : 0} max={16} step={1} label="Steps per measure" format={formatSteps}  />
-<!-- <Slider bind:value={getSteps, setSteps} min={part.oddSignature ? 1 : 0} max={16} step={1} label="Steps per measure" format={e => "asde"}  /> -->
-<Stepper bind:value={part.measures} min={0} max={16} step={1} label="Measures"  />
+<Checkbox bind:value={partData.oddSignature} label="Odd signature" />
+<Stepper bind:value={getSteps, setSteps} min={partData.oddSignature ? 1 : 0} max={16} step={1} label="Steps per measure" format={formatSteps}  />
+<Stepper bind:value={partData.measures} min={0} max={16} step={1} label="Measures"  />
 <!-- <Slider disabled value={$time} min={0} max={1} step={0.01} label="Progress"/> -->
-<!-- {@render btnSnippet(ChevronUp, onPartChanged(() => part.stepsPerMeasure++))}
-{@render btnSnippet(ChevronDown, onPartChanged(() => part.stepsPerMeasure--))}
-{@render btnSnippet(ChevronUp, onPartChanged(() => part.measures++))}
-{@render btnSnippet(ChevronDown, onPartChanged(() => part.measures--))} -->
