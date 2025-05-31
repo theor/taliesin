@@ -44,7 +44,7 @@ setupInterval();
 
 if (import.meta.hot) {
   // HMR specific stuff...
-  console.log('Strudel HMR enabled!', import.meta.hot);
+  // console.log('Strudel HMR enabled!', import.meta.hot);
 
   import.meta.hot.on('vite:beforeUpdate', () => {
     console.log('Strudel HMR dispose  !');

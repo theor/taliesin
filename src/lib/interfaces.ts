@@ -1,4 +1,4 @@
-import type { InstrumentPart } from './parts.svelte';
+import type { InstrumentPart, InstrumentPartTyped, PartType } from './parts.svelte';
 import type { InstrumentData } from './instruments';
 
 export enum Status {
@@ -7,8 +7,9 @@ export enum Status {
   connected = 'connected'
 }
 
-export interface IPartViewProps<T extends InstrumentPart> {
+export interface IPartViewProps<T extends InstrumentPartTyped<any>> {
   part: T;
+  partData: PartType<T>;
 }
 export interface IInstrumentViewProps {
   instrumentData: InstrumentData;

@@ -1,7 +1,17 @@
-import { PartChords, PartEffects, PartFilter, PartSteps, type InstrumentPart, PartArpeggiator} from './parts.svelte';
+import { findPartTypeAndData, getPartType, getPartTypeAndData } from './Store.svelte';
+import {
+  PartChords,
+  PartEffects,
+  PartFilter,
+  PartSteps,
+  type InstrumentPart,
+  PartArpeggiator,
+  type InstrumentPartData,
+  InstrumentPartTyped,
+  type PartType
+} from './parts.svelte';
 import type { ISequencer } from './sequencer';
 import { strudel } from './strudel';
-
 
 export interface Length {
   stepsPerMeasure: number;
@@ -11,7 +21,7 @@ export abstract class Instrument {
   getLength(data: InstrumentData): Length {
     var steps = getPart(PartSteps, data);
     if (steps) {
-      return steps.data;
+      return steps;
     }
     return { stepsPerMeasure: 4, measures: 1 };
   }
@@ -22,27 +32,37 @@ export abstract class Instrument {
   name: string = this.constructor.name;
   // progress(data:InstrumentData) { return getPart(PartSteps, data)?.time(strudel.time)!; }
 
-  abstract createData_(): InstrumentPart[];
+  abstract createData_(): InstrumentPartData[];
   createData(name?: string): InstrumentData {
     return {
       parts: this.createData_(),
       instrumentName: this.name,
       name: name || this.name,
       volume: 1,
-      state: TrackState.Playing,
+      state: TrackState.Playing
     };
   }
   protected abstract generate_(data: InstrumentData): string;
   generate(data: InstrumentData): string {
-    const inputPart = data.parts.find((x) => x.isInput());
-    
+    const generatePart = (x:Constructor<InstrumentPartTyped<any>>) => {
+      const part = getPartTypeAndData(x, data);
+      console.log(`Generating part ${x.name}`, part);
+      if (part.part && part.data) {
+        
+        return part.part.generate(data, part.data, this.getLength(data));
+      }
+      return '';
+    }
+    const inputPart = findPartTypeAndData(data, (x) => x.isInput());
+console.warn(`Generating instrument ${this.name} with input part:`, inputPart?.part, inputPart?.data, data);
+
     const l = this.getLength(data);
-    return `${inputPart?.generate(data, l) || ''}
-  ${getPart(PartChords, data)?.generate(data, l) || ''}
-  ${getPart(PartArpeggiator, data)?.generate(data, l) || ''}
+    return `${inputPart?.part.generate(data, inputPart.data, l) || ''}
+  ${generatePart(PartChords)}
+  ${generatePart(PartArpeggiator)}
   .fast(${this.getLength(data).stepsPerMeasure})
-  ${getPart(PartFilter, data)?.generate(data, l) || ''}
-  ${getPart(PartEffects, data)?.generate(data, l) || ''}
+  ${generatePart(PartFilter)}
+  ${generatePart(PartEffects)}
   ${this.generate_(data)}
   ${this.trackOptions(data)}`;
   }
@@ -55,27 +75,32 @@ export type Constructor<T> = new (...args: any[]) => T;
 export enum TrackState {
   Playing,
   Muted,
-  Solo,
+  Solo
 }
 export interface InstrumentData {
   name: string;
   instrumentName: string;
-  parts: InstrumentPart[];
+  parts: InstrumentPartData[];
   volume: number;
   state: TrackState;
 }
-export type InstrumentDataJsonValue = Omit<InstrumentData, 'parts'> & {parts: {name:string}[]};
-
-export function getPart<T extends InstrumentPart>(
+export type InstrumentDataJsonValue = InstrumentData & { [key: string]: any }; // Omit<InstrumentData, 'parts'> & {parts: {name:string}[]};
+export function getPart<T extends InstrumentPartTyped<any>>(
+  key: Constructor<T>,
+  data: InstrumentData
+): PartType<T> | undefined {
+  return data.parts.find((x) => x.partName === key.name) as PartType<T>;
+}
+export function getPartInstance<T extends InstrumentPartTyped<any>>(
   key: Constructor<T>,
   data: InstrumentData
 ): T | undefined {
-  // console.log('getPart', key.name, data.instrumentName, data.parts);
-
-  return data.parts.find((x) => x instanceof key) as T;
+  const partData = getPart(key, data);
+  return new key(partData) as T;
 }
 export function hasPart<T extends InstrumentPart>(
   key: Constructor<T>,
-  data: InstrumentData): boolean {
+  data: InstrumentData
+): boolean {
   return data.parts.some((x) => x instanceof key);
 }

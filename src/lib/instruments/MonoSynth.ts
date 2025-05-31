@@ -1,5 +1,6 @@
+import { makePartData } from "$lib/Store.svelte";
 import { Instrument,getPart,type InstrumentData } from "$lib/instruments";
-import { InstrumentPart, MonoSequence, PartEffects, PartFilter, PartOctave, PartSteps } from "$lib/parts.svelte";
+import { InstrumentPart, MonoSequence, PartEffects, PartFilter, PartOctave, PartSteps, type InstrumentPartData } from "$lib/parts.svelte";
 import { Sequencer, MonoSequenceSequencer } from "$lib/sequencer";
 
 
@@ -8,7 +9,7 @@ export class PianoScale extends Instrument {
       const part = getPart(MonoSequence, data)!;
       const length = this.getLength(data);
 
-      part.data.notes = Array.from({length: length.stepsPerMeasure * length.measures}, (_, i) => {
+      part.notes = Array.from({length: length.stepsPerMeasure * length.measures}, (_, i) => {
         return Math.floor(Math.random() * 7);
       });
       // const notes = part.data.notes.map(() => {
@@ -22,12 +23,12 @@ export class PianoScale extends Instrument {
     }
     override name: string = 'PianoScale';
     // notes = [1,2,3,4,5,6,7].map(x => x.toString());
-    override createData_(): InstrumentPart[] {
+    override createData_(): InstrumentPartData[] {
       return [
-        new PartOctave(4),
-        new MonoSequence({notes:[1, 2, 3, undefined, 4, 5, 3, undefined]}),
-        new PartSteps(8, 2, false),
-        new PartEffects({ reverb: .2,  })
+        makePartData(PartOctave, {octave:4}),
+        makePartData(MonoSequence, {notes:[1, 2, 3, undefined, 4, 5, 3, undefined]}),
+        makePartData(PartSteps, {stepsPerMeasure: 8, measures: 2, oddSignature: false}),
+        makePartData(PartEffects, { reverb: .2,  })
       ];
     }
      
