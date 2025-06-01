@@ -3,6 +3,7 @@ import { getContext, setContext } from "svelte";
 interface GlobalContext {
     host: boolean;
     debug: boolean;
+    roomId: string;
     scaleKey: string;
     scaleMode: string;
 }

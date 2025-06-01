@@ -29,7 +29,7 @@
 
   $effect(() => {
     // console.log('PartView c', $effect.tracking(), partData, instrumentData, instrumentData.parts[partIndex]);
-    console.log(pane);
+    // console.log(pane);
     pane.on('change', (e) => {
       console.log('PartView pane change',e, partData);
 

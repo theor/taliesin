@@ -1,7 +1,7 @@
 <script lang="ts">
   import { AppBar } from '@skeletonlabs/skeleton-svelte';
   import Menu from '@lucide/svelte/icons/menu';
-
+  import { page } from '$app/state';
   import {
     strudel,
     store,
@@ -11,16 +11,37 @@
   import Transport from '../components/Transport.svelte';
   import { setGlobalContext } from '$lib/context';
   
-  const params = new URLSearchParams(window.location.search);
-  const isHost = params.getAll('join').length == 0;
-  const isDebug = params.getAll('debug').length > 0;
+
+  function searchParamsHelper() {
+    const params = page.url.searchParams;
+    return {
+      get: (key: string) => params.get(key) ?? undefined,
+      getNumber: (key: string) => {
+        const v = params.get(key);
+        return v ? Number(v) : undefined;
+      },
+      has: (key: string) => params.has(key),
+      getAll: (key: string) => params.getAll(key),
+    };
+  }
+  const params = searchParamsHelper();
+  const isJoin = params.has('join');
+  const isHost = params.has('host');
+  const room = params.get('room');
+  const isDebug = params.has('debug');
+  if (!room || (!isJoin && !isHost)) {
+    goto('/home')
+  }
+  console.error("params", params, isJoin, isHost, room);
+
+  initStore(isHost, room!);
   setGlobalContext({
     host: isHost,
     debug: isDebug,
+    roomId: room!,
     scaleKey: "A",
     scaleMode: "minor",
   });
-  store.init(isHost);
 
   function onKeyDown(event: KeyboardEvent) {
     console.log(event, event.code);
@@ -64,8 +85,9 @@
   import { Modal } from '@skeletonlabs/skeleton-svelte';
   import AppMenu from '../components/AppMenu.svelte';
     import InstrumentView from '../components/InstrumentView.svelte';
-	import { mixerIndex } from '$lib/Store.svelte';
+	import { initStore, mixerIndex } from '$lib/Store.svelte';
 	import Mixer from '../components/Mixer.svelte';
+    import { goto } from '$app/navigation';
 
   let drawerState = $state(false);
 
@@ -74,7 +96,6 @@
   }
 </script>
 
-<div class="flex h-screen flex-col">
   <AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block" toolbarClasses="">
     {#snippet lead()}
       <!-- <ArrowLeft size={24} /> -->
@@ -154,7 +175,5 @@
 		</Tabs> -->
     </div>
   </div>
-  <!-- <footer class=" h-10% p-4">(footer)</footer> -->
-</div>
 
 <svelte:window on:keydown={onKeyDown} />

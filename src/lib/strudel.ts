@@ -92,6 +92,7 @@ ${code}`);
   time = writable(0);
   updateTime() {
     // return ctx.currentTime;
+    if(!this.repls?.scheduler) return;
     const sched = this.repls.scheduler;
     const duration = sched.clock.duration;
     const seconds_since_cps_change = sched.num_ticks_since_cps_change * duration;

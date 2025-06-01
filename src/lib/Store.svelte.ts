@@ -1,12 +1,13 @@
 import { Status } from './interfaces';
 import { joinRoom, type BaseRoomConfig, type RelayConfig } from 'trystero/nostr';
+import { selfId, type ActionSender, type JsonValue, type Room } from 'trystero';
 import {
-  selfId,
-  type ActionSender,
-  type JsonValue,
-  type Room,
-} from 'trystero';
-import { getPart, type Constructor, type Instrument, type InstrumentData, type InstrumentDataJsonValue } from './instruments';
+  getPart,
+  type Constructor,
+  type Instrument,
+  type InstrumentData,
+  type InstrumentDataJsonValue
+} from './instruments';
 import { PianoScale } from './instruments/MonoSynth';
 import { Drum } from './instruments/Drum';
 import type { Component } from 'svelte';
@@ -29,12 +30,11 @@ import { VITEST } from './strudel';
 
 export const mixerIndex = -1;
 
-if(VITEST){
-
+if (VITEST) {
 }
 
 const config: BaseRoomConfig & RelayConfig = {
-  appId: 'taliesin',
+  appId: 'taliesin'
 
   // turnConfig: [
   //   { urls: ['stun:stun.l.google.com:19302' ]},
@@ -42,11 +42,7 @@ const config: BaseRoomConfig & RelayConfig = {
 
   // relayUrls: ["wss://192.168.1.82:3334"]
 };
-const room: Room = VITEST ? {
-    makeAction: () => [() => {}, () => {}],
-    onPeerJoin: () => {},
-    onPeerLeave: () => {},
-} as any as Room : joinRoom(config, 'room1');
+let room: Room = undefined!;
 
 type WrappedInstrument = {
   index: number;
@@ -59,7 +55,7 @@ type Preset = {
   parts: InstrumentPartData[];
 };
 
-export const parts: { part: Constructor<InstrumentPart>,partName: string }[] = [
+export const parts: { part: Constructor<InstrumentPart>; partName: string }[] = [
   { partName: PartEffects.name, part: PartEffects },
   { partName: PartFilter.name, part: PartFilter },
   { partName: PartSteps.name, part: PartSteps },
@@ -67,15 +63,22 @@ export const parts: { part: Constructor<InstrumentPart>,partName: string }[] = [
   { partName: PartArpeggiator.name, part: PartArpeggiator },
   { partName: MonoSequence.name, part: MonoSequence },
   { partName: PartOctave.name, part: PartOctave },
-    { partName: PartTrackNotes.name, part: PartTrackNotes },
+  { partName: PartTrackNotes.name, part: PartTrackNotes }
 ];
-export const partMap: { [key: string]: InstrumentPart } = parts.reduce((acc, p) => {
-  acc[p.partName] = new p.part();
-  return acc;
-}, {} as { [key: string]: InstrumentPart });
+export const partMap: { [key: string]: InstrumentPart } = parts.reduce(
+  (acc, p) => {
+    acc[p.partName] = new p.part();
+    return acc;
+  },
+  {} as { [key: string]: InstrumentPart }
+);
 
-export type PartTypeAndData<T extends InstrumentPartTyped<any>> =  {part:T,data:PartType<T>};
-export function findPartTypeAndData<T extends InstrumentPartTyped<any>>(data:InstrumentData, f: (x:InstrumentPart) => boolean): PartTypeAndData<T> | undefined {// Constructor<InstrumentPart> | undefined {
+export type PartTypeAndData<T extends InstrumentPartTyped<any>> = { part: T; data: PartType<T> };
+export function findPartTypeAndData<T extends InstrumentPartTyped<any>>(
+  data: InstrumentData,
+  f: (x: InstrumentPart) => boolean
+): PartTypeAndData<T> | undefined {
+  // Constructor<InstrumentPart> | undefined {
   for (const p of data.parts) {
     const partInst = partMap[p.partName] as T;
     if (partInst && f(partInst)) {
@@ -85,41 +88,57 @@ export function findPartTypeAndData<T extends InstrumentPartTyped<any>>(data:Ins
   return undefined;
 }
 
-export function getPartTypeAndData<T extends InstrumentPartTyped<any>>(partType: Constructor<T>, data:InstrumentData): PartTypeAndData<T> {// Constructor<InstrumentPart> | undefined {
+export function getPartTypeAndData<T extends InstrumentPartTyped<any>>(
+  partType: Constructor<T>,
+  data: InstrumentData
+): PartTypeAndData<T> {
+  // Constructor<InstrumentPart> | undefined {
   const part = partMap[partType.name] as T;
   if (!part) {
     console.error('Part type not found:', partType.name);
     return { part: undefined!, data: undefined! };
   }
-  const partData = getPart(partType,data);
-  return { part, data:partData!};
+  const partData = getPart(partType, data);
+  return { part, data: partData! };
 }
-export function getPartType(name:string): InstrumentPart {// Constructor<InstrumentPart> | undefined {
+export function getPartType(name: string): InstrumentPart {
+  // Constructor<InstrumentPart> | undefined {
   // return part.find((p) => p.part.name === name)?.part;
   return partMap[name];
 }
-export function makePartData<T extends InstrumentPartTyped<any>>(part: Constructor<T>, data?: Partial<Omit<PartType<T>, 'partName'>>): InstrumentPartData {
+export function makePartData<T extends InstrumentPartTyped<any>>(
+  part: Constructor<T>,
+  data?: Partial<Omit<PartType<T>, 'partName'>>
+): InstrumentPartData {
   const partName = part.name;
   const partInstance = getPartType(partName);
   return { ...partInstance.createData(data), partName };
 }
 
 export const presets: Preset[] = [
-  { name: 'Piano', instrument: PianoScale, parts: [makePartData(PartChords), makePartData(PartArpeggiator)] },
+  {
+    name: 'Piano',
+    instrument: PianoScale,
+    parts: [makePartData(PartChords), makePartData(PartArpeggiator)]
+  },
   { name: 'Drum', instrument: Drum, parts: [] },
   {
     name: 'Bass',
     instrument: PianoScale,
     parts: [
-      makePartData(PartEffects,{ reverb: 0.5 }),
-      makePartData(MonoSequence,{ notes: [1, 2, 3, undefined, 4, 5, 3, undefined] }),
-      makePartData(PartSteps,{stepsPerMeasure: 8,measures: 2}),
-      makePartData(PartOctave,{octave:2})
+      makePartData(PartEffects, { reverb: 0.5 }),
+      makePartData(MonoSequence, { notes: [1, 2, 3, undefined, 4, 5, 3, undefined] }),
+      makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
+      makePartData(PartOctave, { octave: 2 })
     ]
   }
 ];
 class AppStore {
-  updatePart<TPart extends InstrumentPartData>(instrumentIndex:number, partIndex: number, partData: TPart) {
+  updatePart<TPart extends InstrumentPartData>(
+    instrumentIndex: number,
+    partIndex: number,
+    partData: TPart
+  ) {
     const instrument = this.instrumentsData.instrumentsData[instrumentIndex];
     if (!instrument) {
       console.error('Instrument not found', instrumentIndex);
@@ -156,17 +175,16 @@ class AppStore {
   }
 
   cycle() {
-    console.log("cycle");
+    console.log('cycle');
     const json = this.serialized();
-    console.warn(json)
-    this.instrumentsData.instrumentsData = (JSON.parse(json) as InstrumentDataJsonValue[]);
+    console.warn(json);
+    this.instrumentsData.instrumentsData = JSON.parse(json) as InstrumentDataJsonValue[];
   }
   instrumentsData = $state({ instrumentsData: [] as InstrumentData[], volume: 0.8 });
   serialized(): string {
     return JSON.stringify(
-      this.instrumentsData.instrumentsData
+      this.instrumentsData.instrumentsData,
       //.map((i) => this.serializeInstrumentData(i))
-      ,
       null,
       2
     );
@@ -190,8 +208,7 @@ class AppStore {
   peerJoined(peerId: string) {
     console.log('peer joined', peerId);
     // TODO PARTS
-    if (this.host)
-      this.sendState(this.instrumentsData.instrumentsData, peerId);
+    if (this.host) this.sendState(this.instrumentsData.instrumentsData, peerId);
   }
   peerLeft(peerId: string) {
     console.log('peer left', peerId);
@@ -214,7 +231,7 @@ class AppStore {
   //   }).filter(x => x)};
   //   // console.log('deserializeInstrumentData', data, res);
   //   return res;
-    
+
   // }
   // serializeInstrumentData(dataOrReactive: InstrumentData): InstrumentDataJsonValue {
   //   const data = $state.snapshot(dataOrReactive) as InstrumentData;
@@ -226,11 +243,19 @@ class AppStore {
   // }
   isReceiving = false;
 
-  constructor() {
+  constructor(host: boolean, roomId:string) {
+
+    this.init(host, roomId);
+
     const [sendState, onReceiveState] = room.makeAction<InstrumentDataJsonValue[]>('state');
     const [sendInstrument, onReceiveInstrument] = room.makeAction<WrappedInstrument>('instrument');
     this.sendState = sendState;
     this.sendInstrument = sendInstrument;
+
+
+    room.onPeerJoin((peerId) => this.peerJoined(peerId));
+    room.onPeerLeave((peerId) => this.peerLeft(peerId));
+
     onReceiveState((data, peerId) => {
       if (this.host) return;
       console.log('receiveState', data, peerId);
@@ -241,14 +266,22 @@ class AppStore {
       this.isReceiving = true;
       try {
         this.instrumentsData.instrumentsData.splice(data.index, 1, data.instrument);
-        
       } catch (error) {
         this.isReceiving = false;
       }
     });
   }
-  init(host: boolean) {
+  private init(host: boolean, roomId: string) {
     this.host = host;
+
+    room = VITEST
+      ? ({
+          makeAction: () => [() => {}, () => {}],
+          onPeerJoin: () => {},
+          onPeerLeave: () => {}
+        } as any as Room)
+      : joinRoom(config, roomId);
+
     if (this.instrumentsData.instrumentsData.length === 0) this.preset();
   }
   preset() {
@@ -266,11 +299,10 @@ class AppStore {
     return this.instrumentsData.instrumentsData[this.instrumentsData.instrumentsData.length - 1];
   }
   setInstrument(index: number, data: InstrumentData) {
-    console.log("setInstrument", index, data);
+    console.log('setInstrument', index, data);
     const snapshot = data;
     this.instrumentsData.instrumentsData.splice(index, 1, snapshot);
-    if(!this.isReceiving)
-      this.sendInstrument({ index, instrument: snapshot});
+    if (!this.isReceiving) this.sendInstrument({ index, instrument: snapshot });
   }
   // TODO send
   setInstrumentPartial = (index: number, data: Partial<InstrumentData>) => {
@@ -285,10 +317,14 @@ class AppStore {
   }
 }
 
-export const store = new AppStore();
-room.onPeerJoin((peerId) => store.peerJoined(peerId));
-room.onPeerLeave((peerId) => store.peerLeft(peerId));
-
+export let store: AppStore = undefined!;
+export function initStore(host: boolean, roomId: string) {
+  if (store) {
+    console.warn('Store already initialized');
+    return store;
+  }
+  store = new AppStore(host, roomId);
+}
 const instrumentMap: { [key: string]: Instrument } = {
   PianoScale: new PianoScale(),
   Drum: new Drum()

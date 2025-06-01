@@ -23,8 +23,8 @@
 </script>
 
 <div class="card preset-outlined-surface-200-800 bg-surface-50-950 space-y-1 p-2">
-  <header class="card-header instrument-header flex flex-row justify-between portrait:flex-col">
-    <span class="border-secondary-500 mb-2 flex gap-2 border-b-2"
+  <header class="card-header instrument-header flex justify-between flex-col">
+    <span class="border-primary-500 mb-2 flex gap-2 border-b-2"
       ><Icon size="24" /> {instrumentData.instrumentName}</span
     >
     <div class="flex gap-2 portrait:flex-col">
