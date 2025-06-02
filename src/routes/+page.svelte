@@ -10,7 +10,15 @@
   import Network from '../components/Network.svelte';
   import Transport from '../components/Transport.svelte';
   import { setGlobalContext } from '$lib/context';
-  
+
+  function onSwipe(dir:SwipeDirection) {
+    console.log('onSwipe', dir);
+    if (dir === SwipeDirection.Right) {
+      selectedIndex = Math.max(-1, selectedIndex - 1);
+    } else if (dir === SwipeDirection.Left) {
+      selectedIndex = Math.min(instrumentsData.instrumentsData.length - 1, selectedIndex + 1);
+    }
+  }
 
   function searchParamsHelper() {
     const params = page.url.searchParams;
@@ -88,6 +96,7 @@
 	import { initStore, mixerIndex } from '$lib/Store.svelte';
 	import Mixer from '../components/Mixer.svelte';
     import { goto } from '$app/navigation';
+    import { myAction, SwipeDirection } from '$lib/utils/hammerAction';
 
   let drawerState = $state(false);
 
@@ -133,7 +142,7 @@
       <AppMenu bind:selectedIndex />
     </div>
 
-    <div class="flex-1 gap-4 p-4">
+    <div class="flex-1 gap-4 p-4" use:myAction={onSwipe}>
       {#if isDebug}
         <div
           class="card flex-col preset-outlined-surface-200-800 bg-surface-50-950 hidden space-y-5 p-5 lg:flex"
