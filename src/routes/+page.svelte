@@ -12,12 +12,12 @@
   import { setGlobalContext } from '$lib/context';
 
   function onSwipe(dir:SwipeDirection) {
-    console.log('onSwipe', dir);
-    if (dir === SwipeDirection.Right) {
-      selectedIndex = Math.max(-1, selectedIndex - 1);
-    } else if (dir === SwipeDirection.Left) {
-      selectedIndex = Math.min(instrumentsData.instrumentsData.length - 1, selectedIndex + 1);
-    }
+    // console.log('onSwipe', dir);
+    // if (dir === SwipeDirection.Right) {
+    //   selectedIndex = Math.max(-1, selectedIndex - 1);
+    // } else if (dir === SwipeDirection.Left) {
+    //   selectedIndex = Math.min(instrumentsData.instrumentsData.length - 1, selectedIndex + 1);
+    // }
   }
 
   function searchParamsHelper() {
