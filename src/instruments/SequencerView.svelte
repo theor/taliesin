@@ -12,6 +12,7 @@
   import { Pagination, Progress } from '@skeletonlabs/skeleton-svelte';
   import { writable } from 'svelte/store';
   import { gestures, pointer, SwipeDirection } from '$lib/utils/hammerAction';
+  import { SvelteMap } from 'svelte/reactivity';
 
   const { index, instrumentData = $bindable() }: IInstrumentViewProps = $props();
   const instr: Instrument | undefined = getInstrument(instrumentData);
@@ -21,45 +22,54 @@
   const buttonClassOff = 'preset-outlined-primary-500';
   const buttonClassOnOdd = 'preset-filled-tertiary-500';
   const buttonClassOffOdd = 'preset-outlined-tertiary-500';
+  const buttonClassModifiedOn = 'preset-filled-secondary-500';
+  const buttonClassModifiedOff = 'preset-tonal-secondary';
   let progress = writable(0); //derived(instr?.progress(instrumentData)!, (x:number) => Number.isNaN(x) ? 0 : x!*100)!;
 
-  $effect(() => {
-    // console.log('SEQ instrumentData', instrumentData);
-    // if (instr) {
-    // 	instrumentData.notes = instr.getNotes(instrumentData);
-    // }
-  });
 
   let panWillTurnOn: boolean | undefined = $state(undefined);
   let lastCell = [-1, -1];
   let startX = [-1, -1];
   let stride = $state(1);
+  let modifiedSteps = new SvelteMap<number, number>();
+  console.log('modifiedSteps', modifiedSteps, modifiedSteps.get(1001));
   function onPointer(e: PointerEvent) {
-    // console.log(e);
     e.preventDefault();
+    const elt = document.elementFromPoint(e.x, e.y);
+    if (!elt || !elt.hasAttribute('data-x')) return;
+    const [x, y] = [Number(elt.getAttribute('data-x')), Number(elt.getAttribute('data-y'))];
+
+    stride = 1 + Math.abs(y - startX[1]);
+
+
     if (e.type === 'pointerup') {
       console.log('pointerup reset turn on');
 
+      modifiedSteps.clear();
       panWillTurnOn = undefined;
-      stride =1;
+      for (let ix = Math.min(startX[0],x); ix <= Math.max(startX[0],x); ix++) {
+        let isOn = x === startX[0]  ? !seq.getCell(instrumentData,startX[1],ix) : (Math.abs(ix - startX[0]) % stride === 0);
+        seq.setCell(
+        instrumentData,
+        startX[1],
+        ix,
+        isOn
+      );
+      store.setInstrument(index, instrumentData);
+      }
+      stride = 1;
       lastCell = [-1, -1];
       startX = [-1, -1];
       return;
     }
-    const elt = document.elementFromPoint(e.x, e.y);
-    if (!elt || !elt.hasAttribute('data-x')) return;
-    const [x, y] = [Number(elt.getAttribute('data-x')), Number(elt.getAttribute('data-y'))];
-    
-    stride = 1 + Math.abs(y -  startX[1]);
+
     if (x === lastCell[0]) {
-      // console.log('same cell', x, y, elt);
       return;
     }
     if (startX[0] === -1) {
       startX = [x, y];
     }
     lastCell[0] = x;
-    // console.log('e.pointer', e.type, x,y,elt);
     console.log(e.type, x, y);
 
     if (isNaN(x) || isNaN(y)) {
@@ -67,28 +77,17 @@
     }
 
     if (panWillTurnOn === undefined) {
-      // console.log('panWillTurnOn', e.type, elt);
-      panWillTurnOn = true; // !seq.getCell(instrumentData, x, y);
+      panWillTurnOn = true;
     }
-    console.log('panWillTurnOn', panWillTurnOn, e.type, elt);
-    let anyChanged = false;
-    for (let index = startX[0]; index <= x; index++) {
-      console.log(index, startX[1], (index - startX[0]) % stride === 0);
-      let thisChanged = seq.setCell(
-        instrumentData,
-        startX[1],
-        index,
-        (index - startX[0]) % stride === 0
-      );
-      if (thisChanged) {
-        anyChanged = true;
-      }
+    modifiedSteps.clear();
+    for (let ix = Math.min(startX[0],x); ix <= Math.max(startX[0],x); ix++) {
+      let isOn = (ix - startX[0]) % stride === 0;
+      console.log(ix, startX[1], isOn);
+      modifiedSteps.set(ix + 1000 * startX[1], ix - startX[0]);
+     
     }
-    // if(seq.setCell(instrumentData, y, x, panWillTurnOn))
-    // if(anyChanged)
     store.setInstrument(index, instrumentData);
   }
-  let panStride = $state<number | undefined>(undefined);
 
   let page = $state(1);
   let pages = $derived(paginate(page, instr));
@@ -134,7 +133,7 @@
 
   <div class="mb-2 flex flex-col gap-1" use:pointer={{ onPointer }}>
     {#each seq.tracks.reverse() as track, rindex}
-      {@const index = seq.tracks.length - 1 - rindex}
+      {@const trackIndex = seq.tracks.length - 1 - rindex}
 
       {@const currentRange = currentPageRange(page)}
       <div class="flex flex-row gap-1">
@@ -142,20 +141,26 @@
         {#each currentRange, ri}
           {@const i = currentRange.start + ri}
 
-          {@const cell = seq.getCell(instrumentData, index, i)}
+          {@const modifiedCell = modifiedSteps.get(i + 1000 * trackIndex)}
+          {@const cell = seq.getCell(instrumentData, trackIndex, i)}
           {@const odd = Math.floor(i / length.stepsPerMeasure) % 2 === 1}
+         
           <button
-            id="seq-{index}-{i}"
-            aria-label="seq-{index}-{i}"
+            id="seq-{trackIndex}-{i}"
+            aria-label="seq-{trackIndex}-{i}"
             data-x={i}
-            data-y={index}
-            class="flex-1 {cell
-              ? odd
-                ? buttonClassOnOdd
-                : buttonClassOn
-              : odd
-                ? buttonClassOffOdd
-                : buttonClassOff}"
+            data-y={trackIndex}
+            class="flex-1 {modifiedCell === undefined
+              ? cell
+                ? odd
+                  ? buttonClassOnOdd
+                  : buttonClassOn
+                : odd
+                  ? buttonClassOffOdd
+                  : buttonClassOff
+              : modifiedCell % stride === 0
+                ? buttonClassModifiedOn
+                : buttonClassModifiedOff}"
           ></button>
         {/each}
       </div>
