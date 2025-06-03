@@ -2,15 +2,11 @@
   import { AppBar } from '@skeletonlabs/skeleton-svelte';
   import Menu from '@lucide/svelte/icons/menu';
   import { page } from '$app/state';
-  import {
-    strudel,
-    store,
-  } from '$lib';
+  import { strudel, store } from '$lib';
   import '../main.scss';
   import Network from '../components/Network.svelte';
   import Transport from '../components/Transport.svelte';
   import { setGlobalContext } from '$lib/context';
-
 
   function searchParamsHelper() {
     const params = page.url.searchParams;
@@ -21,7 +17,7 @@
         return v ? Number(v) : undefined;
       },
       has: (key: string) => params.has(key),
-      getAll: (key: string) => params.getAll(key),
+      getAll: (key: string) => params.getAll(key)
     };
   }
   const params = searchParamsHelper();
@@ -30,17 +26,17 @@
   const room = params.get('room');
   const isDebug = params.has('debug');
   if (!room || (!isJoin && !isHost)) {
-    goto('/home')
+    goto('/home');
   }
-  console.error("params", params, isJoin, isHost, room);
+  console.error('params', params, isJoin, isHost, room);
 
   initStore(isHost, room!);
   setGlobalContext({
     host: isHost,
     debug: isDebug,
     roomId: room!,
-    scaleKey: "A",
-    scaleMode: "minor",
+    scaleKey: 'A',
+    scaleMode: 'minor'
   });
 
   function onKeyDown(event: KeyboardEvent) {
@@ -74,20 +70,19 @@
   $effect(() => {
     // console.log('store changed', $state.snapshot(instrumentsData.instrumentsData), instrumentsData.instrumentsData[0]);
     code = store.code();
-    if(isHost)
-        strudel.evaluate(code);
+    if (isHost) strudel.evaluate(code);
     if (selectedIndex >= instrumentsData.instrumentsData.length) {
       selectedIndex = instrumentsData.instrumentsData.length - 1;
     }
-   
   });
 
   import { Modal } from '@skeletonlabs/skeleton-svelte';
   import AppMenu from '../components/AppMenu.svelte';
-    import InstrumentView from '../components/InstrumentView.svelte';
-	import { initStore, mixerIndex } from '$lib/Store.svelte';
-	import Mixer from '../components/Mixer.svelte';
-    import { goto } from '$app/navigation';
+  import InstrumentView from '../components/InstrumentView.svelte';
+  import { initStore, mixerIndex } from '$lib/Store.svelte';
+  import Mixer from '../components/Mixer.svelte';
+  import { goto } from '$app/navigation';
+  import AppTooltip from '../components/AppTooltip.svelte';
 
   let drawerState = $state(false);
 
@@ -96,70 +91,71 @@
   }
 </script>
 
-  <AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block" toolbarClasses="">
-    {#snippet lead()}
-      <!-- <ArrowLeft size={24} /> -->
-      <Network />
-    {/snippet}
-    {#snippet trail()}
-      <div class="hidden space-x-4 sm:flex">
-        <Transport />
-      </div>
-      <div class="block md:hidden">
-        <Modal
-          open={drawerState}
-          onOpenChange={(e) => (drawerState = e.open)}
-          triggerBase="btn preset-tonal"
-          contentBase="card border-surface-100-900 border-[1px] space-y-4 shadow-xl  h-screen"
-          positionerJustify="justify-start"
-          positionerAlign=""
-          positionerPadding=""
-          closeOnInteractOutside={true}
-          transitionsPositionerIn={{ x: -480, duration: 200 }}
-          transitionsPositionerOut={{ x: -480, duration: 200 }}
-        >
-          {#snippet trigger()}<Menu size={20} />{/snippet}
-          {#snippet content()}
-            <AppMenu {drawerClose} bind:selectedIndex />
-          {/snippet}
-        </Modal>
-      </div>
-    {/snippet}
-    <span>{title}</span>
-  </AppBar>
-
-  <div class="flex h-full flex-row">
-    <div class="card border-surface-100-900 hidden flex-col border-[1px] md:flex">
-      <AppMenu bind:selectedIndex />
+<!-- <AppTooltip /> -->
+<AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block" toolbarClasses="">
+  {#snippet lead()}
+    <!-- <ArrowLeft size={24} /> -->
+    <Network />
+  {/snippet}
+  {#snippet trail()}
+    <div class="hidden space-x-4 sm:flex">
+      <Transport />
     </div>
+    <div class="block md:hidden">
+      <Modal
+        open={drawerState}
+        onOpenChange={(e) => (drawerState = e.open)}
+        triggerBase="btn preset-tonal"
+        contentBase="card border-surface-100-900 border-[1px] space-y-4 shadow-xl  h-screen"
+        positionerJustify="justify-start"
+        positionerAlign=""
+        positionerPadding=""
+        closeOnInteractOutside={true}
+        transitionsPositionerIn={{ x: -480, duration: 200 }}
+        transitionsPositionerOut={{ x: -480, duration: 200 }}
+      >
+        {#snippet trigger()}<Menu size={20} />{/snippet}
+        {#snippet content()}
+          <AppMenu {drawerClose} bind:selectedIndex />
+        {/snippet}
+      </Modal>
+    </div>
+  {/snippet}
+  <span>{title}</span>
+</AppBar>
 
-    <div class="flex-1 gap-4 p-4">
-      {#if isDebug}
-        <div
-          class="card flex-col preset-outlined-surface-200-800 bg-surface-50-950 hidden space-y-5 p-5 lg:flex"
-        >
-          Code
-          <div class="flex flex-row">
+<div class="flex h-full flex-row">
+  <div class="card border-surface-100-900 hidden flex-col border-[1px] md:flex">
+    <AppMenu bind:selectedIndex />
+  </div>
+
+  <div class="flex-1 gap-4 p-4">
+    {#if isDebug}
+      <div
+        class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden flex-col space-y-5 p-5 lg:flex"
+      >
+        Code
+        <div class="flex flex-row">
           <button class="btn preset-outlined ml-4" onclick={() => store.cycle()}>Cycle</button>
         </div>
-          <pre>
+        <pre>
 {code}
             </pre>
-            <!-- <pre>{store.serialized()}</pre> -->
-        </div>
-      {/if}
-      
-	  {#if selectedIndex === mixerIndex}
-	  <Mixer />
-	  {:else if currentInstrument}
-      <InstrumentView bind:instrumentData={currentInstrument} index={selectedIndex} />
-        <!-- {@render instrumentCard(currentInstrument, selectedIndex)} -->
-      {/if}
+        <!-- <pre>{store.serialized()}</pre> -->
+      </div>
+    {/if}
 
-      <!-- {#each instrumentsData.instrumentsData as instrumentData, index}
+    {#if selectedIndex === mixerIndex}
+      <Mixer />
+    {:else if currentInstrument}
+      <InstrumentView bind:instrumentData={currentInstrument} index={selectedIndex} />
+      <!-- {@render instrumentCard(currentInstrument, selectedIndex)} -->
+    {/if}
+
+    <!-- {#each instrumentsData.instrumentsData as instrumentData, index}
 			{@render instrumentCard(instrumentData, index)}
 		{/each} -->
-      <!-- <Tabs value={group} onValueChange={(e) => (group = e.value)}>
+    <!-- <Tabs value={group} onValueChange={(e) => (group = e.value)}>
 			{#snippet list()}
 				{#each instrumentsData.instrumentsData as instrumentData, index}
 					<Tabs.Control value={index.toString()}>{instrumentData.instrumentName}</Tabs.Control>
@@ -173,7 +169,7 @@
 				{/each}
 			{/snippet}
 		</Tabs> -->
-    </div>
   </div>
+</div>
 
 <svelte:window on:keydown={onKeyDown} />

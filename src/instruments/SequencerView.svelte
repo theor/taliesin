@@ -6,7 +6,8 @@
     ArrowRightIcon,
     ChevronFirstIcon,
     ChevronLastIcon,
-    EllipsisIcon
+    EllipsisIcon,
+    HelpCircleIcon
   } from '@lucide/svelte';
   import { Pagination, Progress } from '@skeletonlabs/skeleton-svelte';
   import { writable } from 'svelte/store';
@@ -29,43 +30,75 @@
     // }
   });
 
+  let panWillTurnOn: boolean | undefined = $state(undefined);
+  let lastCell = [-1, -1];
+  let startX = [-1, -1];
+  let stride = $state(1);
   function onPointer(e: PointerEvent) {
     // console.log(e);
     e.preventDefault();
     if (e.type === 'pointerup') {
+      console.log('pointerup reset turn on');
+
       panWillTurnOn = undefined;
+      stride =1;
+      lastCell = [-1, -1];
+      startX = [-1, -1];
       return;
     }
     const elt = document.elementFromPoint(e.x, e.y);
     if (!elt || !elt.hasAttribute('data-x')) return;
     const [x, y] = [Number(elt.getAttribute('data-x')), Number(elt.getAttribute('data-y'))];
+    
+    stride = 1 + Math.abs(y -  startX[1]);
+    if (x === lastCell[0]) {
+      // console.log('same cell', x, y, elt);
+      return;
+    }
+    if (startX[0] === -1) {
+      startX = [x, y];
+    }
+    lastCell[0] = x;
     // console.log('e.pointer', e.type, x,y,elt);
     console.log(e.type, x, y);
 
     if (isNaN(x) || isNaN(y)) {
-      console.log('Invalid coordinates', x, y);
-      
       return;
     }
-    
-    if(panWillTurnOn === undefined) {
+
+    if (panWillTurnOn === undefined) {
       // console.log('panWillTurnOn', e.type, elt);
-      panWillTurnOn = !seq.getCell(instrumentData, x, y);
+      panWillTurnOn = true; // !seq.getCell(instrumentData, x, y);
     }
     console.log('panWillTurnOn', panWillTurnOn, e.type, elt);
-    
-    if(seq.setCell(instrumentData, x, y, panWillTurnOn))
-      store.setInstrument(index, instrumentData);
-  }
-  let panWillTurnOn: boolean | undefined = false;
-  
-
-  function toggleCell(track: number, i: number): any {
-    seq.setCell(instrumentData, track, i, !seq.getCell(instrumentData, track, i));
+    let anyChanged = false;
+    for (let index = startX[0]; index <= x; index++) {
+      console.log(index, startX[1], (index - startX[0]) % stride === 0);
+      let thisChanged = seq.setCell(
+        instrumentData,
+        startX[1],
+        index,
+        (index - startX[0]) % stride === 0
+      );
+      if (thisChanged) {
+        anyChanged = true;
+      }
+    }
+    // if(seq.setCell(instrumentData, y, x, panWillTurnOn))
+    // if(anyChanged)
     store.setInstrument(index, instrumentData);
   }
+  let panStride = $state<number | undefined>(undefined);
 
   let page = $state(1);
+  let pages = $derived(paginate(page, instr));
+
+  $effect(() => {
+    if (page - 1 >= pages.length) {
+      page = pages.length;
+    }
+  });
+
   function paginate(page: number, instr: Instrument | undefined) {
     console.log('paginate', page, instr);
 
@@ -81,23 +114,12 @@
       end: Math.min((i + 1) * stepsPerPage, totalLength)
     }));
   }
-  $effect(() => {
-    if (page - 1 >= pages.length) {
-      page = pages.length;
-    }
-  });
-  let pages = $derived(paginate(page, instr));
+
   function currentPageRange(pageIndex: number) {
     if (!instr || page > pages.length) return { start: 0, end: 0, length: 0 };
 
     const curPage = pages[page - 1];
     return { ...curPage, length: curPage.end - curPage.start };
-  }
-
-  function ontouchstart(event: TouchEvent) {
-    // Prevent default touch behavior to avoid scrolling
-    event.preventDefault();
-    console.log('Touch event detected:', event);
   }
 </script>
 
@@ -113,7 +135,7 @@
   <div class="mb-2 flex flex-col gap-1" use:pointer={{ onPointer }}>
     {#each seq.tracks.reverse() as track, rindex}
       {@const index = seq.tracks.length - 1 - rindex}
-    
+
       {@const currentRange = currentPageRange(page)}
       <div class="flex flex-row gap-1">
         <div class="mr-1 w-4 flex-none">{track}</div>
@@ -125,8 +147,8 @@
           <button
             id="seq-{index}-{i}"
             aria-label="seq-{index}-{i}"
-            data-x={index}
-            data-y={i}
+            data-x={i}
+            data-y={index}
             class="flex-1 {cell
               ? odd
                 ? buttonClassOnOdd
@@ -148,6 +170,12 @@
       {#snippet labelFirst()}<ChevronFirstIcon class="size-4" />{/snippet}
       {#snippet labelLast()}<ChevronLastIcon class="size-4" />{/snippet}
     </Pagination>
+    <div class="flex flex-row items-center gap-2">
+      {#if panWillTurnOn}
+        {stride}
+      {/if}
+      <HelpCircleIcon />
+    </div>
   </div>
   <!-- {/if} -->
 {:else}

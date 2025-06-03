@@ -299,7 +299,7 @@ class AppStore {
     return this.instrumentsData.instrumentsData[this.instrumentsData.instrumentsData.length - 1];
   }
   setInstrument(index: number, data: InstrumentData) {
-    console.log('setInstrument', index, data);
+    // console.log('setInstrument', index, data);
     const snapshot = data;
     this.instrumentsData.instrumentsData.splice(index, 1, snapshot);
     if (!this.isReceiving) this.sendInstrument({ index, instrument: snapshot });
