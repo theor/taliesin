@@ -106,7 +106,7 @@ export class PartChords extends InstrumentPartTyped<{ enabled: boolean; mode: Vo
     selfData: PartChords['_dataType'],
     length: Length
   ): string {
-    return selfData.enabled ? `.asChords("<m m7>*2").mode('${selfData.mode}').voicing()` : '';
+    return selfData.enabled ? `.asChords("<m m>*2").mode('${selfData.mode}').voicing()` : '';
   }
   // override generate(data: InstrumentData, selfData: infer T, length: Length): string {
   // }

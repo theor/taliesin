@@ -10,6 +10,7 @@
   } from '@lucide/svelte';
   import { Pagination, Progress } from '@skeletonlabs/skeleton-svelte';
   import { writable } from 'svelte/store';
+  import { gestures, pointer, SwipeDirection } from '$lib/utils/hammerAction';
 
   const { index, instrumentData = $bindable() }: IInstrumentViewProps = $props();
   const instr: Instrument | undefined = getInstrument(instrumentData);
@@ -27,6 +28,37 @@
     // 	instrumentData.notes = instr.getNotes(instrumentData);
     // }
   });
+
+  function onPointer(e: PointerEvent) {
+    // console.log(e);
+    e.preventDefault();
+    if (e.type === 'pointerup') {
+      panWillTurnOn = undefined;
+      return;
+    }
+    const elt = document.elementFromPoint(e.x, e.y);
+    if (!elt || !elt.hasAttribute('data-x')) return;
+    const [x, y] = [Number(elt.getAttribute('data-x')), Number(elt.getAttribute('data-y'))];
+    // console.log('e.pointer', e.type, x,y,elt);
+    console.log(e.type, x, y);
+
+    if (isNaN(x) || isNaN(y)) {
+      console.log('Invalid coordinates', x, y);
+      
+      return;
+    }
+    
+    if(panWillTurnOn === undefined) {
+      // console.log('panWillTurnOn', e.type, elt);
+      panWillTurnOn = !seq.getCell(instrumentData, x, y);
+    }
+    console.log('panWillTurnOn', panWillTurnOn, e.type, elt);
+    
+    if(seq.setCell(instrumentData, x, y, panWillTurnOn))
+      store.setInstrument(index, instrumentData);
+  }
+  let panWillTurnOn: boolean | undefined = false;
+  
 
   function toggleCell(track: number, i: number): any {
     seq.setCell(instrumentData, track, i, !seq.getCell(instrumentData, track, i));
@@ -61,6 +93,12 @@
     const curPage = pages[page - 1];
     return { ...curPage, length: curPage.end - curPage.start };
   }
+
+  function ontouchstart(event: TouchEvent) {
+    // Prevent default touch behavior to avoid scrolling
+    event.preventDefault();
+    console.log('Touch event detected:', event);
+  }
 </script>
 
 {#if instr}
@@ -72,8 +110,10 @@
     <Progress classes="" value={$progress} max={100} />
   </div>
 
-  <div class="mb-2 flex flex-col gap-1">
-    {#each seq.tracks as track, index}
+  <div class="mb-2 flex flex-col gap-1" use:pointer={{ onPointer }}>
+    {#each seq.tracks.reverse() as track, rindex}
+      {@const index = seq.tracks.length - 1 - rindex}
+    
       {@const currentRange = currentPageRange(page)}
       <div class="flex flex-row gap-1">
         <div class="mr-1 w-4 flex-none">{track}</div>
@@ -83,9 +123,11 @@
           {@const cell = seq.getCell(instrumentData, index, i)}
           {@const odd = Math.floor(i / length.stepsPerMeasure) % 2 === 1}
           <button
+            id="seq-{index}-{i}"
             aria-label="seq-{index}-{i}"
-            onclick={() => toggleCell(index, i)}
-            class="btn flex-1 {cell
+            data-x={index}
+            data-y={i}
+            class="flex-1 {cell
               ? odd
                 ? buttonClassOnOdd
                 : buttonClassOn

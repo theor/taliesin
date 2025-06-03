@@ -5,7 +5,7 @@ export interface ISequencer {
     tracks: string[];
   
     getCell(data: InstrumentData, track: number, step: number): boolean;
-    setCell(data: InstrumentData, track: number, step: number, value: boolean): void;
+    setCell(data: InstrumentData, track: number, step: number, value: boolean): boolean;
   }
   export class Sequencer<TTrack, T extends InstrumentPartTyped<any>> implements ISequencer {
     tracks: string[];
@@ -24,8 +24,8 @@ export interface ISequencer {
         step
       );
     }
-    setCell(data: InstrumentData, track: number, step: number, value: boolean): void {
-      this.partSequencer.setCell(
+    setCell(data: InstrumentData, track: number, step: number, value: boolean): boolean {
+      return this.partSequencer.setCell(
         getPart(this.partType, data)!,
         this.partSequencer.tracks[track],
         step,
@@ -36,7 +36,7 @@ export interface ISequencer {
   export interface PartSequencer<TTrack, T extends InstrumentPartTyped<any>> {
     tracks: TTrack[];
     getCell(part: PartType<T>, track: TTrack, step: number): boolean;
-    setCell(part: PartType<T>, track: TTrack, step: number, value: boolean): void;
+    setCell(part: PartType<T>, track: TTrack, step: number, value: boolean): boolean;
   }
 
   export class MonoSequenceSequencer implements PartSequencer<number, MonoSequence> {
@@ -46,11 +46,13 @@ export interface ISequencer {
       if (!part || step < 0 || step >= part.notes.length) return false;
       return part.notes[step] == track;
     }
-    setCell(part: PartType<MonoSequence>, track: number, step: number, value: boolean): void {
-      if (!part || step < 0) return;
+    setCell(part: PartType<MonoSequence>, track: number, step: number, value: boolean): boolean {
+      if (!part || step < 0) return false;
       if(step >= part.notes.length)
         part.notes = [...part.notes, ...new Array(step - part.notes.length + 1).fill(undefined)];   
+      let changed = part.notes[step] !== track;
       part.notes[step] = value ? track : undefined;
+      return changed;
     }
   }
   
@@ -64,13 +66,15 @@ export interface ISequencer {
       if (step < 0 || step >= trackData.length) return false;
       return trackData[step] == 1;
     }
-    setCell(part: PartType<PartTrackNotes>, track: string, step: number, value: boolean): void {
-      if (!part) return;
+    setCell(part: PartType<PartTrackNotes>, track: string, step: number, value: boolean): boolean {
+      if (!part) return false;
       let trackData = part.notes[track as DrumNote];
       if (!trackData) {
         trackData = new Array(this.length).fill(0);
       }
+      let changed = trackData[step] !== (value ? 1 : 0);
       trackData[step] = value ? 1 : 0;
       part.notes[track as DrumNote] = trackData;
+      return changed;
     }
   }
