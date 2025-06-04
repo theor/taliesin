@@ -26,7 +26,6 @@
   const buttonClassModifiedOff = 'preset-tonal-secondary';
   let progress = writable(0); //derived(instr?.progress(instrumentData)!, (x:number) => Number.isNaN(x) ? 0 : x!*100)!;
 
-
   let panWillTurnOn: boolean | undefined = $state(undefined);
   let lastCell = [-1, -1];
   let startX = [-1, -1];
@@ -35,33 +34,36 @@
   console.log('modifiedSteps', modifiedSteps, modifiedSteps.get(1001));
   function onPointer(e: PointerEvent) {
     e.preventDefault();
-    const elt = document.elementFromPoint(e.x, e.y);
-    if (!elt || !elt.hasAttribute('data-x')) return;
-    const [x, y] = [Number(elt.getAttribute('data-x')), Number(elt.getAttribute('data-y'))];
 
-    stride = 1 + Math.abs(y - startX[1]);
-
-
+    stride = 1 + Math.abs(lastCell[1] - startX[1]);
     if (e.type === 'pointerup') {
       console.log('pointerup reset turn on');
 
       modifiedSteps.clear();
       panWillTurnOn = undefined;
-      for (let ix = Math.min(startX[0],x); ix <= Math.max(startX[0],x); ix++) {
-        let isOn = x === startX[0]  ? !seq.getCell(instrumentData,startX[1],ix) : (Math.abs(ix - startX[0]) % stride === 0);
-        seq.setCell(
-        instrumentData,
-        startX[1],
-        ix,
-        isOn
-      );
-      store.setInstrument(index, instrumentData);
+      for (
+        let ix = Math.min(startX[0], lastCell[0]);
+        ix <= Math.max(startX[0], lastCell[0]);
+        ix++
+      ) {
+        let isOn =
+          lastCell[0] === startX[0]
+            ? !seq.getCell(instrumentData, startX[1], ix)
+            : Math.abs(ix - startX[0]) % stride === 0;
+        seq.setCell(instrumentData, startX[1], ix, isOn);
+        store.setInstrument(index, instrumentData);
       }
       stride = 1;
       lastCell = [-1, -1];
       startX = [-1, -1];
       return;
     }
+
+    const elt = document.elementFromPoint(e.x, e.y);
+    if (!elt || !elt.hasAttribute('data-x')) return;
+
+    const [x, y] = [Number(elt.getAttribute('data-x')), Number(elt.getAttribute('data-y'))];
+    lastCell[1] = y;
 
     if (x === lastCell[0]) {
       return;
@@ -80,11 +82,10 @@
       panWillTurnOn = true;
     }
     modifiedSteps.clear();
-    for (let ix = Math.min(startX[0],x); ix <= Math.max(startX[0],x); ix++) {
+    for (let ix = Math.min(startX[0], x); ix <= Math.max(startX[0], x); ix++) {
       let isOn = (ix - startX[0]) % stride === 0;
       console.log(ix, startX[1], isOn);
       modifiedSteps.set(ix + 1000 * startX[1], ix - startX[0]);
-     
     }
     store.setInstrument(index, instrumentData);
   }
@@ -144,7 +145,7 @@
           {@const modifiedCell = modifiedSteps.get(i + 1000 * trackIndex)}
           {@const cell = seq.getCell(instrumentData, trackIndex, i)}
           {@const odd = Math.floor(i / length.stepsPerMeasure) % 2 === 1}
-         
+
           <button
             id="seq-{trackIndex}-{i}"
             aria-label="seq-{trackIndex}-{i}"
