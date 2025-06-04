@@ -31,9 +31,9 @@
   let startX = [-1, -1];
   let stride = $state(1);
   let modifiedSteps = new SvelteMap<number, number>();
-  console.log('modifiedSteps', modifiedSteps, modifiedSteps.get(1001));
+  // console.log('modifiedSteps', modifiedSteps, modifiedSteps.get(1001));
   function onPointer(e: PointerEvent) {
-    e.preventDefault();
+    // e.preventDefault();
 
     stride = 1 + Math.abs(lastCell[1] - startX[1]);
     if (e.type === 'pointerup') {
@@ -60,7 +60,9 @@
     }
 
     const elt = document.elementFromPoint(e.x, e.y);
-    if (!elt || !elt.hasAttribute('data-x')) return;
+    if (!elt || !elt.hasAttribute('data-x')) {
+      return;
+    }
 
     const [x, y] = [Number(elt.getAttribute('data-x')), Number(elt.getAttribute('data-y'))];
     lastCell[1] = y;
@@ -84,7 +86,7 @@
     modifiedSteps.clear();
     for (let ix = Math.min(startX[0], x); ix <= Math.max(startX[0], x); ix++) {
       let isOn = (ix - startX[0]) % stride === 0;
-      console.log(ix, startX[1], isOn);
+      // console.log(ix, startX[1], isOn);
       modifiedSteps.set(ix + 1000 * startX[1], ix - startX[0]);
     }
     store.setInstrument(index, instrumentData);
@@ -100,7 +102,7 @@
   });
 
   function paginate(page: number, instr: Instrument | undefined) {
-    console.log('paginate', page, instr);
+    // console.log('paginate', page, instr);
 
     if (!instr) return [];
     const length = instr.getLength(instrumentData);
@@ -132,7 +134,7 @@
     <Progress classes="" value={$progress} max={100} />
   </div>
 
-  <div class="mb-2 flex flex-col gap-1" use:pointer={{ onPointer }}>
+  <div class="mb-2 flex flex-col gap-1 touch-none" use:pointer={{ onPointer }}>
     {#each seq.tracks.reverse() as track, rindex}
       {@const trackIndex = seq.tracks.length - 1 - rindex}
 

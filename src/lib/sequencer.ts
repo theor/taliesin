@@ -55,7 +55,7 @@ export interface ISequencer {
         part.notes = [...part.notes, ...new Array(step - part.notes.length + 1).fill(undefined)];   
       let changed = part.notes[step] !== track;
       part.notes[step] = value ? track : undefined;
-      console.log(`Setting step ${track}:${step} to ${value} in part`, part);
+      // console.log(`Setting step ${track}:${step} to ${value} in part`, part);
       
       return changed;
     }

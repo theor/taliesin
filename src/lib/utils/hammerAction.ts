@@ -58,6 +58,7 @@ export function pointer(node: HTMLElement, p: PointerParams): ActionReturn<Point
           state = PointerState.Up;
         break;
     }
+    // console.error('Pointer event', event.type, state);
     if (p.onPointer && state !== PointerState.Up) {
       p.onPointer(event);
     }
@@ -72,6 +73,7 @@ export function pointer(node: HTMLElement, p: PointerParams): ActionReturn<Point
       p = updatedParameter;
     },
     destroy: () => {
+      console.log('Pointer action destroyed');
       node.removeEventListener('pointerdown', handlePointer);
       node.removeEventListener('pointerup', handlePointer);
       node.removeEventListener('pointermove', handlePointer);
