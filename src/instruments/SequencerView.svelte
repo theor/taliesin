@@ -147,6 +147,7 @@
       {@const currentRange = currentPageRange(page)}
       <div class="flex flex-row">
         <div class="mr-1 w-4 flex-none">{track}</div>
+        <div class="flex-1 grid grid-cols-8">
         {#each currentRange, ri}
           {@const i = currentRange.start + ri}
 
@@ -154,24 +155,27 @@
           {@const cell = seq.getCell(instrumentData, trackIndex, i)}
           {@const odd = Math.floor(i / length.stepsPerMeasure) % 2 === 1}
 
-          <button
+          <div
             id="seq-{trackIndex}-{i}"
             aria-label="seq-{trackIndex}-{i}"
             data-x={i}
             data-y={trackIndex}
-            class="flex-1 p-2 {modifiedCell === undefined
-              ? cell
-                ? odd
-                  ? buttonClassOnOdd
-                  : buttonClassOn
-                : odd
-                  ? buttonClassOffOdd
-                  : buttonClassOff
-              : modifiedCell % stride === 0
-                ? buttonClassModifiedOn
-                : (eraseEmpty ?buttonClassModifiedOffErase: buttonClassModifiedOff)}"
-          ></button>
+            class="flex-1 p-px flex "
+          >
+        <span class="flex-1 h-full pointer-events-none rounded-xs {modifiedCell === undefined
+          ? cell
+            ? odd
+              ? buttonClassOnOdd
+              : buttonClassOn
+            : odd
+              ? buttonClassOffOdd
+              : buttonClassOff
+          : modifiedCell % stride === 0
+            ? buttonClassModifiedOn
+            : (eraseEmpty ?buttonClassModifiedOffErase: buttonClassModifiedOff)}"></span>  
+        </div>
         {/each}
+      </div>
       </div>
     {/each}
   </div>
