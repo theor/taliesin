@@ -58,7 +58,7 @@ export interface ISequencer {
       // console.log(`Setting step ${track}:${step} to ${value} in part`, part);
       
       return changed;
-    }
+    }                                            
   }
   
   export class TrackSequencer implements PartSequencer<string, PartTrackNotes> {

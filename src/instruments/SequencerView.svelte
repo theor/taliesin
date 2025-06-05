@@ -7,9 +7,10 @@
     ChevronFirstIcon,
     ChevronLastIcon,
     EllipsisIcon,
+    EraserIcon,
     HelpCircleIcon
   } from '@lucide/svelte';
-  import { Pagination, Progress } from '@skeletonlabs/skeleton-svelte';
+  import { Pagination, Progress, Switch } from '@skeletonlabs/skeleton-svelte';
   import { writable } from 'svelte/store';
   import { gestures, pointer, SwipeDirection } from '$lib/utils/hammerAction';
   import { SvelteMap } from 'svelte/reactivity';
@@ -24,6 +25,7 @@
   const buttonClassOffOdd = 'preset-outlined-tertiary-500';
   const buttonClassModifiedOn = 'preset-filled-secondary-500';
   const buttonClassModifiedOff = 'preset-tonal-secondary';
+  const buttonClassModifiedOffErase = 'preset-gradient';
   let progress = writable(0); //derived(instr?.progress(instrumentData)!, (x:number) => Number.isNaN(x) ? 0 : x!*100)!;
 
   let panWillTurnOn: boolean | undefined = $state(undefined);
@@ -46,11 +48,13 @@
         ix <= Math.max(startX[0], lastCell[0]);
         ix++
       ) {
+        const isOnlyCell = lastCell[0] === startX[0];
         let isOn =
-          lastCell[0] === startX[0]
+          isOnlyCell
             ? !seq.getCell(instrumentData, startX[1], ix)
             : Math.abs(ix - startX[0]) % stride === 0;
-        seq.setCell(instrumentData, startX[1], ix, isOn);
+        if(isOn|| eraseEmpty ||isOnlyCell) 
+          seq.setCell(instrumentData, startX[1], ix, isOn);
         store.setInstrument(index, instrumentData);
       }
       stride = 1;
@@ -87,6 +91,7 @@
     for (let ix = Math.min(startX[0], x); ix <= Math.max(startX[0], x); ix++) {
       let isOn = (ix - startX[0]) % stride === 0;
       // console.log(ix, startX[1], isOn);
+      if(isOn|| eraseEmpty)
       modifiedSteps.set(ix + 1000 * startX[1], ix - startX[0]);
     }
     store.setInstrument(index, instrumentData);
@@ -94,6 +99,7 @@
 
   let page = $state(1);
   let pages = $derived(paginate(page, instr));
+  let eraseEmpty = $state(false);
 
   $effect(() => {
     if (page - 1 >= pages.length) {
@@ -134,12 +140,12 @@
     <Progress classes="" value={$progress} max={100} />
   </div>
 
-  <div class="mb-2 flex flex-col gap-1 touch-none" use:pointer={{ onPointer }}>
+  <div class="mb-2 flex flex-col touch-none" use:pointer={{ onPointer }}>
     {#each seq.tracks.reverse() as track, rindex}
       {@const trackIndex = seq.tracks.length - 1 - rindex}
 
       {@const currentRange = currentPageRange(page)}
-      <div class="flex flex-row gap-1">
+      <div class="flex flex-row">
         <div class="mr-1 w-4 flex-none">{track}</div>
         {#each currentRange, ri}
           {@const i = currentRange.start + ri}
@@ -153,7 +159,7 @@
             aria-label="seq-{trackIndex}-{i}"
             data-x={i}
             data-y={trackIndex}
-            class="flex-1 {modifiedCell === undefined
+            class="flex-1 p-2 {modifiedCell === undefined
               ? cell
                 ? odd
                   ? buttonClassOnOdd
@@ -163,7 +169,7 @@
                   : buttonClassOff
               : modifiedCell % stride === 0
                 ? buttonClassModifiedOn
-                : buttonClassModifiedOff}"
+                : (eraseEmpty ?buttonClassModifiedOffErase: buttonClassModifiedOff)}"
           ></button>
         {/each}
       </div>
@@ -182,6 +188,11 @@
       {#if panWillTurnOn}
         {stride}
       {/if}
+      <Switch  compact checked={eraseEmpty} onCheckedChange={() => (eraseEmpty = !eraseEmpty)}
+        label="Erase empty">
+        {#snippet inactiveChild()}<EraserIcon size="20" />{/snippet}
+        {#snippet activeChild()}<EraserIcon size="20" />{/snippet}
+      </Switch>
       <HelpCircleIcon />
     </div>
   </div>
