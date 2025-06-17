@@ -195,7 +195,7 @@ class AppStore {
         const instr = getInstrument(i);
         return instr ? `$: ${instr.generate(i)}` : '';
       })
-      .join('\n');
+      .join('\n').replace(/[\r\n]{2,}/g, '\n\n')
   };
   status(): Status {
     // return Status.connected;

@@ -15,6 +15,8 @@
   import { gestures, pointer, SwipeDirection } from '$lib/utils/hammerAction';
   import { SvelteMap } from 'svelte/reactivity';
 
+  import AppTooltip from '../components/AppTooltip.svelte';
+
   const { index, instrumentData = $bindable() }: IInstrumentViewProps = $props();
   const instr: Instrument | undefined = getInstrument(instrumentData);
   const seq = instr?.sequencer!;
@@ -39,7 +41,7 @@
 
     stride = 1 + Math.abs(lastCell[1] - startX[1]);
     if (e.type === 'pointerup') {
-      console.log('pointerup reset turn on');
+      console.log('pointerup reset turn on', e);
 
       modifiedSteps.clear();
       panWillTurnOn = undefined;
@@ -137,10 +139,12 @@
   <!-- {@const pages = Math.ceil(totalLength / 16)} -->
 
   <div class="my-4 ml-6 flex flex-1">
+  <AppTooltip />
+
     <Progress classes="" value={$progress} max={100} />
   </div>
 
-  <div class="mb-2 flex flex-col touch-none" use:pointer={{ onPointer }}>
+  <div class="mb-2 flex flex-col touch-none " use:pointer={{ onPointer }}>
     {#each seq.tracks.reverse() as track, rindex}
       {@const trackIndex = seq.tracks.length - 1 - rindex}
 

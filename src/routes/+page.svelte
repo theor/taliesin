@@ -82,16 +82,24 @@
   import { initStore, mixerIndex } from '$lib/Store.svelte';
   import Mixer from '../components/Mixer.svelte';
   import { goto } from '$app/navigation';
-  import AppTooltip from '../components/AppTooltip.svelte';
-
+  import { onMount } from 'svelte';
   let drawerState = $state(false);
 
   function drawerClose() {
     drawerState = false;
   }
+
+  onMount(() => {
+    const touchHandler = (ev:TouchEvent) => {
+      ev.preventDefault(); // Prevent text selection
+    };
+    document.addEventListener('touchstart', touchHandler, { passive: false });
+    document.addEventListener('touchmove', touchHandler, { passive: false });
+    document.addEventListener('touchend', touchHandler, { passive: false });
+    document.addEventListener('touchcancel', touchHandler, { passive: false });
+  });
 </script>
 
-<!-- <AppTooltip /> -->
 <AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block" toolbarClasses="">
   {#snippet lead()}
     <!-- <ArrowLeft size={24} /> -->
@@ -129,7 +137,7 @@
     <AppMenu bind:selectedIndex />
   </div>
 
-  <div class="flex-1 gap-4 p-4">
+  <div class="flex flex-1 flex-col gap-4 p-4">
     {#if isDebug}
       <div
         class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden flex-col space-y-5 p-5 lg:flex"
@@ -138,7 +146,7 @@
         <div class="flex flex-row">
           <button class="btn preset-outlined ml-4" onclick={() => store.cycle()}>Cycle</button>
         </div>
-        <pre>
+        <pre class="whitespace-pre-wrap">
 {code}
             </pre>
         <!-- <pre>{store.serialized()}</pre> -->
