@@ -38,6 +38,7 @@
   if (isDebug && typeof window !== 'undefined') {
     (window as any).__store = store;
     (window as any).__strudel = strudel;
+    (window as any).__acoustics = { WebAcoustics, findChirp, makeChirp };
   }
   setGlobalContext({
     host: isHost,
@@ -92,6 +93,17 @@
   import { presetCommands } from '$lib/commandBuilders';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { WebAcoustics } from '$lib/calibration/webAcoustics';
+  import { findChirp, makeChirp } from '$lib/calibration/dsp';
+  const calibration = store.calibration;
+  const calibrationNote = $derived.by(() => {
+    if (calibration.running) return 'Listening… keep the room quiet';
+    return Object.values(calibration.results)
+      .map((r) =>
+        r.status === 'ok' ? `calibrated (${Math.round(r.delay * 1000)} ms)` : r.reason
+      )
+      .join(' · ');
+  });
   let drawerState = $state(false);
 
   function drawerClose() {
@@ -126,6 +138,25 @@
       <Transport playing={store.transport.playing} {position} dispatch={store.dispatch} />
       {#if !isHost && store.transport.playing && !$audioRunning}
         <button class="btn preset-filled" onclick={() => strudel.unlockAudio()}>Tap to hear</button>
+      {/if}
+      {#if isHost && store.peers.length > 0}
+        <button
+          class="btn preset-tonal"
+          disabled={calibration.running || store.transport.playing}
+          title="The host's microphone listens while each device plays a test sound, so every device can be lined up with this one. Stop the song and keep the room quiet."
+          onclick={() => calibration.run(store.peers)}>Calibrate</button
+        >
+        {#if calibrationNote}<span class="self-center text-sm" data-testid="calibration-note"
+            >{calibrationNote}</span
+          >{/if}
+      {/if}
+      {#if !isHost && calibration.applied !== undefined}
+        <button
+          class="btn preset-outlined"
+          title="Calibrated by the host. Click to go back to the browser's own estimate."
+          onclick={() => calibration.reset()}
+          >Synced {Math.round(calibration.applied * 1000)} ms ✕</button
+        >
       {/if}
     </div>
     <div class="block md:hidden">

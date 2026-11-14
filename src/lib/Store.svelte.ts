@@ -29,6 +29,8 @@ import {
 } from './parts.svelte';
 import { VITEST, strudel } from './strudel';
 import { Transport, type PlayerLike } from './transport.svelte';
+import { Calibration, type Acoustics } from './calibration/calibration.svelte';
+import { WebAcoustics } from './calibration/webAcoustics';
 import { applySongCommand, isSongCommand, type Command, type SongCommand } from './commands';
 
 export const mixerIndex = -1;
@@ -137,6 +139,8 @@ export class AppStore {
   private room: Room = undefined!;
   /** Host-authoritative play/stop state; use this instead of calling strudel directly from the UI. */
   transport: Transport = undefined!;
+  /** Acoustic latency calibration (host listens, guests play a probe). */
+  calibration: Calibration = undefined!;
   getPreset(name: string): Preset | undefined {
     const preset = presets.find((p) => p.name === name);
     return preset;
@@ -361,13 +365,21 @@ export class AppStore {
     roomId: string,
     room?: Room,
     player: PlayerLike = strudel,
-    storage?: Pick<Storage, 'getItem' | 'setItem'>
+    storage?: Pick<Storage, 'getItem' | 'setItem'>,
+    acoustics?: () => Acoustics
   ) {
     this.storage = storage;
     this.storageKey = `taliesin:song:${roomId}`;
     const { room: r } = this.init(host, roomId, room);
     this.room = r;
     this.transport = new Transport(this.room, host, player);
+    let web: WebAcoustics | undefined;
+    this.calibration = new Calibration(
+      this.room,
+      host,
+      acoustics ?? (() => (web ??= new WebAcoustics(strudel.audioContext()))),
+      this.transport
+    );
 
     const [sendState, onReceiveState] = this.room.makeAction<InstrumentDataJsonValue[]>('state');
     // Command is JSON, but its union type is wider than Trystero's payload constraint allows
