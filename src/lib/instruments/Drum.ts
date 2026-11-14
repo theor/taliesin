@@ -1,4 +1,4 @@
-import { Instrument, getPart, type InstrumentData } from "$lib";
+import { Instrument, getPart, type InstrumentData } from "$lib/instruments";
 import { makePartData } from "$lib/Store.svelte";
 import { PartTrackNotes, PartSteps, PartEffects } from "$lib/parts.svelte";
 import {DrumNote  } from "$lib/parts.svelte";
