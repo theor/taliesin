@@ -94,7 +94,7 @@
   }
 
   onMount(() => {
-    const touchHandler = (ev:TouchEvent) => {
+    const touchHandler = (ev: TouchEvent) => {
       ev.preventDefault(); // Prevent text selection
     };
     document.addEventListener('touchstart', touchHandler, { passive: false });
@@ -156,6 +156,10 @@
         Code
         <div class="flex flex-row">
           <button class="btn preset-outlined ml-4" onclick={() => store.cycle()}>Cycle</button>
+          <button
+            class="btn preset-outlined ml-4"
+            onclick={() => navigator.clipboard.writeText(store.exportLog())}>Copy log</button
+          >
         </div>
         <pre class="whitespace-pre-wrap">
 {code}

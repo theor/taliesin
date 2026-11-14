@@ -189,7 +189,10 @@ describe('structural sync', () => {
     b.dispatch({ type: 'addInstrument', instrument: y as any });
     net.flush();
 
-    const order = (s: AppStore) => snap(s).map((i: any) => i.name).slice(-2);
+    const order = (s: AppStore) =>
+      snap(s)
+        .map((i: any) => i.name)
+        .slice(-2);
     expect(order(a)).toEqual(order(host));
     expect(order(b)).toEqual(order(host));
     expect(new Set(order(host))).toEqual(new Set(['X', 'Y']));
@@ -228,11 +231,22 @@ describe('robustness', () => {
     await send({ type: 'setInstrumentFields', instrumentId: target, fields: { id: 'stolen' } });
     await send({ type: 'setMasterVolume', volume: 'loud' });
     // parts: unknown key, wrong type, partName rewrite, prototype poisoning
-    const part = (fields: any) => ({ type: 'setPartFields', instrumentId: target, partName: 'PartEffects', fields });
+    const part = (fields: any) => ({
+      type: 'setPartFields',
+      instrumentId: target,
+      partName: 'PartEffects',
+      fields
+    });
     await send(part({ evil: 1 }));
     await send(part({ reverb: 'wet' }));
     await send(part({ partName: 'Other' }));
-    await send(JSON.parse('{"type":"setPartFields","instrumentId":"' + target + '","partName":"PartEffects","fields":{"__proto__":{"polluted":true}}}'));
+    await send(
+      JSON.parse(
+        '{"type":"setPartFields","instrumentId":"' +
+          target +
+          '","partName":"PartEffects","fields":{"__proto__":{"polluted":true}}}'
+      )
+    );
 
     expect(snap(host)).toEqual(before);
     expect(({} as any).polluted).toBeUndefined();
@@ -455,5 +469,84 @@ describe('playhead sync', () => {
   test('a client with no message yet reports 0', () => {
     const { a } = setup();
     expect(a.transport.position()).toBe(0);
+  });
+});
+
+describe('throttled streaming commands', () => {
+  afterEach(() => vi.useRealTimers());
+  const volume = (s: AppStore, index: number, v: number): Command => ({
+    type: 'setInstrumentFields',
+    instrumentId: idOf(s, index),
+    fields: { volume: v }
+  });
+
+  test('a drag sends one merged command, but the local song updates at once', () => {
+    vi.useFakeTimers();
+    const { host, a } = setup();
+    a.throttleMs = 50;
+    const sent = vi.spyOn(a, 'sendCommand');
+
+    for (const v of [0.1, 0.2, 0.3, 0.4]) a.dispatch(volume(a, 0, v));
+    expect(a.instrumentsData.instrumentsData[0].volume).toBe(0.4); // local is never delayed
+    expect(sent).not.toHaveBeenCalled();
+    expect(host.instrumentsData.instrumentsData[0].volume).toBe(1);
+
+    vi.advanceTimersByTime(50);
+    expect(sent).toHaveBeenCalledTimes(1);
+    expect(host.instrumentsData.instrumentsData[0].volume).toBe(0.4);
+  });
+
+  test('merges fields of the same part and keeps different targets apart', () => {
+    vi.useFakeTimers();
+    const { host, a } = setup();
+    a.throttleMs = 50;
+    const id = idOf(a, 0);
+    const part = (fields: any): Command => ({
+      type: 'setPartFields',
+      instrumentId: id,
+      partName: 'PartEffects',
+      fields
+    });
+    const reverb = effects(a, 0).reverb;
+    a.dispatch(part({ reverb: 0.5 }));
+    a.dispatch(part({ delay: 0.25 }));
+    a.dispatch(volume(a, 1, 0.3));
+    a.dispatch({ type: 'setMasterVolume', volume: 0.2 });
+    vi.advanceTimersByTime(50);
+    expect(reverb).not.toBe(0.5); // precondition
+    expect(effects(host, 0).reverb).toBe(0.5);
+    expect(effects(host, 0).delay).toBe(0.25);
+    expect(host.instrumentsData.instrumentsData[1].volume).toBe(0.3);
+    expect(host.instrumentsData.volume).toBe(0.2);
+  });
+
+  test('a structural command flushes pending ones first, keeping order', () => {
+    vi.useFakeTimers();
+    const { host, a } = setup();
+    a.throttleMs = 50;
+    const id = idOf(a, 0);
+    a.dispatch(volume(a, 0, 0.5));
+    a.dispatch({ type: 'removeInstrument', instrumentId: id });
+    const types = host.commandLog.map((e) => e.cmd.type);
+    expect(types).toEqual(['setInstrumentFields', 'removeInstrument']);
+    vi.advanceTimersByTime(100); // nothing left to send
+    expect(host.commandLog).toHaveLength(2);
+  });
+});
+
+describe('command log export', () => {
+  test('start + log replays to the same song on a fresh store', () => {
+    const { host, a } = setup();
+    a.dispatch(rename(a, 0, 'x'));
+    host.dispatch({ type: 'setMasterVolume', volume: 0.1 });
+    const report = JSON.parse(a.exportLog());
+    expect(report.log.length).toBeGreaterThanOrEqual(2); // includes the host echo of a's own command
+
+    const net = createFakeNetwork();
+    const fresh = new AppStore(true, 'r', net.join('fresh'), fakePlayer());
+    fresh.instrumentsData.instrumentsData = report.start;
+    for (const { cmd } of report.log) fresh.dispatch(cmd);
+    expect(snap(fresh)).toEqual(snap(a));
+    expect(fresh.instrumentsData.volume).toBe(0.1);
   });
 });

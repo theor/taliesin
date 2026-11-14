@@ -164,7 +164,8 @@ export class AppStore {
         const instr = getInstrument(i);
         return instr ? `$: ${instr.generate(i)}` : '';
       })
-      .join('\n').replace(/[\r\n]{2,}/g, '\n\n')
+      .join('\n')
+      .replace(/[\r\n]{2,}/g, '\n\n');
   };
   /** Ids of the peers currently connected to us. */
   peers = $state<string[]>([]);
@@ -203,6 +204,17 @@ export class AppStore {
 
   /** Every command applied here, in order: a recording that can be replayed through `dispatch`. */
   commandLog: { cmd: Command; origin: 'local' | 'remote' }[] = [];
+  /** The song `commandLog` starts from (set when the song is seeded or received in full). */
+  logStart: InstrumentDataJsonValue[] = [];
+
+  /** A bug report: the starting song and every command since, as JSON. Replay through `dispatch`. */
+  exportLog(): string {
+    return JSON.stringify(
+      { start: this.logStart, volume: this.instrumentsData.volume, log: this.commandLog },
+      null,
+      1
+    );
+  }
 
   /**
    * The single entry point for UI intent. Song commands are applied locally right away (the UI feels
@@ -216,8 +228,57 @@ export class AppStore {
       return;
     }
     if (!this.applyCommand(cmd)) return;
-    this.sendCommand({ cmd, ordered: this.host });
+    this.emit(cmd, this.host);
   };
+
+  /**
+   * Minimum gap between network sends of the same slider-like command. While one is waiting, newer
+   * commands for the same target are merged into it (last value wins). Local state is never delayed.
+   * 0 sends everything immediately (the default under test).
+   */
+  throttleMs = VITEST ? 0 : 50;
+  private pending = new Map<string, SongCommand>();
+  private pendingTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** Commands that stream while a control is dragged, keyed by what they overwrite. */
+  private static coalesceKey(cmd: SongCommand): string | undefined {
+    switch (cmd.type) {
+      case 'setPartFields':
+        return `p:${cmd.instrumentId}:${cmd.partName}`;
+      case 'setInstrumentFields':
+        return `i:${cmd.instrumentId}`;
+      case 'setMasterVolume':
+        return 'm';
+    }
+  }
+
+  /** Send a song command, throttling streaming ones. Order between different commands is preserved. */
+  private emit(cmd: SongCommand, ordered: boolean) {
+    const key = this.throttleMs > 0 ? AppStore.coalesceKey(cmd) : undefined;
+    if (key === undefined) {
+      this.flushPending();
+      this.sendCommand({ cmd, ordered });
+      return;
+    }
+    const waiting = this.pending.get(key);
+    if (waiting && 'fields' in waiting && 'fields' in cmd) {
+      this.pending.set(key, {
+        ...cmd,
+        fields: { ...waiting.fields, ...cmd.fields }
+      } as SongCommand);
+    } else {
+      this.pending.set(key, cmd);
+    }
+    this.pendingTimer ??= setTimeout(() => this.flushPending(), this.throttleMs);
+  }
+  /** Send whatever is waiting now (in the order it first started waiting). */
+  flushPending() {
+    clearTimeout(this.pendingTimer);
+    this.pendingTimer = undefined;
+    const batch = [...this.pending.values()];
+    this.pending.clear();
+    for (const cmd of batch) this.sendCommand({ cmd, ordered: this.host });
+  }
   private applyCommand(cmd: SongCommand): boolean {
     return applySongCommand(this.instrumentsData, cmd, {
       sequencerFor: (data) => getInstrument(data)?.sequencer,
@@ -275,7 +336,7 @@ export class AppStore {
       if (this.host ? msg.ordered : !msg.ordered) return;
       if (!this.applyCommand(msg.cmd)) return;
       this.commandLog.push({ cmd: msg.cmd, origin: 'remote' });
-      if (this.host) this.sendCommand({ cmd: msg.cmd, ordered: true });
+      if (this.host) this.emit(msg.cmd, true);
     });
 
     this.room.onPeerJoin((peerId) => this.peerJoined(peerId));
@@ -286,6 +347,8 @@ export class AppStore {
       console.log('receiveState', data, peerId);
       if (!Array.isArray(data)) return;
       this.instrumentsData.instrumentsData = data.map((i) => ({ ...i, id: i.id ?? newId() }));
+      this.commandLog = [];
+      this.logStart = this.snapshotInstruments();
     });
   }
   private init(host: boolean, roomId: string, room?: Room) {
@@ -294,6 +357,7 @@ export class AppStore {
     const r = room ?? joinRoom(config, roomId);
 
     if (this.instrumentsData.instrumentsData.length === 0) this.seed();
+    this.logStart = this.snapshotInstruments();
     return { room: r };
   }
   /** The initial song, built locally (peers get the host's version when they connect). */
@@ -312,7 +376,9 @@ export function initStore(host: boolean, roomId: string, opts: { relayUrls?: str
     console.warn('Store already initialized');
     return store;
   }
-  const room = opts.relayUrls ? joinRoom({ ...config, relayUrls: opts.relayUrls }, roomId) : undefined;
+  const room = opts.relayUrls
+    ? joinRoom({ ...config, relayUrls: opts.relayUrls }, roomId)
+    : undefined;
   store = new AppStore(host, roomId, room);
 }
 const instrumentMap: { [key: string]: Instrument } = {
