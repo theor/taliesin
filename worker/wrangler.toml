@@ -1,0 +1,10 @@
+name = "taliesin-turn"
+main = "turn.ts"
+compatibility_date = "2025-01-01"
+
+[vars]
+ALLOWED_ORIGINS = "https://theor.github.io"
+
+# secrets, set once with:
+#   npx wrangler secret put TURN_KEY_ID
+#   npx wrangler secret put TURN_API_TOKEN

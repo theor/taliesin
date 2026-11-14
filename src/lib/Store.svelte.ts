@@ -29,6 +29,7 @@ import {
 } from './parts.svelte';
 import { VITEST, strudel } from './strudel';
 import { Transport, type PlayerLike } from './transport.svelte';
+import type { IceServer } from './turn';
 import { Calibration, type Acoustics } from './calibration/calibration.svelte';
 import { WebAcoustics } from './calibration/webAcoustics';
 import { applySongCommand, isSongCommand, type Command, type SongCommand } from './commands';
@@ -455,14 +456,27 @@ function safeLocalStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
 }
 export let store: AppStore = undefined!;
 /** @param opts.relayUrls override the Nostr signalling relays (e2e tests point this at a local relay). */
-export function initStore(host: boolean, roomId: string, opts: { relayUrls?: string[] } = {}) {
+export function initStore(
+  host: boolean,
+  roomId: string,
+  opts: { relayUrls?: string[]; iceServers?: IceServer[] } = {}
+) {
   if (store) {
     console.warn('Store already initialized');
     return store;
   }
-  const room = opts.relayUrls
-    ? joinRoom({ ...config, relayUrls: opts.relayUrls }, roomId)
-    : undefined;
+  const turn = [...(turnConfig ?? []), ...(opts.iceServers ?? [])];
+  const room =
+    opts.relayUrls || opts.iceServers?.length
+      ? joinRoom(
+          {
+            ...config,
+            ...(opts.relayUrls ? { relayUrls: opts.relayUrls } : {}),
+            ...({ turnConfig: turn.length ? turn : undefined } as object)
+          },
+          roomId
+        )
+      : undefined;
   store = new AppStore(host, roomId, room, undefined, safeLocalStorage());
   // a change in the last half second must survive closing the tab
   globalThis.addEventListener?.('pagehide', () => store.saveNow());

@@ -29,6 +29,7 @@ jobs:
       - run: yarn build
         env:
           BASE_PATH: /${{ github.event.repository.name }}
+          VITE_TURN_ENDPOINT: ${{ vars.TURN_ENDPOINT }}
           VITE_TURN_URLS: ${{ vars.TURN_URLS }}
           VITE_TURN_USERNAME: ${{ vars.TURN_USERNAME }}
           VITE_TURN_CREDENTIAL: ${{ vars.TURN_CREDENTIAL }}

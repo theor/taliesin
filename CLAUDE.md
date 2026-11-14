@@ -41,6 +41,8 @@ Vitest has three workspaces: `client` (jsdom, `*.svelte.{test,spec}.ts`), `serve
 
 **Acoustic calibration (`src/lib/calibration/`)**: the browser's reported output latency is often wrong (Bluetooth), so devices in the same room can be measured. The host's "Calibrate" button records its microphone while each guest plays a probe chirp on request; the host times the arrival against its own speaker-to-mic delay (same input path, so mic latency cancels) and sends the guest `round`; the guest subtracts the network delay it assumes and applies the result as `transport.offset`, which *replaces* the reported-latency term in `Transport.target()`. `dsp.ts` is pure (chirps, FFT, normalised cross-correlation: raw correlation peaks accept any loud beep, so keep it normalised); `calibration.svelte.ts` is the protocol over an injected `Acoustics`; `webAcoustics.ts` is the real Web Audio/AudioWorklet implementation. Unit tests simulate the air; e2e loops the real audio graph back into the worklet. Only meaningful for co-located devices, with the song stopped.
 
+**TURN relay (`src/lib/turn.ts`, `worker/`)**: peers on mobile data or strict NATs need a TURN relay. `routes/+page.ts` fetches short-lived ICE servers from `VITE_TURN_ENDPOINT` (or `?turn=<url>`) before the room is joined; failure just means no relay. `worker/turn.ts` is the Cloudflare Worker that holds the API token (setup in `worker/README.md`). Static `VITE_TURN_URLS/USERNAME/CREDENTIAL` also work for providers with fixed credentials.
+
 ## Notes
 
 README todos: presets, add part, transport sync for client playheads, song mode, mixer, LFO.

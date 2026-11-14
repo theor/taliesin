@@ -8,6 +8,7 @@
   import Transport from '../components/Transport.svelte';
   import { setGlobalContext } from '$lib/context';
   import { base } from '$app/paths';
+  import type { IceServer } from '$lib/turn';
 
   function searchParamsHelper() {
     const params = page.url.searchParams;
@@ -21,6 +22,7 @@
       getAll: (key: string) => params.getAll(key)
     };
   }
+  let { data = { iceServers: [] } }: { data?: { iceServers: IceServer[] } } = $props();
   const params = searchParamsHelper();
   const isJoin = params.has('join');
   const isHost = params.has('host');
@@ -33,7 +35,10 @@
   console.error('params', params, isJoin, isHost, room);
 
   const relay = params.get('relay');
-  initStore(isHost, room!, { relayUrls: relay ? [relay] : undefined });
+  initStore(isHost, room!, {
+    relayUrls: relay ? [relay] : undefined,
+    iceServers: data.iceServers
+  });
   // `?debug` exposes the store so e2e tests (and the console) can inspect and drive it
   if (isDebug && typeof window !== 'undefined') {
     (window as any).__store = store;
