@@ -401,6 +401,11 @@ describe('TURN credentials', () => {
     );
     expect(servers).toContainEqual(turn);
     expect(JSON.stringify(servers)).not.toContain('not-an-ice-server');
+
+    // the on-screen diagnostics (for phones) report the connection and that TURN was configured
+    const lines = () => client.getByTestId('rtc-debug').allTextContents();
+    await expect.poll(async () => (await lines()).join(' '), { timeout: 15_000 }).toMatch(/conn=connected/);
+    expect((await lines()).join(' ')).toMatch(/turn=yes/);
   });
 });
 
