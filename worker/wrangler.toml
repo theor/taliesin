@@ -1,4 +1,4 @@
-name = "taliesin-turn"
+name = "taliesin"
 main = "turn.ts"
 compatibility_date = "2025-01-01"
 
