@@ -362,6 +362,48 @@ describe('acoustic calibration (real Web Audio)', () => {
   });
 });
 
+describe('TURN credentials', () => {
+  test('credentials fetched from ?turn= reach the peer connections, and the jam still connects', async () => {
+    const room = newRoom();
+    const turn = { urls: ['turn:turn.example.test:3478'], username: 'user', credential: 'pass' };
+    const open2 = async (role: 'host' | 'join') => {
+      const context = await browser.newContext();
+      contexts.push(context);
+      await context.route('https://creds.example.test/**', (route) =>
+        route.fulfill({
+          contentType: 'application/json',
+          headers: { 'access-control-allow-origin': '*' },
+          body: JSON.stringify({ iceServers: [turn, { urls: 'http://not-an-ice-server' }] })
+        })
+      );
+      await context.addInitScript(() => {
+        const Native = window.RTCPeerConnection;
+        (window as any).__rtcConfigs = [];
+        window.RTCPeerConnection = class extends Native {
+          constructor(cfg?: RTCConfiguration) {
+            super(cfg);
+            (window as any).__rtcConfigs.push(cfg);
+          }
+        } as any;
+      });
+      const page = await context.newPage();
+      await page.goto(
+        `${APP_URL}/?${role}&room=${room}&relay=${encodeURIComponent(RELAY_URL)}&debug&turn=${encodeURIComponent('https://creds.example.test/turn')}`
+      );
+      await page.waitForFunction(() => (window as any).__store);
+      return page;
+    };
+    const host = await open2('host');
+    const client = await open2('join');
+    await connected(host, client);
+    const servers = await client.evaluate(() =>
+      ((window as any).__rtcConfigs as RTCConfiguration[]).flatMap((c) => c.iceServers ?? [])
+    );
+    expect(servers).toContainEqual(turn);
+    expect(JSON.stringify(servers)).not.toContain('not-an-ice-server');
+  });
+});
+
 describe('on a phone (touch input)', () => {
   test('the menu drawer opens with a tap', async () => {
     const context = await browser.newContext({

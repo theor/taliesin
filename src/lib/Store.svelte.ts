@@ -29,6 +29,7 @@ import {
 } from './parts.svelte';
 import { VITEST, strudel } from './strudel';
 import { Transport, type PlayerLike } from './transport.svelte';
+import type { IceServer } from './turn';
 import { Calibration, type Acoustics } from './calibration/calibration.svelte';
 import { WebAcoustics } from './calibration/webAcoustics';
 import { applySongCommand, isSongCommand, type Command, type SongCommand } from './commands';
@@ -38,15 +39,25 @@ export const mixerIndex = -1;
 if (VITEST) {
 }
 
-const config: BaseRoomConfig & RelayConfig = {
-  appId: 'taliesin'
+/**
+ * Optional TURN relay, set at build time (VITE_TURN_URLS comma-separated, VITE_TURN_USERNAME,
+ * VITE_TURN_CREDENTIAL). Needed when peers cannot reach each other directly (mobile data, strict NATs,
+ * isolated Wi-Fi): media and data then flow through the relay. STUN servers are already built in.
+ * These values end up in the public bundle, so use a relay's browser-side credentials, not an admin key.
+ */
+const turnUrls = import.meta.env?.VITE_TURN_URLS?.split(',').filter(Boolean) ?? [];
+const turnConfig = turnUrls.length
+  ? [
+      {
+        urls: turnUrls,
+        username: import.meta.env.VITE_TURN_USERNAME,
+        credential: import.meta.env.VITE_TURN_CREDENTIAL
+      }
+    ]
+  : undefined;
 
-  // turnConfig: [
-  //   { urls: ['stun:stun.l.google.com:19302' ]},
-  // ]
-
-  // relayUrls: ["wss://192.168.1.82:3334"]
-};
+// `turnConfig` is read by Trystero's peer setup but missing from its typings
+const config = { appId: 'taliesin', turnConfig } as BaseRoomConfig & RelayConfig;
 
 /** `ordered`: sent by the host, which is the single sequencer of instrument commands. */
 type WireCommand = { cmd: Command; ordered: boolean };
@@ -445,14 +456,27 @@ function safeLocalStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
 }
 export let store: AppStore = undefined!;
 /** @param opts.relayUrls override the Nostr signalling relays (e2e tests point this at a local relay). */
-export function initStore(host: boolean, roomId: string, opts: { relayUrls?: string[] } = {}) {
+export function initStore(
+  host: boolean,
+  roomId: string,
+  opts: { relayUrls?: string[]; iceServers?: IceServer[] } = {}
+) {
   if (store) {
     console.warn('Store already initialized');
     return store;
   }
-  const room = opts.relayUrls
-    ? joinRoom({ ...config, relayUrls: opts.relayUrls }, roomId)
-    : undefined;
+  const turn = [...(turnConfig ?? []), ...(opts.iceServers ?? [])];
+  const room =
+    opts.relayUrls || opts.iceServers?.length
+      ? joinRoom(
+          {
+            ...config,
+            ...(opts.relayUrls ? { relayUrls: opts.relayUrls } : {}),
+            ...({ turnConfig: turn.length ? turn : undefined } as object)
+          },
+          roomId
+        )
+      : undefined;
   store = new AppStore(host, roomId, room, undefined, safeLocalStorage());
   // a change in the last half second must survive closing the tab
   globalThis.addEventListener?.('pagehide', () => store.saveNow());
