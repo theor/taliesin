@@ -27,7 +27,8 @@ import {
   InstrumentPartTyped,
   type PartType
 } from './parts.svelte';
-import { VITEST } from './strudel';
+import { VITEST, strudel } from './strudel';
+import { Transport, type PlayerLike } from './transport.svelte';
 
 export const mixerIndex = -1;
 
@@ -135,6 +136,8 @@ export const presets: Preset[] = [
 ];
 export class AppStore {
   private room: Room = undefined!;
+  /** Host-authoritative play/stop state; use this instead of calling strudel directly from the UI. */
+  transport: Transport = undefined!;
   updatePart<TPart extends InstrumentPartData>(
     instrumentIndex: number,
     partIndex: number,
@@ -219,6 +222,7 @@ export class AppStore {
   peerJoined(peerId: string) {
     console.log('peer joined', peerId);
     if (!this.peers.includes(peerId)) this.peers.push(peerId);
+    this.transport.peerJoined(peerId);
     // Both sides get onPeerJoin for each other, so the host always syncs a (re)connecting peer.
     if (this.host) this.sendState(this.snapshotInstruments(), peerId);
   }
@@ -272,10 +276,12 @@ export class AppStore {
   // }
   /**
    * @param room optional pre-built room (tests inject a fake one); defaults to a real Trystero room.
+   * @param player optional audio player (tests inject a fake one); defaults to the Strudel singleton.
    */
-  constructor(host: boolean, roomId: string, room?: Room) {
+  constructor(host: boolean, roomId: string, room?: Room, player: PlayerLike = strudel) {
     const { room: r } = this.init(host, roomId, room);
     this.room = r;
+    this.transport = new Transport(this.room, host, player);
 
     const [sendState, onReceiveState] = this.room.makeAction<InstrumentDataJsonValue[]>('state');
     const [sendInstrument, onReceiveInstrument] =

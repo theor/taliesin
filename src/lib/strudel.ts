@@ -122,4 +122,8 @@ ${code}`);
 }
 export const strudel = VITEST ? {
   time: writable(0),
-} as StrudelWrapper : new StrudelWrapper();
+  isPlaying: writable(false),
+  evaluate: async () => {},
+  stop() { (this as any).isPlaying.set(false); },
+  async toggle() { const p = (this as any).isPlaying; p.update((x: boolean) => !x); },
+} as unknown as StrudelWrapper : new StrudelWrapper();

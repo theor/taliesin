@@ -4,14 +4,35 @@ import { PartSteps } from './parts.svelte.js';
 import { PianoScale } from './instruments/MonoSynth.js';
 import { createFakeNetwork } from './testing/fakeRoom.js';
 import { Status } from './interfaces.js';
+import { writable } from 'svelte/store';
+
+/** Records what the audio engine was asked to do, so tests can assert "clients never play". */
+function fakePlayer() {
+  const isPlaying = writable(false);
+  const calls: string[] = [];
+  return {
+    isPlaying,
+    time: writable(0),
+    calls,
+    toggle() {
+      calls.push('toggle');
+      isPlaying.update((x) => !x);
+    },
+    stop() {
+      calls.push('stop');
+      isPlaying.set(false);
+    }
+  };
+}
 
 function setup(opts: { queued?: boolean } = {}) {
   const net = createFakeNetwork(opts);
-  const host = new AppStore(true, 'r', net.join('host'));
-  const a = new AppStore(false, 'r', net.join('a'));
-  const b = new AppStore(false, 'r', net.join('b'));
+  const players = { host: fakePlayer(), a: fakePlayer(), b: fakePlayer() };
+  const host = new AppStore(true, 'r', net.join('host'), players.host);
+  const a = new AppStore(false, 'r', net.join('a'), players.a);
+  const b = new AppStore(false, 'r', net.join('b'), players.b);
   net.settle();
-  return { net, host, a, b };
+  return { net, host, a, b, players };
 }
 // JSON round-trip: the wire format turns `undefined` (rests in note arrays) into `null`
 const snap = (s: AppStore) => JSON.parse(JSON.stringify(s.instrumentsData.instrumentsData));
@@ -170,5 +191,79 @@ describe('status', () => {
     roomA.leave();
     expect(host.status()).toBe(Status.disconnected);
     expect(host.peers).toEqual([]);
+  });
+});
+
+describe('transport sync', () => {
+  test('host play/stop is mirrored by clients, which never touch their own player', async () => {
+    const { host, a, b, players } = setup();
+    expect([host, a, b].map((s) => s.transport.playing)).toEqual([false, false, false]);
+
+    await host.transport.toggle();
+    expect([host, a, b].map((s) => s.transport.playing)).toEqual([true, true, true]);
+
+    host.transport.stop();
+    expect([host, a, b].map((s) => s.transport.playing)).toEqual([false, false, false]);
+
+    expect(players.a.calls).toEqual([]);
+    expect(players.b.calls).toEqual([]);
+  });
+
+  test('a client request is executed by the host and mirrored everywhere', async () => {
+    const { host, a, b, players } = setup();
+    await a.transport.toggle();
+    expect(players.host.calls).toEqual(['toggle']);
+    expect([host, a, b].map((s) => s.transport.playing)).toEqual([true, true, true]);
+
+    b.transport.stop();
+    expect(players.host.calls).toEqual(['toggle', 'stop']);
+    expect([host, a, b].map((s) => s.transport.playing)).toEqual([false, false, false]);
+    expect(players.a.calls).toEqual([]);
+    expect(players.b.calls).toEqual([]);
+  });
+
+  test('a client toggling does not flip its own state before the host confirms', async () => {
+    const { net, a, host } = setup({ queued: true });
+    net.flush();
+    await a.transport.toggle();
+    expect(a.transport.playing).toBe(false); // optimistic updates would desync if the host is slow
+    net.flush(); // request -> host
+    net.flush(); // host broadcast -> clients
+    expect(host.transport.playing).toBe(true);
+    expect(a.transport.playing).toBe(true);
+  });
+
+  test('a late joiner learns the current state', async () => {
+    const { net, host } = setup();
+    await host.transport.toggle();
+    const late = new AppStore(false, 'r', net.join('late'), fakePlayer());
+    net.settle();
+    expect(late.transport.playing).toBe(true);
+  });
+
+  test('state changes that bypass toggle()/stop() are still broadcast', () => {
+    const { host, a, players } = setup();
+    players.host.isPlaying.set(true); // e.g. something calling the player directly
+    expect(a.transport.playing).toBe(true);
+    expect(host.transport.playing).toBe(true);
+  });
+
+  test('requests sent to a client are ignored; malformed transport payloads are ignored', async () => {
+    const net = createFakeNetwork();
+    const players = { host: fakePlayer(), a: fakePlayer() };
+    const host = new AppStore(true, 'r', net.join('host'), players.host);
+    const a = new AppStore(false, 'r', net.join('a'), players.a);
+    const rogue = net.join('rogue');
+    net.settle();
+    const [sendReq] = rogue.makeAction<any>('transportReq');
+    const [sendState] = rogue.makeAction<any>('transport');
+    await sendReq({ action: 'toggle' }, 'a'); // only the host honours requests
+    await sendReq({ action: 'explode' }, 'host');
+    await sendState({ playing: 'yes' }, 'a');
+    await sendState(undefined as any, 'a');
+    expect(players.a.calls).toEqual([]);
+    expect(players.host.calls).toEqual([]);
+    expect(a.transport.playing).toBe(false);
+    expect(host.transport.playing).toBe(false);
   });
 });
