@@ -37,6 +37,8 @@ Vitest has three workspaces: `client` (jsdom, `*.svelte.{test,spec}.ts`), `serve
 
 **UI**: `src/routes/+page.svelte` sets the global context (`lib/context.ts`: host/roomId/scale) and renders the instruments. `components/InstrumentView` → `InstrumentPartView` dispatch to `Part*View` components per part; `src/instruments/` holds instrument-specific views (`SequencerView` grid, `PianoScaleView`). Touch gestures use hammerjs via `lib/utils/hammerAction.ts`. `lib/sequencer.ts` adapts a part (steps/notes) to the grid `ISequencer` interface.
 
+**Start page & saving**: `/home` starts a jam (`lib/room.ts`: short room codes, `parseRoom` accepts a pasted share link or code). The host autosaves the song to `localStorage` per room (`taliesin:song:<room>`, debounced, restored through the command reducer so bad data is dropped); clients never save.
+
 ## Notes
 
 README todos: presets, add part, transport sync for client playheads, song mode, mixer, LFO.

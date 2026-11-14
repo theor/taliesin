@@ -232,6 +232,34 @@ describe('transport (real transport)', () => {
   });
 });
 
+// --- start page and saved song ----------------------------------------------------------------------------
+describe('start page and persistence', () => {
+  test('Start a jam opens a hosted room, and the host edits survive a reload', async () => {
+    const context = await browser.newContext();
+    contexts.push(context);
+    const page = await context.newPage();
+    await page.goto(`${APP_URL}/home`);
+    await page.getByRole('button', { name: 'Start a jam' }).click();
+    await page.waitForURL(/\?host&room=[A-Z2-9]{6}/);
+    const url = new URL(page.url());
+    url.searchParams.set('debug', '');
+    await page.goto(url.toString());
+    await page.waitForFunction(() => (window as any).__store);
+
+    const before = (await instruments(page))[0].id;
+    await page.evaluate(() => {
+      const s = (window as any).__store;
+      s.dispatch({ type: 'setInstrumentFields', instrumentId: s.instrumentsData.instrumentsData[0].id, fields: { name: 'kept' } });
+      s.saveNow();
+    });
+    await page.reload();
+    await page.waitForFunction(() => (window as any).__store);
+    const after = (await instruments(page))[0];
+    expect(after.name).toBe('kept');
+    expect(after.id).toBe(before);
+  });
+});
+
 // --- every peer plays the song itself, on the host's clock -----------------------------------------------
 /** The scheduler's cycle and the wall clock at the same instant (both pages share this machine's clock). */
 const sample = (p: Page) =>

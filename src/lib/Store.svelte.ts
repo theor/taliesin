@@ -228,8 +228,49 @@ export class AppStore {
       return;
     }
     if (!this.applyCommand(cmd)) return;
+    this.scheduleSave();
     this.emit(cmd, this.host);
   };
+
+  /** Where the host keeps the song between sessions (`localStorage`; none under test). */
+  private storage?: Pick<Storage, 'getItem' | 'setItem'>;
+  private storageKey = '';
+  private saveTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Host: write the song soon (debounced). Clients get it from the host, so they don't save. */
+  private scheduleSave() {
+    if (!this.host || !this.storage) return;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this.saveNow(), 500);
+  }
+  saveNow() {
+    clearTimeout(this.saveTimer);
+    if (!this.host || !this.storage) return;
+    try {
+      this.storage.setItem(
+        this.storageKey,
+        JSON.stringify({
+          instruments: this.snapshotInstruments(),
+          volume: this.instrumentsData.volume
+        })
+      );
+    } catch (e) {
+      console.warn('could not save the song', e); // storage full or blocked: the jam goes on
+    }
+  }
+  /** Replace the song with the saved one, if any. Goes through the reducer, so bad data is dropped. */
+  private restore(): boolean {
+    try {
+      const saved = JSON.parse(this.storage?.getItem(this.storageKey) ?? 'null');
+      if (!Array.isArray(saved?.instruments)) return false;
+      for (const instrument of saved.instruments)
+        this.applyCommand({ type: 'addInstrument', instrument });
+      if (typeof saved.volume === 'number')
+        this.applyCommand({ type: 'setMasterVolume', volume: saved.volume });
+      return this.instrumentsData.instrumentsData.length > 0;
+    } catch {
+      return false; // corrupt: start from the presets
+    }
+  }
 
   /**
    * Minimum gap between network sends of the same slider-like command. While one is waiting, newer
@@ -315,7 +356,15 @@ export class AppStore {
    * @param room optional pre-built room (tests inject a fake one); defaults to a real Trystero room.
    * @param player optional audio player (tests inject a fake one); defaults to the Strudel singleton.
    */
-  constructor(host: boolean, roomId: string, room?: Room, player: PlayerLike = strudel) {
+  constructor(
+    host: boolean,
+    roomId: string,
+    room?: Room,
+    player: PlayerLike = strudel,
+    storage?: Pick<Storage, 'getItem' | 'setItem'>
+  ) {
+    this.storage = storage;
+    this.storageKey = `taliesin:song:${roomId}`;
     const { room: r } = this.init(host, roomId, room);
     this.room = r;
     this.transport = new Transport(this.room, host, player);
@@ -337,7 +386,10 @@ export class AppStore {
       if (this.host ? msg.ordered : !msg.ordered) return;
       if (!this.applyCommand(msg.cmd)) return;
       this.commandLog.push({ cmd: msg.cmd, origin: 'remote' });
-      if (this.host) this.emit(msg.cmd, true);
+      if (this.host) {
+        this.scheduleSave();
+        this.emit(msg.cmd, true);
+      }
     });
 
     this.room.onPeerJoin((peerId) => this.peerJoined(peerId));
@@ -357,6 +409,7 @@ export class AppStore {
 
     const r = room ?? joinRoom(config, roomId);
 
+    if (host && this.restore()) console.log('restored the saved song');
     if (this.instrumentsData.instrumentsData.length === 0) this.seed();
     this.logStart = this.snapshotInstruments();
     return { room: r };
@@ -370,6 +423,14 @@ export class AppStore {
   }
 }
 
+/** `localStorage`, or nothing where it is missing or blocked (private windows, tests). */
+function safeLocalStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
+  try {
+    return VITEST ? undefined : globalThis.localStorage;
+  } catch {
+    return undefined;
+  }
+}
 export let store: AppStore = undefined!;
 /** @param opts.relayUrls override the Nostr signalling relays (e2e tests point this at a local relay). */
 export function initStore(host: boolean, roomId: string, opts: { relayUrls?: string[] } = {}) {
@@ -380,7 +441,9 @@ export function initStore(host: boolean, roomId: string, opts: { relayUrls?: str
   const room = opts.relayUrls
     ? joinRoom({ ...config, relayUrls: opts.relayUrls }, roomId)
     : undefined;
-  store = new AppStore(host, roomId, room);
+  store = new AppStore(host, roomId, room, undefined, safeLocalStorage());
+  // a change in the last half second must survive closing the tab
+  globalThis.addEventListener?.('pagehide', () => store.saveNow());
 }
 const instrumentMap: { [key: string]: Instrument } = {
   PianoScale: new PianoScale(),

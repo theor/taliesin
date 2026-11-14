@@ -672,3 +672,90 @@ describe('local playback on every peer', () => {
     expect(host.transport.playing).toBe(false);
   });
 });
+
+describe('saving the song', () => {
+  afterEach(() => vi.useRealTimers());
+  const memory = (initial: Record<string, string> = {}) => {
+    const data = { ...initial };
+    return {
+      data,
+      getItem: (k: string) => data[k] ?? null,
+      setItem: (k: string, v: string) => void (data[k] = v)
+    };
+  };
+  const hostWith = (storage: ReturnType<typeof memory>, room = 'r') =>
+    new AppStore(true, room, createFakeNetwork().join('host'), fakePlayer(), storage);
+
+  test('the host saves edits (debounced) and a reloaded host restores them, ids included', () => {
+    vi.useFakeTimers();
+    const storage = memory();
+    const first = hostWith(storage);
+    expect(storage.data).toEqual({}); // nothing to save yet
+    first.dispatch(rename(first, 0, 'saved name'));
+    first.dispatch({ type: 'setMasterVolume', volume: 0.33 });
+    vi.advanceTimersByTime(499);
+    expect(storage.data).toEqual({});
+    vi.advanceTimersByTime(2);
+    expect(Object.keys(storage.data)).toEqual(['taliesin:song:r']);
+
+    const second = hostWith(storage);
+    expect(snap(second)).toEqual(snap(first));
+    expect(second.instrumentsData.volume).toBe(0.33);
+    expect(snap(second)[0].name).toBe('saved name');
+  });
+
+  test('each room has its own song', () => {
+    vi.useFakeTimers();
+    const storage = memory();
+    const one = hostWith(storage, 'one');
+    one.dispatch(rename(one, 0, 'in room one'));
+    vi.advanceTimersByTime(600);
+    expect(snap(hostWith(storage, 'two'))[0].name).not.toBe('in room one');
+  });
+
+  test('saveNow writes immediately (page hide)', () => {
+    const storage = memory();
+    const s = hostWith(storage);
+    s.dispatch(rename(s, 0, 'x'));
+    s.saveNow();
+    expect(JSON.parse(storage.data['taliesin:song:r']).instruments[0].name).toBe('x');
+  });
+
+  test('a client never saves: the host owns the song', () => {
+    vi.useFakeTimers();
+    const storage = memory();
+    const net = createFakeNetwork();
+    new AppStore(true, 'r', net.join('host'), fakePlayer());
+    const client = new AppStore(false, 'r', net.join('c'), fakePlayer(), storage);
+    net.settle();
+    client.dispatch(rename(client, 0, 'x'));
+    vi.advanceTimersByTime(2000);
+    expect(storage.data).toEqual({});
+  });
+
+  test('corrupt or hostile saved data falls back to the presets instead of crashing', () => {
+    for (const bad of [
+      'not json',
+      '{"instruments": 5}',
+      'null',
+      '{"instruments":[{"id":"x"}],"volume":"loud"}'
+    ]) {
+      const s = hostWith(memory({ 'taliesin:song:r': bad }));
+      expect(s.instrumentsData.instrumentsData.length).toBe(3);
+    }
+  });
+
+  test('a storage that throws does not break editing', () => {
+    vi.useFakeTimers();
+    const storage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('quota');
+      }
+    };
+    const s = new AppStore(true, 'r', createFakeNetwork().join('host'), fakePlayer(), storage);
+    s.dispatch(rename(s, 0, 'still works'));
+    expect(() => vi.advanceTimersByTime(1000)).not.toThrow();
+    expect(snap(s)[0].name).toBe('still works');
+  });
+});
