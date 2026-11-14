@@ -55,7 +55,7 @@
     </p>
       </article>
       <footer class="flex justify-end gap-4">
-        <a type="button" target="_blank" class="btn preset-filled-tonal" href={url}>Open link</a>
+        <a type="button" target="_blank" class="btn preset-filled-tonal" href={url.toString()}>Open link</a>
         <button type="button" class="btn preset-filled" onclick={() => showShareModal = false}>Close</button>
       </footer>
     {/snippet}

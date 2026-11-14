@@ -55,7 +55,7 @@ if (import.meta.hot) {
   });
 }
 class StrudelWrapper {
-  repls: webaudioRepl;
+  repls: any;
   private initPromise: Promise<void>;
   async evaluate(code: string): Promise<void> {
     if (code === '') return Promise.resolve();
