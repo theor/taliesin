@@ -234,9 +234,10 @@ export class AppStore {
   /**
    * Minimum gap between network sends of the same slider-like command. While one is waiting, newer
    * commands for the same target are merged into it (last value wins). Local state is never delayed.
-   * 0 sends everything immediately (the default under test).
+   * 0 sends everything immediately: the default under unit tests and in automated browsers
+   * (`navigator.webdriver`, e.g. the Playwright e2e run); only a real UI session throttles.
    */
-  throttleMs = VITEST ? 0 : 50;
+  throttleMs = VITEST || (typeof navigator !== 'undefined' && navigator.webdriver) ? 0 : 50;
   private pending = new Map<string, SongCommand>();
   private pendingTimer: ReturnType<typeof setTimeout> | undefined;
 
