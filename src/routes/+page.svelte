@@ -7,6 +7,7 @@
   import Network from '../components/Network.svelte';
   import Transport from '../components/Transport.svelte';
   import { setGlobalContext } from '$lib/context';
+  import { base } from '$app/paths';
 
   function searchParamsHelper() {
     const params = page.url.searchParams;
@@ -23,14 +24,21 @@
   const params = searchParamsHelper();
   const isJoin = params.has('join');
   const isHost = params.has('host');
+  const audioRunning = strudel.audioRunning;
   const room = params.get('room');
   const isDebug = params.has('debug');
   if (!room || (!isJoin && !isHost)) {
-    goto('/home');
+    goto(`${base}/home`);
   }
   console.error('params', params, isJoin, isHost, room);
 
-  initStore(isHost, room!);
+  const relay = params.get('relay');
+  initStore(isHost, room!, { relayUrls: relay ? [relay] : undefined });
+  // `?debug` exposes the store so e2e tests (and the console) can inspect and drive it
+  if (isDebug && typeof window !== 'undefined') {
+    (window as any).__store = store;
+    (window as any).__strudel = strudel;
+  }
   setGlobalContext({
     host: isHost,
     debug: isDebug,
@@ -47,13 +55,13 @@
         drawerState = !drawerState;
         break;
       case 'Space':
-        strudel.toggle();
+        store.dispatch({ type: 'transport', action: 'toggle' });
         break;
       case 'Escape':
-        strudel.stop();
+        store.dispatch({ type: 'transport', action: 'stop' });
         break;
       case 'KeyA':
-        store.preset();
+        presetCommands().forEach(store.dispatch);
         break;
       default:
         break;
@@ -70,7 +78,7 @@
   $effect(() => {
     // console.log('store changed', $state.snapshot(instrumentsData.instrumentsData), instrumentsData.instrumentsData[0]);
     code = store.code();
-    if (isHost) strudel.evaluate(code);
+    strudel.evaluate(code); // every peer plays the song itself, following the host's clock
     if (selectedIndex >= instrumentsData.instrumentsData.length) {
       selectedIndex = instrumentsData.instrumentsData.length - 1;
     }
@@ -81,17 +89,33 @@
   import InstrumentView from '../components/InstrumentView.svelte';
   import { initStore, mixerIndex } from '$lib/Store.svelte';
   import Mixer from '../components/Mixer.svelte';
+  import { presetCommands } from '$lib/commandBuilders';
   import { goto } from '$app/navigation';
-  import AppTooltip from '../components/AppTooltip.svelte';
-
+  import { onMount } from 'svelte';
   let drawerState = $state(false);
 
   function drawerClose() {
     drawerState = false;
   }
+
+  onMount(() => {
+    const touchHandler = (ev: TouchEvent) => {
+      ev.preventDefault(); // Prevent text selection
+    };
+    document.addEventListener('touchstart', touchHandler, { passive: false });
+    document.addEventListener('touchmove', touchHandler, { passive: false });
+    document.addEventListener('touchend', touchHandler, { passive: false });
+    document.addEventListener('touchcancel', touchHandler, { passive: false });
+  });
+
+  // Playhead: exact on the host, extrapolated from the host's messages on clients.
+  let position = $state(0);
+  onMount(() => {
+    const id = setInterval(() => (position = store.transport.position()), 100);
+    return () => clearInterval(id);
+  });
 </script>
 
-<!-- <AppTooltip /> -->
 <AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block" toolbarClasses="">
   {#snippet lead()}
     <!-- <ArrowLeft size={24} /> -->
@@ -99,7 +123,10 @@
   {/snippet}
   {#snippet trail()}
     <div class="hidden space-x-4 sm:flex">
-      <Transport />
+      <Transport playing={store.transport.playing} {position} dispatch={store.dispatch} />
+      {#if !isHost && store.transport.playing && !$audioRunning}
+        <button class="btn preset-filled" onclick={() => strudel.unlockAudio()}>Tap to hear</button>
+      {/if}
     </div>
     <div class="block md:hidden">
       <Modal
@@ -116,7 +143,7 @@
       >
         {#snippet trigger()}<Menu size={20} />{/snippet}
         {#snippet content()}
-          <AppMenu {drawerClose} bind:selectedIndex />
+          <AppMenu {drawerClose} bind:selectedIndex dispatch={store.dispatch} />
         {/snippet}
       </Modal>
     </div>
@@ -126,10 +153,10 @@
 
 <div class="flex h-full flex-row">
   <div class="card border-surface-100-900 hidden flex-col border-[1px] md:flex">
-    <AppMenu bind:selectedIndex />
+    <AppMenu bind:selectedIndex dispatch={store.dispatch} />
   </div>
 
-  <div class="flex-1 gap-4 p-4">
+  <div class="flex flex-1 flex-col gap-4 p-4">
     {#if isDebug}
       <div
         class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden flex-col space-y-5 p-5 lg:flex"
@@ -137,8 +164,12 @@
         Code
         <div class="flex flex-row">
           <button class="btn preset-outlined ml-4" onclick={() => store.cycle()}>Cycle</button>
+          <button
+            class="btn preset-outlined ml-4"
+            onclick={() => navigator.clipboard.writeText(store.exportLog())}>Copy log</button
+          >
         </div>
-        <pre>
+        <pre class="whitespace-pre-wrap">
 {code}
             </pre>
         <!-- <pre>{store.serialized()}</pre> -->
@@ -146,9 +177,13 @@
     {/if}
 
     {#if selectedIndex === mixerIndex}
-      <Mixer />
+      <Mixer song={store.instrumentsData} dispatch={store.dispatch} />
     {:else if currentInstrument}
-      <InstrumentView bind:instrumentData={currentInstrument} index={selectedIndex} />
+      <InstrumentView
+        bind:instrumentData={currentInstrument}
+        index={selectedIndex}
+        dispatch={store.dispatch}
+      />
       <!-- {@render instrumentCard(currentInstrument, selectedIndex)} -->
     {/if}
 

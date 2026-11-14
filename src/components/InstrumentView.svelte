@@ -7,12 +7,13 @@
     PartOctave,
     PartSteps,
     type Constructor,
-    type IInstrumentViewProps,
+    type IDispatchingInstrumentViewProps,
     type InstrumentPartTyped,
     type IPartViewProps,
     type PartType
   } from '$lib';
-  import { getInstrumentIcon, getPartType, store } from '$lib/Store.svelte';
+  import { getInstrumentIcon } from '$lib/Store.svelte';
+  import { randomizeCommands } from '$lib/commandBuilders';
   import { type Component } from 'svelte';
   import { Pane, ThemeUtils } from 'svelte-tweakpane-ui';
   import PartOctaveView from './PartOctaveView.svelte';
@@ -25,7 +26,7 @@
   import PartArpView from './PartArpView.svelte';
   import InstrumentPartView from './InstrumentPartView.svelte';
   import { Switch, Tabs } from '@skeletonlabs/skeleton-svelte';
-  let { index, instrumentData = $bindable() }: IInstrumentViewProps = $props();
+  let { index, instrumentData = $bindable(), dispatch }: IDispatchingInstrumentViewProps = $props();
 
   let Icon = getInstrumentIcon(instrumentData.instrumentName);
 
@@ -58,11 +59,10 @@
       {#each instrumentData.parts as part, partIndex}
         {#if part.partName === partType.name}
           <InstrumentPartView
-            instrumentIndex={index}
-            {instrumentData}
-            {partIndex}
+            instrumentId={instrumentData.id}
+            {dispatch}
             PartComponent={component as Component<IPartViewProps<InstrumentPartTyped<any>>>}
-            bind:partData={instrumentData.parts[partIndex] as PartType<TPart>}
+            partData={instrumentData.parts[partIndex] as PartType<TPart>}
           />
         {/if}
       {/each}
@@ -77,15 +77,16 @@
     {@render renderOptionalPart(PartEffects, PartEffectsView)}
     <!-- {/key} -->
     <!-- {/key} -->
-    <button class="btn preset-filled mr-4 px-2 py-1" onclick={() => store.randomize(index)}
+    <button aria-label="Randomize" class="btn preset-filled mr-4 px-2 py-1" onclick={() => randomizeCommands(instrumentData).forEach(dispatch)}
       ><Dices size={16} /></button
     >
 
     <button
+      aria-label="Remove instrument"
       class="btn btn-xs preset-outlined-error-500 rounded-lg px-2 py-1"
-      onclick={() => store.removeInstrument(index)}><X size="16" /></button
+      onclick={() => dispatch({ type: 'removeInstrument', instrumentId: instrumentData.id })}><X size="16" /></button
     >
   {:else}
-    <PianoScaleView bind:instrumentData {index} />
+    <PianoScaleView bind:instrumentData {index} {dispatch} />
   {/if}
 </div>

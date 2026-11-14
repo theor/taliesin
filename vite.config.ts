@@ -11,7 +11,7 @@ const dirname =
 	typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
 // More info at: https://storybook.js.org/docs/writing-tests/test-addon
-export default defineConfig({
+export default defineConfig(({ command }) => ({
 	// Tell Vitest to use the `browser` entry points in `package.json` files, even though it's running in Node
 	resolve: process.env.VITEST
 		? {
@@ -19,7 +19,9 @@ export default defineConfig({
 			}
 		: undefined,
 	plugins: [
-		mkcert(),
+		// the e2e run serves plain http so pages can talk to a local ws:// relay without mixed-content issues
+		// (and it is only needed by the dev server: CI builds must not try to install a local CA)
+		process.env.E2E || command !== 'serve' ? null : mkcert(),
 		tailwindcss(),
 		sveltekit()
 	],
@@ -76,4 +78,4 @@ export default defineConfig({
 			}
 		]
 	}
-});
+}));

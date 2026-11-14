@@ -60,6 +60,8 @@
       </footer>
     {/snippet}
   </Modal>
-    <!-- <p class="chip preset-filled">{store.status()}</p> -->
+    <p class="chip {store.status() === 'connected' ? 'preset-filled-success-500' : 'preset-outlined'}">
+        {store.status()} · {store.peers.length}
+    </p>
 
 </div>

@@ -3,15 +3,17 @@
   import { Modal, Navigation } from '@skeletonlabs/skeleton-svelte';
   import { Plus, Volume } from '@lucide/svelte';
     import { getInstrumentIcon, mixerIndex, presets } from '$lib/Store.svelte';
-    import { PianoScale } from '$lib/instruments/MonoSynth';
+    import { addInstrumentCommand } from '$lib/commandBuilders';
+    import type { Dispatch } from '$lib/commands';
 
   let {
     drawerClose,
     selectedIndex = $bindable(),
-
+    dispatch
   }: {
     drawerClose?: () => void;
     selectedIndex: number;
+    dispatch: Dispatch;
   } = $props();
 
   const instrumentsData = store.instrumentsData;
@@ -52,7 +54,7 @@
           type="button"
           class="btn  w-full justify-start"
           onclick={() => {
-            store.createInstrumentPreset(preset);
+            dispatch(addInstrumentCommand(preset));
             selectedIndex = instrumentsData.instrumentsData.length - 1;
             addModalOpened = false;
           }}

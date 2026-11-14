@@ -3,6 +3,7 @@ import { joinRoom, type BaseRoomConfig, type RelayConfig } from 'trystero/nostr'
 import { selfId, type ActionSender, type JsonValue, type Room } from 'trystero';
 import {
   getPart,
+  newId,
   type Constructor,
   type Instrument,
   type InstrumentData,
@@ -26,7 +27,9 @@ import {
   InstrumentPartTyped,
   type PartType
 } from './parts.svelte';
-import { VITEST } from './strudel';
+import { VITEST, strudel } from './strudel';
+import { Transport, type PlayerLike } from './transport.svelte';
+import { applySongCommand, isSongCommand, type Command, type SongCommand } from './commands';
 
 export const mixerIndex = -1;
 
@@ -42,12 +45,9 @@ const config: BaseRoomConfig & RelayConfig = {
 
   // relayUrls: ["wss://192.168.1.82:3334"]
 };
-let room: Room = undefined!;
 
-type WrappedInstrument = {
-  index: number;
-  instrument: InstrumentDataJsonValue;
-};
+/** `ordered`: sent by the host, which is the single sequencer of instrument commands. */
+type WireCommand = { cmd: Command; ordered: boolean };
 
 type Preset = {
   name: string;
@@ -133,45 +133,13 @@ export const presets: Preset[] = [
     ]
   }
 ];
-class AppStore {
-  updatePart<TPart extends InstrumentPartData>(
-    instrumentIndex: number,
-    partIndex: number,
-    partData: TPart
-  ) {
-    const instrument = this.instrumentsData.instrumentsData[instrumentIndex];
-    if (!instrument) {
-      console.error('Instrument not found', instrumentIndex);
-      return;
-    }
-    const part = instrument.parts[partIndex];
-    if (!part) {
-      console.error('Part not found', partIndex);
-      return;
-    }
-    // Update the part data
-    Object.assign(part, partData);
-    // Update the instrument
-    this.setInstrument(instrumentIndex, instrument);
-  }
+export class AppStore {
+  private room: Room = undefined!;
+  /** Host-authoritative play/stop state; use this instead of calling strudel directly from the UI. */
+  transport: Transport = undefined!;
   getPreset(name: string): Preset | undefined {
     const preset = presets.find((p) => p.name === name);
     return preset;
-  }
-  createInstrumentPreset(preset: Preset) {
-    const { instrument, parts } = preset;
-    this.instrumentsData.instrumentsData.push(createInstrument(instrument, parts, preset.name));
-  }
-  setInstrumentPart(selectedIndex: number, partIndex: number, p: InstrumentPartData): void {
-    this.instrumentsData.instrumentsData[selectedIndex].parts.splice(partIndex, 1, p);
-    this.setInstrument(selectedIndex, this.instrumentsData.instrumentsData[selectedIndex]);
-  }
-  randomize(index: number) {
-    const instr = getInstrument(this.instrumentsData.instrumentsData[index]);
-    if (instr) {
-      const data = instr.randomize(this.instrumentsData.instrumentsData[index]);
-      this.setInstrumentPartial(index, data);
-    }
   }
 
   cycle() {
@@ -179,6 +147,7 @@ class AppStore {
     const json = this.serialized();
     console.warn(json);
     this.instrumentsData.instrumentsData = JSON.parse(json) as InstrumentDataJsonValue[];
+    this.broadcastState();
   }
   instrumentsData = $state({ instrumentsData: [] as InstrumentData[], volume: 0.8 });
   serialized(): string {
@@ -195,11 +164,13 @@ class AppStore {
         const instr = getInstrument(i);
         return instr ? `$: ${instr.generate(i)}` : '';
       })
-      .join('\n');
+      .join('\n')
+      .replace(/[\r\n]{2,}/g, '\n\n');
   };
+  /** Ids of the peers currently connected to us. */
+  peers = $state<string[]>([]);
   status(): Status {
-    // return Status.connected;
-    return Status.disconnected;
+    return this.peers.length > 0 ? Status.connected : Status.disconnected;
   }
   id() {
     return selfId; // this.webrtcProvider.doc.clientID;
@@ -207,15 +178,155 @@ class AppStore {
   host: boolean = false;
   peerJoined(peerId: string) {
     console.log('peer joined', peerId);
-    // TODO PARTS
-    if (this.host) this.sendState(this.instrumentsData.instrumentsData, peerId);
+    if (!this.peers.includes(peerId)) this.peers.push(peerId);
+    this.transport.peerJoined(peerId);
+    // Both sides get onPeerJoin for each other, so the host always syncs a (re)connecting peer.
+    if (this.host) this.sendState(this.snapshotInstruments(), peerId);
   }
   peerLeft(peerId: string) {
     console.log('peer left', peerId);
+    this.peers = this.peers.filter((p) => p !== peerId);
   }
 
+  private snapshotInstruments(): InstrumentDataJsonValue[] {
+    return $state.snapshot(this.instrumentsData.instrumentsData) as InstrumentDataJsonValue[];
+  }
+  /**
+   * Send the full instrument list to everyone. Used for structural changes (add / remove / reorder),
+   * where per-instrument updates can't express the change. Last write wins.
+   */
+  private broadcastState() {
+    // not wired yet while the constructor seeds the initial presets
+    this.sendState?.(this.snapshotInstruments());
+  }
   sendState: ActionSender<InstrumentDataJsonValue[]>;
-  sendInstrument: ActionSender<WrappedInstrument>;
+  sendCommand: ActionSender<WireCommand>;
+
+  /** Every command applied here, in order: a recording that can be replayed through `dispatch`. */
+  commandLog: { cmd: Command; origin: 'local' | 'remote' }[] = [];
+  /** The song `commandLog` starts from (set when the song is seeded or received in full). */
+  logStart: InstrumentDataJsonValue[] = [];
+
+  /** A bug report: the starting song and every command since, as JSON. Replay through `dispatch`. */
+  exportLog(): string {
+    return JSON.stringify(
+      { start: this.logStart, volume: this.instrumentsData.volume, log: this.commandLog },
+      null,
+      1
+    );
+  }
+
+  /**
+   * The single entry point for UI intent. Song commands are applied locally right away (the UI feels
+   * instant) and sent to the host, which orders them; transport commands go to the transport.
+   */
+  dispatch = (cmd: Command) => {
+    this.commandLog.push({ cmd, origin: 'local' });
+    if (cmd.type === 'transport') {
+      if (cmd.action === 'toggle') void this.transport.toggle();
+      else this.transport.stop();
+      return;
+    }
+    if (!this.applyCommand(cmd)) return;
+    this.scheduleSave();
+    this.emit(cmd, this.host);
+  };
+
+  /** Where the host keeps the song between sessions (`localStorage`; none under test). */
+  private storage?: Pick<Storage, 'getItem' | 'setItem'>;
+  private storageKey = '';
+  private saveTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Host: write the song soon (debounced). Clients get it from the host, so they don't save. */
+  private scheduleSave() {
+    if (!this.host || !this.storage) return;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this.saveNow(), 500);
+  }
+  saveNow() {
+    clearTimeout(this.saveTimer);
+    if (!this.host || !this.storage) return;
+    try {
+      this.storage.setItem(
+        this.storageKey,
+        JSON.stringify({
+          instruments: this.snapshotInstruments(),
+          volume: this.instrumentsData.volume
+        })
+      );
+    } catch (e) {
+      console.warn('could not save the song', e); // storage full or blocked: the jam goes on
+    }
+  }
+  /** Replace the song with the saved one, if any. Goes through the reducer, so bad data is dropped. */
+  private restore(): boolean {
+    try {
+      const saved = JSON.parse(this.storage?.getItem(this.storageKey) ?? 'null');
+      if (!Array.isArray(saved?.instruments)) return false;
+      for (const instrument of saved.instruments)
+        this.applyCommand({ type: 'addInstrument', instrument });
+      if (typeof saved.volume === 'number')
+        this.applyCommand({ type: 'setMasterVolume', volume: saved.volume });
+      return this.instrumentsData.instrumentsData.length > 0;
+    } catch {
+      return false; // corrupt: start from the presets
+    }
+  }
+
+  /**
+   * Minimum gap between network sends of the same slider-like command. While one is waiting, newer
+   * commands for the same target are merged into it (last value wins). Local state is never delayed.
+   * 0 sends everything immediately: the default under unit tests and in automated browsers
+   * (`navigator.webdriver`, e.g. the Playwright e2e run); only a real UI session throttles.
+   */
+  throttleMs = VITEST || (typeof navigator !== 'undefined' && navigator.webdriver) ? 0 : 50;
+  private pending = new Map<string, SongCommand>();
+  private pendingTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** Commands that stream while a control is dragged, keyed by what they overwrite. */
+  private static coalesceKey(cmd: SongCommand): string | undefined {
+    switch (cmd.type) {
+      case 'setPartFields':
+        return `p:${cmd.instrumentId}:${cmd.partName}`;
+      case 'setInstrumentFields':
+        return `i:${cmd.instrumentId}`;
+      case 'setMasterVolume':
+        return 'm';
+    }
+  }
+
+  /** Send a song command, throttling streaming ones. Order between different commands is preserved. */
+  private emit(cmd: SongCommand, ordered: boolean) {
+    const key = this.throttleMs > 0 ? AppStore.coalesceKey(cmd) : undefined;
+    if (key === undefined) {
+      this.flushPending();
+      this.sendCommand({ cmd, ordered });
+      return;
+    }
+    const waiting = this.pending.get(key);
+    if (waiting && 'fields' in waiting && 'fields' in cmd) {
+      this.pending.set(key, {
+        ...cmd,
+        fields: { ...waiting.fields, ...cmd.fields }
+      } as SongCommand);
+    } else {
+      this.pending.set(key, cmd);
+    }
+    this.pendingTimer ??= setTimeout(() => this.flushPending(), this.throttleMs);
+  }
+  /** Send whatever is waiting now (in the order it first started waiting). */
+  flushPending() {
+    clearTimeout(this.pendingTimer);
+    this.pendingTimer = undefined;
+    const batch = [...this.pending.values()];
+    this.pending.clear();
+    for (const cmd of batch) this.sendCommand({ cmd, ordered: this.host });
+  }
+  private applyCommand(cmd: SongCommand): boolean {
+    return applySongCommand(this.instrumentsData, cmd, {
+      sequencerFor: (data) => getInstrument(data)?.sequencer,
+      isKnownInstrument: (name) => name in instrumentMap
+    });
+  }
 
   // deserializeInstrumentData(data: InstrumentDataJsonValue): InstrumentData {
   //   let res: InstrumentData = {...data, parts: data.parts.map(part => {
@@ -241,89 +352,98 @@ class AppStore {
   //     parts: data.parts.map((part, index) => {return {...dataOrReactive.parts[index].serialize(), name: dataOrReactive.parts[index].constructor.name}})
   //   };
   // }
-  isReceiving = false;
+  /**
+   * @param room optional pre-built room (tests inject a fake one); defaults to a real Trystero room.
+   * @param player optional audio player (tests inject a fake one); defaults to the Strudel singleton.
+   */
+  constructor(
+    host: boolean,
+    roomId: string,
+    room?: Room,
+    player: PlayerLike = strudel,
+    storage?: Pick<Storage, 'getItem' | 'setItem'>
+  ) {
+    this.storage = storage;
+    this.storageKey = `taliesin:song:${roomId}`;
+    const { room: r } = this.init(host, roomId, room);
+    this.room = r;
+    this.transport = new Transport(this.room, host, player);
 
-  constructor(host: boolean, roomId:string) {
-
-    this.init(host, roomId);
-
-    const [sendState, onReceiveState] = room.makeAction<InstrumentDataJsonValue[]>('state');
-    const [sendInstrument, onReceiveInstrument] = room.makeAction<WrappedInstrument>('instrument');
+    const [sendState, onReceiveState] = this.room.makeAction<InstrumentDataJsonValue[]>('state');
+    // Command is JSON, but its union type is wider than Trystero's payload constraint allows
+    const [sendCommand, onReceiveCommand] = this.room.makeAction<any>('cmd') as unknown as [
+      ActionSender<WireCommand>,
+      (cb: (msg: WireCommand, peerId: string) => void) => void
+    ];
     this.sendState = sendState;
-    this.sendInstrument = sendInstrument;
+    this.sendCommand = sendCommand;
 
-
-    room.onPeerJoin((peerId) => this.peerJoined(peerId));
-    room.onPeerLeave((peerId) => this.peerLeft(peerId));
-
-    onReceiveState((data, peerId) => {
-      if (this.host) return;
-      console.log('receiveState', data, peerId);
-      this.instrumentsData.instrumentsData = data;
-    });
-    onReceiveInstrument((data, peerId) => {
-      console.log('receiveInstrument', data, peerId);
-      this.isReceiving = true;
-      try {
-        this.instrumentsData.instrumentsData.splice(data.index, 1, data.instrument);
-      } catch (error) {
-        this.isReceiving = false;
+    // Host: takes unordered commands from clients, applies them and rebroadcasts them in the order it
+    // received them (including back to the sender). Clients: only take the host's ordered stream, so a
+    // peer-to-peer copy of someone else's command can never race the host's ordering.
+    onReceiveCommand((msg) => {
+      if (!isSongCommand(msg?.cmd)) return;
+      if (this.host ? msg.ordered : !msg.ordered) return;
+      if (!this.applyCommand(msg.cmd)) return;
+      this.commandLog.push({ cmd: msg.cmd, origin: 'remote' });
+      if (this.host) {
+        this.scheduleSave();
+        this.emit(msg.cmd, true);
       }
     });
+
+    this.room.onPeerJoin((peerId) => this.peerJoined(peerId));
+    this.room.onPeerLeave((peerId) => this.peerLeft(peerId));
+
+    // Full state: sent by the host when a peer connects (and by cycle()). Everything after that is commands.
+    onReceiveState((data, peerId) => {
+      console.log('receiveState', data, peerId);
+      if (!Array.isArray(data)) return;
+      this.instrumentsData.instrumentsData = data.map((i) => ({ ...i, id: i.id ?? newId() }));
+      this.commandLog = [];
+      this.logStart = this.snapshotInstruments();
+    });
   }
-  private init(host: boolean, roomId: string) {
+  private init(host: boolean, roomId: string, room?: Room) {
     this.host = host;
 
-    room = VITEST
-      ? ({
-          makeAction: () => [() => {}, () => {}],
-          onPeerJoin: () => {},
-          onPeerLeave: () => {}
-        } as any as Room)
-      : joinRoom(config, roomId);
+    const r = room ?? joinRoom(config, roomId);
 
-    if (this.instrumentsData.instrumentsData.length === 0) this.preset();
+    if (host && this.restore()) console.log('restored the saved song');
+    if (this.instrumentsData.instrumentsData.length === 0) this.seed();
+    this.logStart = this.snapshotInstruments();
+    return { room: r };
   }
-  preset() {
-    this.createInstrumentPreset(this.getPreset('Piano')!);
-    this.createInstrumentPreset(this.getPreset('Bass')!);
-    this.createInstrumentPreset(this.getPreset('Drum')!);
-  }
-  createInstrument<T extends Instrument>(name: Constructor<T>) {
-    this.instrumentsData.instrumentsData.push(
-      createInstrument(
-        name
-        //  notes: [1, 2, 3,undefined,4,5,3,undefined]
-      )
-    );
-    return this.instrumentsData.instrumentsData[this.instrumentsData.instrumentsData.length - 1];
-  }
-  setInstrument(index: number, data: InstrumentData) {
-    // console.log('setInstrument', index, data);
-    const snapshot = data;
-    this.instrumentsData.instrumentsData.splice(index, 1, snapshot);
-    if (!this.isReceiving) this.sendInstrument({ index, instrument: snapshot });
-  }
-  // TODO send
-  setInstrumentPartial = (index: number, data: Partial<InstrumentData>) => {
-    this.instrumentsData.instrumentsData[index] = {
-      ...this.instrumentsData.instrumentsData[index],
-      ...data
-    };
-    console.log('setInstrumentPartial', index, data, $state.snapshot(this.instrumentsData));
-  };
-  removeInstrument(index: number): any {
-    this.instrumentsData.instrumentsData.splice(index, 1);
+  /** The initial song, built locally (peers get the host's version when they connect). */
+  private seed() {
+    for (const name of ['Piano', 'Bass', 'Drum']) {
+      const { instrument, parts, name: presetName } = this.getPreset(name)!;
+      this.instrumentsData.instrumentsData.push(createInstrument(instrument, parts, presetName));
+    }
   }
 }
 
+/** `localStorage`, or nothing where it is missing or blocked (private windows, tests). */
+function safeLocalStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
+  try {
+    return VITEST ? undefined : globalThis.localStorage;
+  } catch {
+    return undefined;
+  }
+}
 export let store: AppStore = undefined!;
-export function initStore(host: boolean, roomId: string) {
+/** @param opts.relayUrls override the Nostr signalling relays (e2e tests point this at a local relay). */
+export function initStore(host: boolean, roomId: string, opts: { relayUrls?: string[] } = {}) {
   if (store) {
     console.warn('Store already initialized');
     return store;
   }
-  store = new AppStore(host, roomId);
+  const room = opts.relayUrls
+    ? joinRoom({ ...config, relayUrls: opts.relayUrls }, roomId)
+    : undefined;
+  store = new AppStore(host, roomId, room, undefined, safeLocalStorage());
+  // a change in the last half second must survive closing the tab
+  globalThis.addEventListener?.('pagehide', () => store.saveNow());
 }
 const instrumentMap: { [key: string]: Instrument } = {
   PianoScale: new PianoScale(),
