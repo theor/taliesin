@@ -38,15 +38,25 @@ export const mixerIndex = -1;
 if (VITEST) {
 }
 
-const config: BaseRoomConfig & RelayConfig = {
-  appId: 'taliesin'
+/**
+ * Optional TURN relay, set at build time (VITE_TURN_URLS comma-separated, VITE_TURN_USERNAME,
+ * VITE_TURN_CREDENTIAL). Needed when peers cannot reach each other directly (mobile data, strict NATs,
+ * isolated Wi-Fi): media and data then flow through the relay. STUN servers are already built in.
+ * These values end up in the public bundle, so use a relay's browser-side credentials, not an admin key.
+ */
+const turnUrls = import.meta.env?.VITE_TURN_URLS?.split(',').filter(Boolean) ?? [];
+const turnConfig = turnUrls.length
+  ? [
+      {
+        urls: turnUrls,
+        username: import.meta.env.VITE_TURN_USERNAME,
+        credential: import.meta.env.VITE_TURN_CREDENTIAL
+      }
+    ]
+  : undefined;
 
-  // turnConfig: [
-  //   { urls: ['stun:stun.l.google.com:19302' ]},
-  // ]
-
-  // relayUrls: ["wss://192.168.1.82:3334"]
-};
+// `turnConfig` is read by Trystero's peer setup but missing from its typings
+const config = { appId: 'taliesin', turnConfig } as BaseRoomConfig & RelayConfig;
 
 /** `ordered`: sent by the host, which is the single sequencer of instrument commands. */
 type WireCommand = { cmd: Command; ordered: boolean };
