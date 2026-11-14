@@ -23,6 +23,7 @@
   const params = searchParamsHelper();
   const isJoin = params.has('join');
   const isHost = params.has('host');
+  const audioRunning = strudel.audioRunning;
   const room = params.get('room');
   const isDebug = params.has('debug');
   if (!room || (!isJoin && !isHost)) {
@@ -33,7 +34,10 @@
   const relay = params.get('relay');
   initStore(isHost, room!, { relayUrls: relay ? [relay] : undefined });
   // `?debug` exposes the store so e2e tests (and the console) can inspect and drive it
-  if (isDebug && typeof window !== 'undefined') (window as any).__store = store;
+  if (isDebug && typeof window !== 'undefined') {
+    (window as any).__store = store;
+    (window as any).__strudel = strudel;
+  }
   setGlobalContext({
     host: isHost,
     debug: isDebug,
@@ -73,7 +77,7 @@
   $effect(() => {
     // console.log('store changed', $state.snapshot(instrumentsData.instrumentsData), instrumentsData.instrumentsData[0]);
     code = store.code();
-    if (isHost) strudel.evaluate(code);
+    strudel.evaluate(code); // every peer plays the song itself, following the host's clock
     if (selectedIndex >= instrumentsData.instrumentsData.length) {
       selectedIndex = instrumentsData.instrumentsData.length - 1;
     }
@@ -119,6 +123,9 @@
   {#snippet trail()}
     <div class="hidden space-x-4 sm:flex">
       <Transport playing={store.transport.playing} {position} dispatch={store.dispatch} />
+      {#if !isHost && store.transport.playing && !$audioRunning}
+        <button class="btn preset-filled" onclick={() => strudel.unlockAudio()}>Tap to hear</button>
+      {/if}
     </div>
     <div class="block md:hidden">
       <Modal

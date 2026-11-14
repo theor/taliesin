@@ -7,7 +7,12 @@ const contexts: BrowserContext[] = [];
 
 beforeAll(async () => {
   // mDNS-obfuscated host candidates can't be resolved between two contexts on one machine
-  browser = await chromium.launch({ args: ['--disable-features=WebRtcHideLocalIpsWithMdns'] });
+  browser = await chromium.launch({
+    args: [
+      '--disable-features=WebRtcHideLocalIpsWithMdns',
+      '--autoplay-policy=no-user-gesture-required'
+    ]
+  });
 });
 afterAll(async () => {
   await browser?.close();
@@ -22,7 +27,8 @@ async function open(role: 'host' | 'join', room: string): Promise<Page> {
   contexts.push(context);
   const page = await context.newPage();
   page.on('pageerror', (e) => console.error(`[${role} pageerror]`, e.message));
-  if (process.env.E2E_LOG) page.on('console', (m) => console.log(`[${role}] ${m.type()}: ${m.text().slice(0, 300)}`));
+  if (process.env.E2E_LOG)
+    page.on('console', (m) => console.log(`[${role}] ${m.type()}: ${m.text().slice(0, 300)}`));
   await page.goto(`${APP_URL}/?${role}&room=${room}&relay=${encodeURIComponent(RELAY_URL)}&debug`);
   await page.waitForFunction(() => (window as any).__store);
   return page;
@@ -30,7 +36,9 @@ async function open(role: 'host' | 'join', room: string): Promise<Page> {
 
 const peers = (p: Page) => p.evaluate(() => (window as any).__store.peers.length as number);
 const instruments = (p: Page) =>
-  p.evaluate(() => JSON.parse(JSON.stringify((window as any).__store.instrumentsData.instrumentsData)));
+  p.evaluate(() =>
+    JSON.parse(JSON.stringify((window as any).__store.instrumentsData.instrumentsData))
+  );
 
 async function connected(host: Page, client: Page) {
   await expect.poll(() => peers(host), { timeout: 30_000 }).toBe(1);
@@ -44,14 +52,15 @@ describe('two real browsers over WebRTC', () => {
     const client = await open('join', room);
     await connected(host, client);
 
-    await expect.poll(async () => (await instruments(client)).map((i: any) => i.id)).toEqual(
-      (await instruments(host)).map((i: any) => i.id)
-    );
+    await expect
+      .poll(async () => (await instruments(client)).map((i: any) => i.id))
+      .toEqual((await instruments(host)).map((i: any) => i.id));
   });
 });
 
 const playing = (p: Page) => p.evaluate(() => (window as any).__store.transport.playing as boolean);
-const position = (p: Page) => p.evaluate(() => (window as any).__store.transport.position() as number);
+const position = (p: Page) =>
+  p.evaluate(() => (window as any).__store.transport.position() as number);
 
 async function pair() {
   const room = newRoom();
@@ -68,7 +77,10 @@ async function pair() {
 const showEffects = (p: Page) =>
   p.locator('header.instrument-header [data-testid="switch-control"]').click();
 const instrumentVolume = (p: Page, index: number) =>
-  p.evaluate((i) => (window as any).__store.instrumentsData.instrumentsData[i].volume as number, index);
+  p.evaluate(
+    (i) => (window as any).__store.instrumentsData.instrumentsData[i].volume as number,
+    index
+  );
 const masterVolume = (p: Page) =>
   p.evaluate(() => (window as any).__store.instrumentsData.volume as number);
 const partField = (p: Page, partName: string, field: string) =>
@@ -146,7 +158,9 @@ describe('instrument sync (real transport, real controls)', () => {
     await setControl(client, 'Reverb', '0.7');
 
     // tweakpane snaps to its step (0.05), which leaves float noise like 0.7000000000000001
-    await expect.poll(() => partField(host, 'PartEffects', 'reverb'), { timeout: 20_000 }).toBeCloseTo(0.7, 5);
+    await expect
+      .poll(() => partField(host, 'PartEffects', 'reverb'), { timeout: 20_000 })
+      .toBeCloseTo(0.7, 5);
     expect(await partField(client, 'PartEffects', 'reverb')).toBeCloseTo(0.7, 5);
   });
 
@@ -158,7 +172,9 @@ describe('instrument sync (real transport, real controls)', () => {
     await client.getByRole('button', { name: 'Randomize' }).click();
 
     await expect
-      .poll(async () => JSON.stringify(await partField(host, 'MonoSequence', 'notes')), { timeout: 20_000 })
+      .poll(async () => JSON.stringify(await partField(host, 'MonoSequence', 'notes')), {
+        timeout: 20_000
+      })
       .not.toBe(JSON.stringify(initial));
     expect(await partField(host, 'MonoSequence', 'notes')).toEqual(
       await partField(client, 'MonoSequence', 'notes')
@@ -213,6 +229,64 @@ describe('transport (real transport)', () => {
     const p1 = await position(client);
     await client.waitForTimeout(1500);
     expect(await position(client)).toBeGreaterThan(p1);
+  });
+});
+
+// --- every peer plays the song itself, on the host's clock -----------------------------------------------
+/** The scheduler's cycle and the wall clock at the same instant (both pages share this machine's clock). */
+const sample = (p: Page) =>
+  p.evaluate(() => {
+    const s = (window as any).__strudel;
+    return {
+      wall: performance.timeOrigin + performance.now(),
+      cycle: s.now() as number,
+      cps: s.cps as number,
+      started: s.repls.scheduler.started as boolean
+    };
+  });
+/** Offset in seconds between two peers' schedulers, compared at the same wall-clock moment. */
+async function skewSeconds(a: Page, b: Page) {
+  const skew = await skewRaw(a, b);
+  if (process.env.E2E_LOG) console.log('skew(s)', skew.toFixed(3));
+  return skew;
+}
+async function skewRaw(a: Page, b: Page) {
+  const [x, y] = [await sample(a), await sample(b)];
+  const atY = x.cycle + ((y.wall - x.wall) / 1000) * x.cps; // x's cycle extrapolated to y's instant
+  return (atY - y.cycle) / x.cps;
+}
+
+describe('synchronised playback (real audio engine)', () => {
+  test('client and host schedulers run on the same clock, also for a client that joins mid-song', async () => {
+    const { host, client } = await pair();
+    await host.evaluate(() => (window as any).__store.transport.toggle());
+    // preconditions: both really started, and their position is advancing
+    await expect
+      .poll(async () => (await sample(client)).started && (await sample(host)).started, {
+        timeout: 30_000
+      })
+      .toBe(true);
+    const c1 = (await sample(client)).cycle;
+    await client.waitForTimeout(1000);
+    expect((await sample(client)).cycle).toBeGreaterThan(c1);
+
+    await client.waitForTimeout(1500); // let the post-start correction settle
+    expect(Math.abs(await skewSeconds(host, client))).toBeLessThan(0.1);
+    await client.waitForTimeout(5000); // across a host resync
+    expect(Math.abs(await skewSeconds(host, client))).toBeLessThan(0.1);
+
+    // a second client joins mid-song
+    const late = await client.context().newPage();
+    await late.goto(client.url());
+    await late.waitForFunction(() => (window as any).__store);
+    await expect.poll(async () => (await sample(late)).started, { timeout: 30_000 }).toBe(true);
+    await late.waitForTimeout(1500);
+    expect(Math.abs(await skewSeconds(host, late))).toBeLessThan(0.1);
+
+    // stop stops everyone
+    await host.evaluate(() => (window as any).__store.transport.stop());
+    await expect.poll(async () => (await sample(client)).started, { timeout: 20_000 }).toBe(false);
+    expect((await sample(late)).started).toBe(false);
   });
 });
 

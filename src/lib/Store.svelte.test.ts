@@ -7,34 +7,19 @@ import type { Command } from './commands.js';
 import { PianoScale } from './instruments/MonoSynth.js';
 import { createFakeNetwork } from './testing/fakeRoom.js';
 import { Status } from './interfaces.js';
-import { writable } from 'svelte/store';
-
-/** Records what the audio engine was asked to do, so tests can assert "clients never play". */
-function fakePlayer() {
-  const isPlaying = writable(false);
-  const calls: string[] = [];
-  return {
-    isPlaying,
-    time: writable(0),
-    cps: 0.5,
-    calls,
-    toggle() {
-      calls.push('toggle');
-      isPlaying.update((x) => !x);
-    },
-    stop() {
-      calls.push('stop');
-      isPlaying.set(false);
-    }
-  };
-}
+import { fakePlayer } from './testing/fakePlayer.js';
 
 function setup(
-  opts: { queued?: boolean; latency?: { host?: number; a?: number; b?: number } } = {}
+  opts: {
+    queued?: boolean;
+    clocked?: boolean; // players model a running scheduler (position advances with the clock)
+    latency?: { host?: number; a?: number; b?: number };
+  } = {}
 ) {
   const net = createFakeNetwork({ queued: opts.queued });
   const l = opts.latency ?? {};
-  const players = { host: fakePlayer(), a: fakePlayer(), b: fakePlayer() };
+  const fp = () => fakePlayer({ clocked: opts.clocked });
+  const players = { host: fp(), a: fp(), b: fp() };
   const host = new AppStore(true, 'r', net.join('host', { latencyMs: l.host }), players.host);
   const a = new AppStore(false, 'r', net.join('a', { latencyMs: l.a }), players.a);
   const b = new AppStore(false, 'r', net.join('b', { latencyMs: l.b }), players.b);
@@ -281,18 +266,20 @@ describe('status', () => {
 });
 
 describe('transport sync', () => {
-  test('host play/stop is mirrored by clients, which never touch their own player', async () => {
+  test('host play/stop is mirrored by clients, which start and stop their own player', async () => {
     const { host, a, b, players } = setup();
     expect([host, a, b].map((s) => s.transport.playing)).toEqual([false, false, false]);
 
     await host.transport.toggle();
     expect([host, a, b].map((s) => s.transport.playing)).toEqual([true, true, true]);
+    await vi.waitFor(() => expect(players.a.isPlayingNow() && players.b.isPlayingNow()).toBe(true));
 
     host.transport.stop();
     expect([host, a, b].map((s) => s.transport.playing)).toEqual([false, false, false]);
 
-    expect(players.a.calls).toEqual([]);
-    expect(players.b.calls).toEqual([]);
+    await vi.waitFor(() => expect(players.a.calls).toEqual(['start', 'stop']));
+    expect(players.b.calls).toEqual(['start', 'stop']);
+    expect(players.host.calls).toEqual(['toggle', 'stop']);
   });
 
   test('a client request is executed by the host and mirrored everywhere', async () => {
@@ -304,8 +291,10 @@ describe('transport sync', () => {
     b.transport.stop();
     expect(players.host.calls).toEqual(['toggle', 'stop']);
     expect([host, a, b].map((s) => s.transport.playing)).toEqual([false, false, false]);
-    expect(players.a.calls).toEqual([]);
-    expect(players.b.calls).toEqual([]);
+    // clients never toggle their player on their own: they only ever follow the host
+    await vi.waitFor(() => expect(players.a.isPlayingNow()).toBe(false));
+    expect(players.a.calls).not.toContain('toggle');
+    expect(players.b.calls).not.toContain('toggle');
   });
 
   test('a client toggling does not flip its own state before the host confirms', async () => {
@@ -347,7 +336,8 @@ describe('transport sync', () => {
     await sendReq({ action: 'explode' }, 'host');
     await sendState({ playing: 'yes' }, 'a');
     await sendState(undefined as any, 'a');
-    expect(players.a.calls).toEqual([]);
+    await Promise.resolve();
+    expect(players.a.calls).toEqual([]); // nothing started or stopped
     expect(players.host.calls).toEqual([]);
     expect(a.transport.playing).toBe(false);
     expect(host.transport.playing).toBe(false);
@@ -359,8 +349,8 @@ describe('playhead sync', () => {
 
   test('a client extrapolates the host position from the last message', async () => {
     vi.useFakeTimers();
-    const { host, a, players } = setup();
-    players.host.time.set(10);
+    const { host, a, players } = setup({ clocked: true });
+    players.host.startCycle = 10;
     await host.transport.toggle();
     expect(a.transport.position()).toBeCloseTo(10);
 
@@ -370,28 +360,30 @@ describe('playhead sync', () => {
 
   test('uses the host tempo', async () => {
     vi.useFakeTimers();
-    const { host, a, players } = setup();
+    const { host, a, players } = setup({ clocked: true });
     players.host.cps = 2;
     await host.transport.toggle();
     vi.advanceTimersByTime(1500);
     expect(a.transport.position()).toBeCloseTo(3);
   });
 
-  test('position is frozen while stopped', async () => {
+  test('position is frozen while stopped (a stop rewinds to the start)', async () => {
     vi.useFakeTimers();
-    const { host, a, players } = setup();
+    const { host, a } = setup({ clocked: true });
     await host.transport.toggle();
-    players.host.time.set(7);
+    vi.advanceTimersByTime(3000);
     host.transport.stop();
+    const frozen = a.transport.position();
+    expect(frozen).toBe(0);
     vi.advanceTimersByTime(5000);
-    expect(a.transport.position()).toBeCloseTo(7);
+    expect(a.transport.position()).toBe(frozen);
   });
 
   test('clients with very different latencies all converge on the host position', async () => {
     vi.useFakeTimers();
-    const { host, a, b, players } = setup({ latency: { host: 20, a: 100, b: 400 } });
+    const { host, a, b, players } = setup({ clocked: true, latency: { host: 20, a: 100, b: 400 } });
     await vi.advanceTimersByTimeAsync(2000); // join-time messages + pings settle
-    players.host.time.set(10);
+    players.host.startCycle = 10;
     await host.transport.toggle();
     await vi.advanceTimersByTimeAsync(0);
     // let the message arrive and each client's ping resolve; stay under the 4s host resync
@@ -405,9 +397,9 @@ describe('playhead sync', () => {
 
   test('the latency measured on an earlier message is already applied when the next one arrives', async () => {
     vi.useFakeTimers();
-    const { host, b, players } = setup({ latency: { b: 400 } });
+    const { host, b, players } = setup({ clocked: true, latency: { b: 400 } });
     await vi.advanceTimersByTimeAsync(5000); // the join-time message let b measure its latency
-    players.host.time.set(10);
+    players.host.startCycle = 10;
     await host.transport.toggle();
     await vi.advanceTimersByTimeAsync(400); // message arrives after 400ms
     // truth is 10 + 0.4s * 0.5 = 10.2, and b already compensates for the 400ms in flight
@@ -548,5 +540,135 @@ describe('command log export', () => {
     for (const { cmd } of report.log) fresh.dispatch(cmd);
     expect(snap(fresh)).toEqual(snap(a));
     expect(fresh.instrumentsData.volume).toBe(0.1);
+  });
+});
+
+describe('local playback on every peer', () => {
+  afterEach(() => vi.useRealTimers());
+  const settle = (ms: number) => vi.advanceTimersByTimeAsync(ms);
+
+  function clocked(
+    opts: { latency?: { host?: number; a?: number; b?: number }; players?: any } = {}
+  ) {
+    const net = createFakeNetwork();
+    const l = opts.latency ?? {};
+    const players = opts.players ?? {
+      host: fakePlayer({ clocked: true }),
+      a: fakePlayer({ clocked: true }),
+      b: fakePlayer({ clocked: true })
+    };
+    const host = new AppStore(true, 'r', net.join('host', { latencyMs: l.host }), players.host);
+    const a = new AppStore(false, 'r', net.join('a', { latencyMs: l.a }), players.a);
+    const b = new AppStore(false, 'r', net.join('b', { latencyMs: l.b }), players.b);
+    net.settle();
+    return { net, host, a, b, players };
+  }
+
+  test('a client starts where the host is, compensating for the network delay', async () => {
+    vi.useFakeTimers();
+    const { host, players } = clocked({ latency: { a: 200 } });
+    await settle(1000); // join messages + pings
+    await host.transport.toggle();
+    players.host.drift(10 - players.host.now()); // host is at cycle 10 when it speaks
+    host.transport.broadcast();
+    await settle(1000);
+    expect(players.a.calls).toContain('start');
+    // started at 10 + (delay so far) * cps, then every peer keeps the same cycle
+    await settle(2000);
+    expect(players.a.now()).toBeCloseTo(players.host.now(), 1);
+  });
+
+  test('stop propagates and a late joiner starts mid-song', async () => {
+    vi.useFakeTimers();
+    const { net, host, players } = clocked();
+    await host.transport.toggle();
+    await settle(6000);
+    const late = fakePlayer({ clocked: true });
+    new AppStore(false, 'r', net.join('late'), late);
+    net.settle();
+    await settle(1000);
+    expect(late.calls).toContain('start');
+    expect(late.now()).toBeCloseTo(players.host.now(), 1);
+
+    host.transport.stop();
+    await settle(100);
+    expect(late.isPlayingNow()).toBe(false);
+    expect(players.a.isPlayingNow()).toBe(false);
+  });
+
+  test('nothing starts before the audio is unlocked, then it joins in sync', async () => {
+    vi.useFakeTimers();
+    const players = {
+      host: fakePlayer({ clocked: true }),
+      a: fakePlayer({ clocked: true, locked: true }),
+      b: fakePlayer({ clocked: true })
+    };
+    const { host } = clocked({ players });
+    await host.transport.toggle();
+    await settle(5000);
+    expect(players.a.isPlayingNow()).toBe(false);
+    players.a.unlock();
+    await settle(1000);
+    expect(players.a.isPlayingNow()).toBe(true);
+    expect(players.a.now()).toBeCloseTo(players.host.now(), 1); // target taken after the unlock
+  });
+
+  test('a client that was stopped by the host while locked never starts', async () => {
+    vi.useFakeTimers();
+    const players = {
+      host: fakePlayer({ clocked: true }),
+      a: fakePlayer({ clocked: true, locked: true }),
+      b: fakePlayer({ clocked: true })
+    };
+    const { host } = clocked({ players });
+    await host.transport.toggle();
+    await settle(1000);
+    host.transport.stop();
+    await settle(1000);
+    players.a.unlock();
+    await settle(1000);
+    expect(players.a.isPlayingNow()).toBe(false);
+  });
+
+  test('drift beyond the threshold is corrected, jitter below it is left alone', async () => {
+    vi.useFakeTimers();
+    const { host, players } = clocked();
+    await host.transport.toggle();
+    await settle(2000);
+    const shifts = () => players.a.calls.filter((c: string) => c === 'shift').length;
+    const before = shifts();
+
+    players.a.drift(0.005); // 5 ms at 0.5 cps = 0.0025 cycles... well under 40 ms
+    await settle(4500); // next host resync
+    expect(shifts()).toBe(before);
+
+    players.a.drift(0.2); // 0.2 cycles = 400 ms at 0.5 cps
+    await settle(4500);
+    expect(shifts()).toBe(before + 1);
+    expect(players.a.now()).toBeCloseTo(players.host.now(), 1);
+  });
+
+  test('an output-latency difference is compensated so the sound lines up', async () => {
+    vi.useFakeTimers();
+    const players = {
+      host: fakePlayer({ clocked: true, outputLatency: 0.02 }),
+      a: fakePlayer({ clocked: true, outputLatency: 0.22 }), // e.g. bluetooth
+      b: fakePlayer({ clocked: true })
+    };
+    const { host } = clocked({ players });
+    await host.transport.toggle();
+    await settle(3000);
+    // `a` outputs 200 ms later, so its scheduler must run 200 ms (0.1 cycle) ahead
+    expect(players.a.now() - players.host.now()).toBeCloseTo(0.1, 1);
+  });
+
+  test('editing the song on a client never starts or restarts its playback', async () => {
+    vi.useFakeTimers();
+    const { host, a, players } = clocked();
+    await settle(500);
+    a.dispatch(rename(a, 0, 'edit')); // the page re-evaluates code; the player must stay stopped
+    await settle(500);
+    expect(players.a.calls).toEqual([]);
+    expect(host.transport.playing).toBe(false);
   });
 });
