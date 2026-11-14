@@ -55,6 +55,15 @@ describe('credentials worker', () => {
   test('answers preflight, allows localhost, reports upstream failure', async () => {
     expect((await handle(req('https://theor.github.io', 'OPTIONS'), env, vi.fn() as any)).status).toBe(204);
     const bad = vi.fn(async () => new Response('no', { status: 401 }));
-    expect((await handle(req('http://localhost:5173'), env, bad as any)).status).toBe(502);
+    const failed = await handle(req('http://localhost:5173'), env, bad as any);
+    expect(failed.status).toBe(502);
+    expect(await failed.text()).toContain('401');
+  });
+  test('says so when the secrets are missing, without calling Cloudflare', async () => {
+    const upstream = vi.fn();
+    const res = await handle(req('https://theor.github.io'), { ...env, TURN_API_TOKEN: '' }, upstream as any);
+    expect(res.status).toBe(500);
+    expect(await res.text()).toContain('TURN_API_TOKEN');
+    expect(upstream).not.toHaveBeenCalled();
   });
 });
