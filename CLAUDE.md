@@ -23,7 +23,7 @@ Vitest has three workspaces: `client` (jsdom, `*.svelte.{test,spec}.ts`), `serve
 
 - `yarn test` runs unit + component tests on an in-memory network (`src/lib/testing/fakeRoom.ts`: per-peer latency, queued and randomised delivery, per-link FIFO) with a recording `fakePlayer`.
 - `yarn test:e2e` runs two real Chromium pages over real WebRTC through a local Node Nostr relay (`e2e/`); it spawns its own dev server (`E2E=1` serves plain http). The app exposes `window.__store` with `?debug`, and `?relay=ws://…` overrides signalling.
-- `yarn check` has 9 pre-existing errors (strudel types, ROPopover, Network.svelte, InstrumentView generics); don't add to them. Use `yarn run check`, because bare `yarn check` is a yarn built-in.
+- `yarn check` has 8 pre-existing errors (strudel types, Network.svelte, InstrumentView generics); don't add to them. Use `yarn run check`, because bare `yarn check` is a yarn built-in.
 
 ## Architecture
 

@@ -16,7 +16,6 @@
   import { gestures, pointer, SwipeDirection } from '$lib/utils/hammerAction';
   import { SvelteMap } from 'svelte/reactivity';
 
-  import AppTooltip from '../components/AppTooltip.svelte';
 
   // The view only reads state and dispatches commands; it never mutates instrument data itself.
   const { instrumentData = $bindable(), dispatch }: IDispatchingInstrumentViewProps = $props();
@@ -116,7 +115,6 @@
   <!-- {@const pages = Math.ceil(totalLength / 16)} -->
 
   <div class="my-4 ml-6 flex flex-1">
-  <AppTooltip />
 
     <Progress classes="" value={$progress} max={100} />
   </div>

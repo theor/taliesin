@@ -6,8 +6,6 @@ import { createInstrument } from '$lib/Store.svelte';
 import { Drum } from '$lib/instruments/Drum';
 import type { Command } from '$lib/commands';
 
-// A cursor-following debug popover that listens to global pointer events; not part of what's under test.
-vi.mock('../components/AppTooltip.svelte', () => ({ default: () => {} }));
 
 // The view in isolation: no store, no network, no audio. It is handed state and a spy `dispatch`, and
 // the tests check which commands a gesture produces. Drum starts as
