@@ -52,9 +52,9 @@
     </Switch>
   </header>
   {#if group}
-    {#snippet renderOptionalPart<TPart extends InstrumentPartTyped<any>>(
-      partType: Constructor<TPart>,
-      component: Component<IPartViewProps<TPart>>
+    {#snippet renderOptionalPart(
+      partType: Constructor<InstrumentPartTyped<any>>,
+      component: Component<IPartViewProps<any>>
     )}
       {#each instrumentData.parts as part, partIndex}
         {#if part.partName === partType.name}
@@ -62,7 +62,7 @@
             instrumentId={instrumentData.id}
             {dispatch}
             PartComponent={component as Component<IPartViewProps<InstrumentPartTyped<any>>>}
-            partData={instrumentData.parts[partIndex] as PartType<TPart>}
+            partData={instrumentData.parts[partIndex] as PartType<InstrumentPartTyped<any>>}
           />
         {/if}
       {/each}
