@@ -5,11 +5,10 @@ Cloudflare Realtime TURN issues short-lived credentials through an authenticated
 holds the API token and gives the app `{ iceServers }`.
 
 1. Cloudflare dashboard -> Realtime -> TURN: create a TURN key. Note the key id and the API token.
-2. **Deploy from GitHub (recommended).** Add these repository *secrets* (Settings -> Secrets and variables ->
-   Actions -> Secrets): `CLOUDFLARE_API_TOKEN` (a token created from the "Edit Cloudflare Workers" template),
-   `CLOUDFLARE_ACCOUNT_ID`, `TURN_KEY_ID`, `TURN_API_TOKEN`. Then run the "Deploy TURN credentials Worker"
-   workflow (Actions tab -> Run workflow); it also runs on every push to `main` that touches `worker/`.
-   Its log prints the Worker's URL.
+2. **Deploy from the Cloudflare dashboard (recommended).** Workers & Pages -> Create -> Import a repository,
+   pick this repo, branch `main`, **root directory `worker`**, no build command, deploy command
+   `npx wrangler deploy`. The Worker must be named `taliesin-turn` (the `name` in `wrangler.toml`). Then, in the
+   Worker's Settings -> Variables and secrets, add the secrets `TURN_KEY_ID` and `TURN_API_TOKEN`.
 
    **Or deploy by hand**, from this folder:
    ```
