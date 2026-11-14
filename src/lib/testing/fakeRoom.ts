@@ -28,7 +28,7 @@ export interface FakeNetwork {
  * makeAction, onPeerJoin, onPeerLeave, getPeers, leave.
  * `queued: true` holds messages until `flush()`, to test ordering / concurrent edits.
  */
-export function createFakeNetwork(opts: { queued?: boolean } = {}): FakeNetwork {
+export function createFakeNetwork(opts: { queued?: boolean; pingMs?: number } = {}): FakeNetwork {
   const peers = new Map<string, FakePeer>();
   const announce: string[] = [];
   const connected = new Set<string>();
@@ -72,7 +72,7 @@ export function createFakeNetwork(opts: { queued?: boolean } = {}): FakeNetwork 
       onPeerJoin: (l: Listener) => void me.joinListeners.push(l),
       onPeerLeave: (l: Listener) => void me.leaveListeners.push(l),
       getPeers: () => Object.fromEntries([...peers.keys()].filter((p) => p !== peerId).map((p) => [p, {}])),
-      ping: async () => 0,
+      ping: async () => opts.pingMs ?? 0,
       leave: () => {
         peers.delete(peerId);
         peers.forEach((p) => p.leaveListeners.forEach((l) => l(peerId)));

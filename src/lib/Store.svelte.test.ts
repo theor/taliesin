@@ -1,4 +1,4 @@
-import { expect, test, describe } from 'vitest';
+import { expect, test, describe, vi, afterEach } from 'vitest';
 import { AppStore, makePartData } from './Store.svelte.js';
 import { PartSteps } from './parts.svelte.js';
 import { PianoScale } from './instruments/MonoSynth.js';
@@ -13,6 +13,7 @@ function fakePlayer() {
   return {
     isPlaying,
     time: writable(0),
+    cps: 0.5,
     calls,
     toggle() {
       calls.push('toggle');
@@ -25,7 +26,7 @@ function fakePlayer() {
   };
 }
 
-function setup(opts: { queued?: boolean } = {}) {
+function setup(opts: { queued?: boolean; pingMs?: number } = {}) {
   const net = createFakeNetwork(opts);
   const players = { host: fakePlayer(), a: fakePlayer(), b: fakePlayer() };
   const host = new AppStore(true, 'r', net.join('host'), players.host);
@@ -265,5 +266,69 @@ describe('transport sync', () => {
     expect(players.host.calls).toEqual([]);
     expect(a.transport.playing).toBe(false);
     expect(host.transport.playing).toBe(false);
+  });
+});
+
+describe('playhead sync', () => {
+  afterEach(() => vi.useRealTimers());
+
+  test('a client extrapolates the host position from the last message', async () => {
+    vi.useFakeTimers();
+    const { host, a, players } = setup();
+    players.host.time.set(10);
+    await host.transport.toggle();
+    expect(a.transport.position()).toBeCloseTo(10);
+
+    vi.advanceTimersByTime(2000); // 2s at 0.5 cycles/s = 1 cycle
+    expect(a.transport.position()).toBeCloseTo(11);
+  });
+
+  test('uses the host tempo', async () => {
+    vi.useFakeTimers();
+    const { host, a, players } = setup();
+    players.host.cps = 2;
+    await host.transport.toggle();
+    vi.advanceTimersByTime(1500);
+    expect(a.transport.position()).toBeCloseTo(3);
+  });
+
+  test('position is frozen while stopped', async () => {
+    vi.useFakeTimers();
+    const { host, a, players } = setup();
+    await host.transport.toggle();
+    players.host.time.set(7);
+    host.transport.stop();
+    vi.advanceTimersByTime(5000);
+    expect(a.transport.position()).toBeCloseTo(7);
+  });
+
+  test('compensates for half the measured round trip', async () => {
+    vi.useFakeTimers();
+    const { host, a, players } = setup({ pingMs: 200 });
+    players.host.time.set(10);
+    await host.transport.toggle();
+    await vi.advanceTimersByTimeAsync(0); // let the ping resolve
+    expect(a.transport.position()).toBeCloseTo(10 + 0.1 * 0.5); // 100ms one-way
+  });
+
+  test('host re-announces its position while playing, so clients correct drift', async () => {
+    vi.useFakeTimers();
+    const { host, a, players, net } = setup();
+    await host.transport.toggle();
+    players.host.time.set(12); // host is actually ahead of what the client extrapolates
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(a.transport.last?.cycle).toBe(12);
+    expect(a.transport.position()).toBeCloseTo(12);
+
+    // and stops announcing once stopped
+    host.transport.stop();
+    const sent = net.log.length;
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(net.log.length).toBe(sent);
+  });
+
+  test('a client with no message yet reports 0', () => {
+    const { a } = setup();
+    expect(a.transport.position()).toBe(0);
   });
 });

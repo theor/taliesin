@@ -1,8 +1,14 @@
 <script lang="ts">
   import { Play, Square, Ban } from '@lucide/svelte';
-  import { strudel, store } from '$lib';
+  import { store } from '$lib';
+  import { onMount } from 'svelte';
 
-  let time = $derived(strudel.time);
+  // The host reads the real scheduler; clients get an extrapolated position from the host's messages.
+  let position = $state(0);
+  onMount(() => {
+    const id = setInterval(() => (position = store.transport.position()), 100);
+    return () => clearInterval(id);
+  });
 </script>
 
 <div>
@@ -15,5 +21,5 @@
   </button>
   <!-- stop -->
   <button onclick={() => store.transport.stop()}><Ban size={20} /></button>
-  <span>{$time.toFixed(2)}</span>
+  <span>{position.toFixed(2)}</span>
 </div>

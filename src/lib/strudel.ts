@@ -90,6 +90,10 @@ ${code}`);
     })();
   }
   time = writable(0);
+  /** Cycles per second of the running scheduler (Strudel's default is 0.5). */
+  get cps(): number {
+    return this.repls?.scheduler?.cps ?? 0.5;
+  }
   updateTime() {
     // return ctx.currentTime;
     if(!this.repls?.scheduler) return;
@@ -123,6 +127,7 @@ ${code}`);
 export const strudel = VITEST ? {
   time: writable(0),
   isPlaying: writable(false),
+  cps: 0.5,
   evaluate: async () => {},
   stop() { (this as any).isPlaying.set(false); },
   async toggle() { const p = (this as any).isPlaying; p.update((x: boolean) => !x); },
