@@ -34,7 +34,7 @@ export async function handle(
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   if (!ok) return new Response('forbidden', { status: 403, headers: cors });
   if (!env.TURN_KEY_ID || !env.TURN_API_TOKEN) {
-    return new Response('not configured: set the TURN_KEY_ID and TURN_API_TOKEN secrets', {
+    return new Response('not configured: set both the TURN_KEY_ID and TURN_API_TOKEN secrets', {
       status: 500,
       headers: cors
     });
