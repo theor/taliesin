@@ -7,7 +7,7 @@ holds the API token and gives the app `{ iceServers }`.
 1. Cloudflare dashboard -> Realtime -> TURN: create a TURN key. Note the key id and the API token.
 2. **Deploy from the Cloudflare dashboard (recommended).** Workers & Pages -> Create -> Import a repository,
    pick this repo, branch `main`, **root directory `worker`**, no build command, deploy command
-   `npx wrangler deploy`. The Worker must be named `taliesin-turn` (the `name` in `wrangler.toml`). Then, in the
+   `npx wrangler deploy`. The Worker must be named `taliesin` (the `name` in `wrangler.toml`). Then, in the
    Worker's Settings -> Variables and secrets, add the secrets `TURN_KEY_ID` and `TURN_API_TOKEN`.
 
    **Or deploy by hand**, from this folder:
@@ -18,7 +18,7 @@ holds the API token and gives the app `{ iceServers }`.
    ```
    Edit `ALLOWED_ORIGINS` in `wrangler.toml` if the site is not on `https://theor.github.io`.
 3. In GitHub: Settings -> Secrets and variables -> Actions -> Variables: add `TURN_ENDPOINT` = the Worker URL
-   (e.g. `https://taliesin-turn.<you>.workers.dev`). The deploy workflow passes it to the build as
+   (e.g. `https://taliesin.<you>.workers.dev`). The deploy workflow passes it to the build as
    `VITE_TURN_ENDPOINT`. For a quick test, open the app with `?turn=<worker url>`.
 
 The Worker only answers requests from the allowed origins (and localhost / LAN addresses for development).
