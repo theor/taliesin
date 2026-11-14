@@ -26,12 +26,15 @@ function fakePlayer() {
   };
 }
 
-function setup(opts: { queued?: boolean; pingMs?: number } = {}) {
-  const net = createFakeNetwork(opts);
+function setup(
+  opts: { queued?: boolean; latency?: { host?: number; a?: number; b?: number } } = {}
+) {
+  const net = createFakeNetwork({ queued: opts.queued });
+  const l = opts.latency ?? {};
   const players = { host: fakePlayer(), a: fakePlayer(), b: fakePlayer() };
-  const host = new AppStore(true, 'r', net.join('host'), players.host);
-  const a = new AppStore(false, 'r', net.join('a'), players.a);
-  const b = new AppStore(false, 'r', net.join('b'), players.b);
+  const host = new AppStore(true, 'r', net.join('host', { latencyMs: l.host }), players.host);
+  const a = new AppStore(false, 'r', net.join('a', { latencyMs: l.a }), players.a);
+  const b = new AppStore(false, 'r', net.join('b', { latencyMs: l.b }), players.b);
   net.settle();
   return { net, host, a, b, players };
 }
@@ -302,13 +305,67 @@ describe('playhead sync', () => {
     expect(a.transport.position()).toBeCloseTo(7);
   });
 
-  test('compensates for half the measured round trip', async () => {
+  test('clients with very different latencies all converge on the host position', async () => {
     vi.useFakeTimers();
-    const { host, a, players } = setup({ pingMs: 200 });
+    const { host, a, b, players } = setup({ latency: { host: 20, a: 100, b: 400 } });
+    await vi.advanceTimersByTimeAsync(2000); // join-time messages + pings settle
     players.host.time.set(10);
     await host.transport.toggle();
-    await vi.advanceTimersByTimeAsync(0); // let the ping resolve
-    expect(a.transport.position()).toBeCloseTo(10 + 0.1 * 0.5); // 100ms one-way
+    await vi.advanceTimersByTimeAsync(0);
+    // let the message arrive and each client's ping resolve; stay under the 4s host resync
+    await vi.advanceTimersByTimeAsync(2000);
+
+    // The host started at 10 two seconds ago, at 0.5 cycles/s -> 11 now. Delivery took 120ms (a) and
+    // 420ms (b), but each client adds its own measured one-way delay back, so they agree.
+    expect(a.transport.position()).toBeCloseTo(11, 2);
+    expect(b.transport.position()).toBeCloseTo(11, 2);
+  });
+
+  test('the latency measured on an earlier message is already applied when the next one arrives', async () => {
+    vi.useFakeTimers();
+    const { host, b, players } = setup({ latency: { b: 400 } });
+    await vi.advanceTimersByTimeAsync(5000); // the join-time message let b measure its latency
+    players.host.time.set(10);
+    await host.transport.toggle();
+    await vi.advanceTimersByTimeAsync(400); // message arrives after 400ms
+    // truth is 10 + 0.4s * 0.5 = 10.2, and b already compensates for the 400ms in flight
+    expect(b.transport.position()).toBeCloseTo(10.2, 2);
+    await vi.advanceTimersByTimeAsync(800);
+    expect(b.transport.position()).toBeCloseTo(10.6, 2); // 10 + 1.2s * 0.5
+  });
+
+  test('a stale transport message that arrives late does not override a newer one', async () => {
+    vi.useFakeTimers();
+    const { net, host, a } = setup({ latency: { a: 500 } });
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await host.transport.toggle(); // "playing" - takes 500ms to reach a
+    net.setLatency('a', 0); // the network recovers...
+    host.transport.stop(); // ..."stopped" overtakes it
+    await vi.advanceTimersByTimeAsync(0);
+    expect(a.transport.playing).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1000); // the stale "playing" finally arrives
+    expect(a.transport.playing).toBe(false);
+  });
+
+  test('a restarted host is not ignored because of an earlier session', async () => {
+    vi.useFakeTimers();
+    const net = createFakeNetwork();
+    const hostRoom1 = net.join('host');
+    const first = new AppStore(true, 'r', hostRoom1, fakePlayer());
+    const client = new AppStore(false, 'r', net.join('c'), fakePlayer());
+    net.settle();
+    for (let i = 0; i < 5; i++) await first.transport.toggle();
+    hostRoom1.leave();
+    vi.advanceTimersByTime(5000); // the page reload takes a while
+
+    // host reloads the page: a new Transport starts counting from scratch
+    const player = fakePlayer();
+    const second = new AppStore(true, 'r', net.join('host'), player);
+    net.settle();
+    await second.transport.toggle();
+    expect(client.transport.playing).toBe(true);
   });
 
   test('host re-announces its position while playing, so clients correct drift', async () => {

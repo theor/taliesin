@@ -19,8 +19,12 @@ export type TransportState = {
   cycle: number;
   /** Cycles per second on the host. */
   cps: number;
-  /** Host wall clock (ms) when the message was sent. Informational: clients never compare clocks. */
-  hostTime: number;
+  /**
+   * Strictly increasing per host (seeded from the host clock so a reloaded host still beats its earlier
+   * session). Clients drop anything not newer than what they already applied: messages can overtake each
+   * other, and a stale "playing" must not override a newer "stopped".
+   */
+  seq: number;
 };
 export type TransportRequest = { action: 'toggle' | 'stop' };
 
@@ -48,6 +52,8 @@ export class Transport {
   private receivedAt = 0; // local monotonic ms when `last` arrived
   private latencyMs = 0; // estimated one-way delay host -> us
   private resync: ReturnType<typeof setInterval> | undefined;
+  private seq = 0; // host: last sequence number sent
+  private appliedSeq = -Infinity; // client: newest sequence number applied
 
   constructor(
     private room: Room,
@@ -75,7 +81,9 @@ export class Transport {
       });
     } else {
       onState((state, peerId) => {
-        if (typeof state?.playing !== 'boolean') return;
+        if (typeof state?.playing !== 'boolean' || typeof state.seq !== 'number') return;
+        if (state.seq <= this.appliedSeq) return; // stale or duplicate
+        this.appliedSeq = state.seq;
         this.playing = state.playing;
         this.last = state;
         this.receivedAt = this.now();
@@ -123,12 +131,13 @@ export class Transport {
   /** Host: tell everybody (or one peer) the current state. */
   broadcast(peerId?: string) {
     if (!this.host) return;
+    this.seq = Math.max(this.seq + 1, Date.now());
     this.sendState(
       {
         playing: get(this.player.isPlaying),
         cycle: get(this.player.time),
         cps: this.player.cps,
-        hostTime: Date.now()
+        seq: this.seq
       },
       peerId
     );

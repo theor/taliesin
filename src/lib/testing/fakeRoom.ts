@@ -5,14 +5,21 @@ type Listener = (peerId: string) => void;
 
 interface FakePeer {
   id: string;
+  latencyMs: number;
   handlers: Map<string, Handler[]>;
   joinListeners: Listener[];
   leaveListeners: Listener[];
 }
 
 export interface FakeNetwork {
-  /** Create a room for a peer. Peers see each other after `settle()` (like real WebRTC, which is async). */
-  join(peerId: string): Room;
+  /**
+   * Create a room for a peer. Peers see each other after `settle()` (like real WebRTC, which is async).
+   * `latencyMs` is this peer's one-way delay to the "internet": a message A -> B takes lat(A) + lat(B),
+   * and ping(A <-> B) is twice that. Needs fake timers (vi.useFakeTimers) when non-zero.
+   */
+  join(peerId: string, opts?: { latencyMs?: number }): Room;
+  /** Change a peer's latency; affects messages sent (and pings made) from now on, so messages can overtake each other. */
+  setLatency(peerId: string, latencyMs: number): void;
   /** Announce pending joins (onPeerJoin on both sides). Call after the stores are constructed. */
   settle(): void;
   /** In queued mode, deliver all pending messages (including ones queued while flushing). */
@@ -27,8 +34,9 @@ export interface FakeNetwork {
  * In-memory stand-in for a Trystero room hub. Implements only the surface AppStore uses:
  * makeAction, onPeerJoin, onPeerLeave, getPeers, leave.
  * `queued: true` holds messages until `flush()`, to test ordering / concurrent edits.
+ * Per-peer `latencyMs` (see join) delays delivery with timers instead.
  */
-export function createFakeNetwork(opts: { queued?: boolean; pingMs?: number } = {}): FakeNetwork {
+export function createFakeNetwork(opts: { queued?: boolean } = {}): FakeNetwork {
   const peers = new Map<string, FakePeer>();
   const announce: string[] = [];
   const connected = new Set<string>();
@@ -36,10 +44,22 @@ export function createFakeNetwork(opts: { queued?: boolean; pingMs?: number } = 
   const log: FakeNetwork['log'] = [];
   const queued = opts.queued ?? false;
 
-  const deliver = (fn: () => void) => (queued ? queue.push(fn) : fn());
+  const oneWay = (from: string, to: string) =>
+    (peers.get(from)?.latencyMs ?? 0) + (peers.get(to)?.latencyMs ?? 0);
+  const deliver = (fn: () => void, delayMs: number) => {
+    if (queued) queue.push(fn);
+    else if (delayMs > 0) setTimeout(fn, delayMs);
+    else fn();
+  };
 
-  function join(peerId: string): Room {
-    const me: FakePeer = { id: peerId, handlers: new Map(), joinListeners: [], leaveListeners: [] };
+  function join(peerId: string, joinOpts: { latencyMs?: number } = {}): Room {
+    const me: FakePeer = {
+      id: peerId,
+      latencyMs: joinOpts.latencyMs ?? 0,
+      handlers: new Map(),
+      joinListeners: [],
+      leaveListeners: []
+    };
     peers.set(peerId, me);
     announce.push(peerId);
 
@@ -59,7 +79,7 @@ export function createFakeNetwork(opts: { queued?: boolean; pingMs?: number } = 
             deliver(() => {
               const peer = peers.get(t);
               peer?.handlers.get(name)?.forEach((h) => h(wire && JSON.parse(wire), peerId));
-            });
+            }, oneWay(peerId, t));
           }
         };
         const receive = (h: Handler) => {
@@ -72,7 +92,10 @@ export function createFakeNetwork(opts: { queued?: boolean; pingMs?: number } = 
       onPeerJoin: (l: Listener) => void me.joinListeners.push(l),
       onPeerLeave: (l: Listener) => void me.leaveListeners.push(l),
       getPeers: () => Object.fromEntries([...peers.keys()].filter((p) => p !== peerId).map((p) => [p, {}])),
-      ping: async () => opts.pingMs ?? 0,
+      ping: (to: string) => {
+        const rtt = 2 * oneWay(peerId, to);
+        return new Promise<number>((resolve) => (rtt > 0 ? setTimeout(() => resolve(rtt), rtt) : resolve(0)));
+      },
       leave: () => {
         peers.delete(peerId);
         peers.forEach((p) => p.leaveListeners.forEach((l) => l(peerId)));
@@ -83,6 +106,10 @@ export function createFakeNetwork(opts: { queued?: boolean; pingMs?: number } = 
 
   return {
     join,
+    setLatency(peerId, latencyMs) {
+      const p = peers.get(peerId);
+      if (p) p.latencyMs = latencyMs;
+    },
     settle() {
       while (announce.length) {
         const id = announce.shift()!;
