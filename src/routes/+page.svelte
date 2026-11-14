@@ -93,6 +93,7 @@
   import { presetCommands } from '$lib/commandBuilders';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { getRelaySockets } from 'trystero/nostr';
   import { WebAcoustics } from '$lib/calibration/webAcoustics';
   import { findChirp, makeChirp } from '$lib/calibration/dsp';
   const calibration = store.calibration;
@@ -109,6 +110,17 @@
   function drawerClose() {
     drawerState = false;
   }
+
+  // `?debug` on a phone: are the signalling relays reachable?
+  let relays = $state('');
+  onMount(() => {
+    if (!isDebug) return;
+    const id = setInterval(() => {
+      const sockets = Object.entries(getRelaySockets());
+      relays = `relays ${sockets.filter(([, s]) => s.readyState === 1).length}/${sockets.length} open`;
+    }, 1000);
+    return () => clearInterval(id);
+  });
 
   // Playhead: exact on the host, extrapolated from the host's messages on clients.
   let position = $state(0);
@@ -179,6 +191,9 @@
 
   <div class="flex flex-1 flex-col gap-4 p-4">
     {#if isDebug}
+      <p class="text-sm" data-testid="net-debug">
+        {relays} · peers {store.peers.length} · secure context {String(window.isSecureContext)}
+      </p>
       <div
         class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden flex-col space-y-5 p-5 lg:flex"
       >
