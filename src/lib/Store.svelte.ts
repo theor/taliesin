@@ -3,6 +3,7 @@ import { joinRoom, type BaseRoomConfig, type RelayConfig } from 'trystero/nostr'
 import { selfId, type ActionSender, type JsonValue, type Room } from 'trystero';
 import {
   getPart,
+  newId,
   type Constructor,
   type Instrument,
   type InstrumentData,
@@ -44,7 +45,7 @@ const config: BaseRoomConfig & RelayConfig = {
 };
 
 type WrappedInstrument = {
-  index: number;
+  id: string;
   instrument: InstrumentDataJsonValue;
 };
 
@@ -161,6 +162,14 @@ export class AppStore {
   createInstrumentPreset(preset: Preset) {
     const { instrument, parts } = preset;
     this.instrumentsData.instrumentsData.push(createInstrument(instrument, parts, preset.name));
+    this.sendCreated(
+      this.instrumentsData.instrumentsData[this.instrumentsData.instrumentsData.length - 1]
+    );
+  }
+  /** An unknown id makes receivers append, so a creation is just an instrument update. */
+  private sendCreated(created: InstrumentData) {
+    // not wired yet while the constructor seeds the initial presets
+    this.sendInstrument?.({ id: created.id, instrument: $state.snapshot(created) as InstrumentData });
   }
   setInstrumentPart(selectedIndex: number, partIndex: number, p: InstrumentPartData): void {
     this.instrumentsData.instrumentsData[selectedIndex].parts.splice(partIndex, 1, p);
@@ -179,6 +188,7 @@ export class AppStore {
     const json = this.serialized();
     console.warn(json);
     this.instrumentsData.instrumentsData = JSON.parse(json) as InstrumentDataJsonValue[];
+    this.broadcastState();
   }
   instrumentsData = $state({ instrumentsData: [] as InstrumentData[], volume: 0.8 });
   serialized(): string {
@@ -197,9 +207,10 @@ export class AppStore {
       })
       .join('\n').replace(/[\r\n]{2,}/g, '\n\n')
   };
+  /** Ids of the peers currently connected to us. */
+  peers = $state<string[]>([]);
   status(): Status {
-    // return Status.connected;
-    return Status.disconnected;
+    return this.peers.length > 0 ? Status.connected : Status.disconnected;
   }
   id() {
     return selfId; // this.webrtcProvider.doc.clientID;
@@ -207,15 +218,33 @@ export class AppStore {
   host: boolean = false;
   peerJoined(peerId: string) {
     console.log('peer joined', peerId);
-    // TODO PARTS
-    if (this.host) this.sendState(this.instrumentsData.instrumentsData, peerId);
+    if (!this.peers.includes(peerId)) this.peers.push(peerId);
+    // Both sides get onPeerJoin for each other, so the host always syncs a (re)connecting peer.
+    if (this.host) this.sendState(this.snapshotInstruments(), peerId);
   }
   peerLeft(peerId: string) {
     console.log('peer left', peerId);
+    this.peers = this.peers.filter((p) => p !== peerId);
+  }
+
+  private snapshotInstruments(): InstrumentDataJsonValue[] {
+    return $state.snapshot(this.instrumentsData.instrumentsData) as InstrumentDataJsonValue[];
+  }
+  /**
+   * Send the full instrument list to everyone. Used for structural changes (add / remove / reorder),
+   * where per-instrument updates can't express the change. Last write wins.
+   */
+  private broadcastState() {
+    // not wired yet while the constructor seeds the initial presets
+    this.sendState?.(this.snapshotInstruments());
+  }
+  private findIndexById(id: string): number {
+    return this.instrumentsData.instrumentsData.findIndex((i) => i.id === id);
   }
 
   sendState: ActionSender<InstrumentDataJsonValue[]>;
   sendInstrument: ActionSender<WrappedInstrument>;
+  sendRemove: ActionSender<{ id: string }>;
 
   // deserializeInstrumentData(data: InstrumentDataJsonValue): InstrumentData {
   //   let res: InstrumentData = {...data, parts: data.parts.map(part => {
@@ -251,21 +280,31 @@ export class AppStore {
     const [sendState, onReceiveState] = this.room.makeAction<InstrumentDataJsonValue[]>('state');
     const [sendInstrument, onReceiveInstrument] =
       this.room.makeAction<WrappedInstrument>('instrument');
+    const [sendRemove, onReceiveRemove] = this.room.makeAction<{ id: string }>('remove');
     this.sendState = sendState;
     this.sendInstrument = sendInstrument;
+    this.sendRemove = sendRemove;
+    onReceiveRemove((data) => {
+      const index = data?.id ? this.findIndexById(data.id) : -1;
+      if (index >= 0) this.instrumentsData.instrumentsData.splice(index, 1);
+    });
 
     this.room.onPeerJoin((peerId) => this.peerJoined(peerId));
     this.room.onPeerLeave((peerId) => this.peerLeft(peerId));
 
     onReceiveState((data, peerId) => {
-      if (this.host) return;
       console.log('receiveState', data, peerId);
-      this.instrumentsData.instrumentsData = data;
+      if (!Array.isArray(data)) return;
+      // Applied directly to the state: never go through the setters, which would echo it back.
+      this.instrumentsData.instrumentsData = data.map((i) => ({ ...i, id: i.id ?? newId() }));
     });
     onReceiveInstrument((data, peerId) => {
       console.log('receiveInstrument', data, peerId);
-      // Apply directly to the state: never go through setInstrument, which would echo it back.
-      this.instrumentsData.instrumentsData.splice(data.index, 1, data.instrument);
+      if (!data?.instrument || !data.id) return;
+      const index = this.findIndexById(data.id);
+      const instrument = { ...data.instrument, id: data.id };
+      if (index >= 0) this.instrumentsData.instrumentsData.splice(index, 1, instrument);
+      else this.instrumentsData.instrumentsData.push(instrument);
     });
   }
   private init(host: boolean, roomId: string, room?: Room) {
@@ -288,26 +327,28 @@ export class AppStore {
         //  notes: [1, 2, 3,undefined,4,5,3,undefined]
       )
     );
-    return this.instrumentsData.instrumentsData[this.instrumentsData.instrumentsData.length - 1];
+    const created =
+      this.instrumentsData.instrumentsData[this.instrumentsData.instrumentsData.length - 1];
+    this.sendCreated(created);
+    return created;
   }
   setInstrument(index: number, data: InstrumentData) {
     // console.log('setInstrument', index, data);
     const snapshot = data;
     this.instrumentsData.instrumentsData.splice(index, 1, snapshot);
-    this.sendInstrument({ index, instrument: snapshot });
+    this.sendInstrument({ id: snapshot.id, instrument: snapshot });
   }
   setInstrumentPartial = (index: number, data: Partial<InstrumentData>) => {
     this.instrumentsData.instrumentsData[index] = {
       ...this.instrumentsData.instrumentsData[index],
       ...data
     };
-    this.sendInstrument({
-      index,
-      instrument: $state.snapshot(this.instrumentsData.instrumentsData[index]) as InstrumentData
-    });
+    const updated = $state.snapshot(this.instrumentsData.instrumentsData[index]) as InstrumentData;
+    this.sendInstrument({ id: updated.id, instrument: updated });
   };
   removeInstrument(index: number): any {
-    this.instrumentsData.instrumentsData.splice(index, 1);
+    const removed = this.instrumentsData.instrumentsData.splice(index, 1)[0];
+    if (removed) this.sendRemove({ id: removed.id });
   }
 }
 

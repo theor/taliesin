@@ -35,6 +35,7 @@ export abstract class Instrument {
   abstract createData_(): InstrumentPartData[];
   createData(name?: string): InstrumentData {
     return {
+      id: newId(),
       parts: this.createData_(),
       instrumentName: this.name,
       name: name || this.name,
@@ -77,7 +78,13 @@ export enum TrackState {
   Muted,
   Solo
 }
+/** Stable identity used to address an instrument across peers (array indices shift on add/remove). */
+export function newId(): string {
+  // crypto.randomUUID needs a secure context; fall back for plain-http LAN sessions
+  return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
 export interface InstrumentData {
+  id: string;
   name: string;
   instrumentName: string;
   parts: InstrumentPartData[];
