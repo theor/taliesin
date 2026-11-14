@@ -42,7 +42,6 @@ const config: BaseRoomConfig & RelayConfig = {
 
   // relayUrls: ["wss://192.168.1.82:3334"]
 };
-let room: Room = undefined!;
 
 type WrappedInstrument = {
   index: number;
@@ -133,7 +132,8 @@ export const presets: Preset[] = [
     ]
   }
 ];
-class AppStore {
+export class AppStore {
+  private room: Room = undefined!;
   updatePart<TPart extends InstrumentPartData>(
     instrumentIndex: number,
     partIndex: number,
@@ -241,20 +241,21 @@ class AppStore {
   //     parts: data.parts.map((part, index) => {return {...dataOrReactive.parts[index].serialize(), name: dataOrReactive.parts[index].constructor.name}})
   //   };
   // }
-  isReceiving = false;
+  /**
+   * @param room optional pre-built room (tests inject a fake one); defaults to a real Trystero room.
+   */
+  constructor(host: boolean, roomId: string, room?: Room) {
+    const { room: r } = this.init(host, roomId, room);
+    this.room = r;
 
-  constructor(host: boolean, roomId:string) {
-
-    this.init(host, roomId);
-
-    const [sendState, onReceiveState] = room.makeAction<InstrumentDataJsonValue[]>('state');
-    const [sendInstrument, onReceiveInstrument] = room.makeAction<WrappedInstrument>('instrument');
+    const [sendState, onReceiveState] = this.room.makeAction<InstrumentDataJsonValue[]>('state');
+    const [sendInstrument, onReceiveInstrument] =
+      this.room.makeAction<WrappedInstrument>('instrument');
     this.sendState = sendState;
     this.sendInstrument = sendInstrument;
 
-
-    room.onPeerJoin((peerId) => this.peerJoined(peerId));
-    room.onPeerLeave((peerId) => this.peerLeft(peerId));
+    this.room.onPeerJoin((peerId) => this.peerJoined(peerId));
+    this.room.onPeerLeave((peerId) => this.peerLeft(peerId));
 
     onReceiveState((data, peerId) => {
       if (this.host) return;
@@ -263,26 +264,17 @@ class AppStore {
     });
     onReceiveInstrument((data, peerId) => {
       console.log('receiveInstrument', data, peerId);
-      this.isReceiving = true;
-      try {
-        this.instrumentsData.instrumentsData.splice(data.index, 1, data.instrument);
-      } catch (error) {
-        this.isReceiving = false;
-      }
+      // Apply directly to the state: never go through setInstrument, which would echo it back.
+      this.instrumentsData.instrumentsData.splice(data.index, 1, data.instrument);
     });
   }
-  private init(host: boolean, roomId: string) {
+  private init(host: boolean, roomId: string, room?: Room) {
     this.host = host;
 
-    room = VITEST
-      ? ({
-          makeAction: () => [() => {}, () => {}],
-          onPeerJoin: () => {},
-          onPeerLeave: () => {}
-        } as any as Room)
-      : joinRoom(config, roomId);
+    const r = room ?? joinRoom(config, roomId);
 
     if (this.instrumentsData.instrumentsData.length === 0) this.preset();
+    return { room: r };
   }
   preset() {
     this.createInstrumentPreset(this.getPreset('Piano')!);
@@ -302,15 +294,17 @@ class AppStore {
     // console.log('setInstrument', index, data);
     const snapshot = data;
     this.instrumentsData.instrumentsData.splice(index, 1, snapshot);
-    if (!this.isReceiving) this.sendInstrument({ index, instrument: snapshot });
+    this.sendInstrument({ index, instrument: snapshot });
   }
-  // TODO send
   setInstrumentPartial = (index: number, data: Partial<InstrumentData>) => {
     this.instrumentsData.instrumentsData[index] = {
       ...this.instrumentsData.instrumentsData[index],
       ...data
     };
-    console.log('setInstrumentPartial', index, data, $state.snapshot(this.instrumentsData));
+    this.sendInstrument({
+      index,
+      instrument: $state.snapshot(this.instrumentsData.instrumentsData[index]) as InstrumentData
+    });
   };
   removeInstrument(index: number): any {
     this.instrumentsData.instrumentsData.splice(index, 1);
