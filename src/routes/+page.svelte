@@ -110,16 +110,6 @@
     drawerState = false;
   }
 
-  onMount(() => {
-    const touchHandler = (ev: TouchEvent) => {
-      ev.preventDefault(); // Prevent text selection
-    };
-    document.addEventListener('touchstart', touchHandler, { passive: false });
-    document.addEventListener('touchmove', touchHandler, { passive: false });
-    document.addEventListener('touchend', touchHandler, { passive: false });
-    document.addEventListener('touchcancel', touchHandler, { passive: false });
-  });
-
   // Playhead: exact on the host, extrapolated from the host's messages on clients.
   let position = $state(0);
   onMount(() => {

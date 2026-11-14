@@ -362,6 +362,24 @@ describe('acoustic calibration (real Web Audio)', () => {
   });
 });
 
+describe('on a phone (touch input)', () => {
+  test('the menu drawer opens with a tap', async () => {
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true
+    });
+    contexts.push(context);
+    const page = await context.newPage();
+    await page.goto(`${APP_URL}/?host&room=${newRoom()}&relay=${encodeURIComponent(RELAY_URL)}&debug`);
+    await page.waitForFunction(() => (window as any).__store);
+    const menuItems = page.locator('[title="Mixer"]:visible');
+    expect(await menuItems.count()).toBe(0); // the desktop sidebar is hidden at this width
+    await page.locator('[class~="md:hidden"] button').first().tap();
+    await expect.poll(() => menuItems.count(), { timeout: 5000 }).toBeGreaterThan(0);
+  });
+});
+
 // --- real pointer input on the sequencer, through the command layer -------------------------------------
 const cellBox = async (p: Page, step: number, track: number) => {
   const cell = p.locator(`[data-x="${step}"][data-y="${track}"]`);
