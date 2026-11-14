@@ -33,6 +33,12 @@ export async function handle(
   };
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   if (!ok) return new Response('forbidden', { status: 403, headers: cors });
+  if (!env.TURN_KEY_ID || !env.TURN_API_TOKEN) {
+    return new Response('not configured: set the TURN_KEY_ID and TURN_API_TOKEN secrets', {
+      status: 500,
+      headers: cors
+    });
+  }
 
   const res = await fetchImpl(
     `https://rtc.live.cloudflare.com/v1/turn/keys/${env.TURN_KEY_ID}/credentials/generate-ice-servers`,
@@ -45,7 +51,8 @@ export async function handle(
       body: JSON.stringify({ ttl: TTL_SECONDS })
     }
   );
-  if (!res.ok) return new Response('upstream error', { status: 502, headers: cors });
+  // Cloudflare's status (401 = wrong token, 404 = wrong key id) says what to fix; it carries no secret
+  if (!res.ok) return new Response(`upstream error (${res.status})`, { status: 502, headers: cors });
   const { iceServers } = (await res.json()) as { iceServers?: unknown };
   return new Response(JSON.stringify({ iceServers: iceServers ?? [] }), {
     headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
