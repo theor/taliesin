@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { store, Instrument, type IInstrumentViewProps } from '$lib';
+  import { Instrument, type IDispatchingInstrumentViewProps } from '$lib';
+  import { commitStroke, previewStroke, strideOf, type Cell } from '$lib/gesture';
   import { getInstrument } from '$lib/Store.svelte';
   import {
     ArrowLeftIcon,
@@ -17,7 +18,8 @@
 
   import AppTooltip from '../components/AppTooltip.svelte';
 
-  const { index, instrumentData = $bindable() }: IInstrumentViewProps = $props();
+  // The view only reads state and dispatches commands; it never mutates instrument data itself.
+  const { instrumentData = $bindable(), dispatch }: IDispatchingInstrumentViewProps = $props();
   const instr: Instrument | undefined = getInstrument(instrumentData);
   const seq = instr?.sequencer!;
 
@@ -31,72 +33,47 @@
   let progress = writable(0); //derived(instr?.progress(instrumentData)!, (x:number) => Number.isNaN(x) ? 0 : x!*100)!;
 
   let panWillTurnOn: boolean | undefined = $state(undefined);
-  let lastCell = [-1, -1];
-  let startX = [-1, -1];
+  let start: Cell | undefined; // where the current stroke began
+  let last: Cell | undefined; // where the pointer is now
   let stride = $state(1);
-  let modifiedSteps = new SvelteMap<number, number>();
-  // console.log('modifiedSteps', modifiedSteps, modifiedSteps.get(1001));
+  let modifiedSteps = new SvelteMap<number, number>(); // live preview of the stroke, not yet committed
+
   function onPointer(e: PointerEvent) {
-    // e.preventDefault();
-
-    stride = 1 + Math.abs(lastCell[1] - startX[1]);
     if (e.type === 'pointerup') {
-      console.log('pointerup reset turn on', e);
-
       modifiedSteps.clear();
       panWillTurnOn = undefined;
-      for (
-        let ix = Math.min(startX[0], lastCell[0]);
-        ix <= Math.max(startX[0], lastCell[0]);
-        ix++
-      ) {
-        const isOnlyCell = lastCell[0] === startX[0];
-        let isOn =
-          isOnlyCell
-            ? !seq.getCell(instrumentData, startX[1], ix)
-            : Math.abs(ix - startX[0]) % stride === 0;
-        if(isOn|| eraseEmpty ||isOnlyCell) 
-          seq.setCell(instrumentData, startX[1], ix, isOn);
-        store.setInstrument(index, instrumentData);
+      if (start && last) {
+        const from = start;
+        const { track, cells } = commitStroke({
+          start,
+          last,
+          eraseEmpty,
+          isOn: (step) => seq.getCell(instrumentData, from.track, step)
+        });
+        if (cells.length) dispatch({ type: 'setCells', instrumentId: instrumentData.id, track, cells });
       }
       stride = 1;
-      lastCell = [-1, -1];
-      startX = [-1, -1];
+      start = last = undefined;
       return;
     }
 
     const elt = document.elementFromPoint(e.x, e.y);
-    if (!elt || !elt.hasAttribute('data-x')) {
-      return;
-    }
+    if (!elt || !elt.hasAttribute('data-x')) return;
+    const cell: Cell = { step: Number(elt.getAttribute('data-x')), track: Number(elt.getAttribute('data-y')) };
+    if (isNaN(cell.step) || isNaN(cell.track)) return;
 
-    const [x, y] = [Number(elt.getAttribute('data-x')), Number(elt.getAttribute('data-y'))];
-    lastCell[1] = y;
+    if (last) last = { step: last.step, track: cell.track }; // the row can change within a column
+    if (start) stride = strideOf(start, last ?? cell);
+    if (last && cell.step === last.step) return;
 
-    if (x === lastCell[0]) {
-      return;
-    }
-    if (startX[0] === -1) {
-      startX = [x, y];
-    }
-    lastCell[0] = x;
-    console.log(e.type, x, y);
-
-    if (isNaN(x) || isNaN(y)) {
-      return;
-    }
-
-    if (panWillTurnOn === undefined) {
-      panWillTurnOn = true;
-    }
+    start ??= cell;
+    last = cell;
+    panWillTurnOn ??= true;
+    stride = strideOf(start, cell);
     modifiedSteps.clear();
-    for (let ix = Math.min(startX[0], x); ix <= Math.max(startX[0], x); ix++) {
-      let isOn = (ix - startX[0]) % stride === 0;
-      // console.log(ix, startX[1], isOn);
-      if(isOn|| eraseEmpty)
-      modifiedSteps.set(ix + 1000 * startX[1], ix - startX[0]);
+    for (const p of previewStroke(start, cell, eraseEmpty)) {
+      modifiedSteps.set(p.step + 1000 * start.track, p.offset);
     }
-    store.setInstrument(index, instrumentData);
   }
 
   let page = $state(1);

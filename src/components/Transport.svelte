@@ -1,25 +1,26 @@
 <script lang="ts">
   import { Play, Square, Ban } from '@lucide/svelte';
-  import { store } from '$lib';
-  import { onMount } from 'svelte';
+  import type { Dispatch } from '$lib/commands';
 
-  // The host reads the real scheduler; clients get an extrapolated position from the host's messages.
-  let position = $state(0);
-  onMount(() => {
-    const id = setInterval(() => (position = store.transport.position()), 100);
-    return () => clearInterval(id);
-  });
+  // Pure view: state comes in as props, intent goes out as commands.
+  let { playing, position, dispatch }: { playing: boolean; position: number; dispatch: Dispatch } =
+    $props();
 </script>
 
 <div>
-  <button onclick={() => store.transport.toggle()}>
-    {#if store.transport.playing}
+  <button
+    aria-label={playing ? 'Pause' : 'Play'}
+    onclick={() => dispatch({ type: 'transport', action: 'toggle' })}
+  >
+    {#if playing}
       <Square size={20} />
     {:else}
       <Play size={20} />
     {/if}
   </button>
   <!-- stop -->
-  <button onclick={() => store.transport.stop()}><Ban size={20} /></button>
+  <button aria-label="Stop" onclick={() => dispatch({ type: 'transport', action: 'stop' })}
+    ><Ban size={20} /></button
+  >
   <span>{position.toFixed(2)}</span>
 </div>

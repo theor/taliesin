@@ -86,6 +86,6 @@
       onclick={() => store.removeInstrument(index)}><X size="16" /></button
     >
   {:else}
-    <PianoScaleView bind:instrumentData {index} />
+    <PianoScaleView bind:instrumentData {index} dispatch={store.dispatch} />
   {/if}
 </div>

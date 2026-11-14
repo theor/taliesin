@@ -58,7 +58,9 @@ async function pair() {
   const host = await open('host', room);
   const client = await open('join', room);
   await connected(host, client);
-  await expect.poll(async () => (await instruments(client)).length).toBe((await instruments(host)).length);
+  // wait for the host's state itself: the client already has its own, differently-id'd, presets
+  const ids = async (p: Page) => (await instruments(p)).map((i: any) => i.id);
+  await expect.poll(() => ids(client)).toEqual(await ids(host));
   return { room, host, client };
 }
 
@@ -132,5 +134,57 @@ describe('transport (real transport)', () => {
     const p1 = await position(client);
     await client.waitForTimeout(1500);
     expect(await position(client)).toBeGreaterThan(p1);
+  });
+});
+
+// --- real pointer input on the sequencer, through the command layer -------------------------------------
+const cellBox = async (p: Page, step: number, track: number) => {
+  const cell = p.locator(`[data-x="${step}"][data-y="${track}"]`);
+  await cell.scrollIntoViewIfNeeded(); // raw mouse coordinates must be on screen
+  const box = await cell.boundingBox();
+  if (!box) throw new Error(`cell ${step},${track} not visible`);
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+};
+const pianoNotes = (p: Page) =>
+  p.evaluate(() => {
+    const inst = (window as any).__store.instrumentsData.instrumentsData[0];
+    const part = inst.parts.find((x: any) => x.partName === 'MonoSequence');
+    return JSON.parse(JSON.stringify(part.notes)) as (number | null)[];
+  });
+const cellClass = (p: Page, step: number, track: number) =>
+  p.locator(`[data-x="${step}"][data-y="${track}"] > span`).getAttribute('class');
+
+describe('sequencer gestures (real pointer, real network)', () => {
+  test('a tap on the client sets the note on the host, and the host re-renders the cell', async () => {
+    const { host, client } = await pair();
+    // precondition, so the test cannot pass vacuously: step 2 holds note 3, and track 6 is off there
+    expect((await pianoNotes(host))[2]).toBe(3);
+    expect(await cellClass(host, 2, 6)).toContain('preset-outlined');
+
+    const at = await cellBox(client, 2, 6);
+    await client.mouse.move(at.x, at.y);
+    await client.mouse.down();
+    await client.mouse.up();
+
+    await expect.poll(async () => (await pianoNotes(host))[2], { timeout: 20_000 }).toBe(6);
+    expect((await pianoNotes(client))[2]).toBe(6);
+    // the cell lit up on both screens, not just in the data
+    await expect.poll(() => cellClass(host, 2, 6)).toContain('preset-filled');
+    expect(await cellClass(client, 2, 6)).toContain('preset-filled');
+  });
+
+  test('dragging along a row on the host reaches the client as one stroke', async () => {
+    const { host, client } = await pair();
+    expect((await pianoNotes(client)).slice(0, 4)).toEqual([1, 2, 3, null]); // precondition
+    const from = await cellBox(host, 0, 5);
+    const to = await cellBox(host, 3, 5);
+    await host.mouse.move(from.x, from.y);
+    await host.mouse.down();
+    await host.mouse.move(to.x, to.y, { steps: 6 });
+    await host.mouse.up();
+
+    await expect
+      .poll(async () => (await pianoNotes(client)).slice(0, 4), { timeout: 20_000 })
+      .toEqual([5, 5, 5, 5]);
   });
 });

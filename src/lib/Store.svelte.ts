@@ -29,6 +29,12 @@ import {
 } from './parts.svelte';
 import { VITEST, strudel } from './strudel';
 import { Transport, type PlayerLike } from './transport.svelte';
+import {
+  applyInstrumentCommand,
+  isInstrumentCommand,
+  type Command,
+  type InstrumentCommand
+} from './commands';
 
 export const mixerIndex = -1;
 
@@ -49,6 +55,9 @@ type WrappedInstrument = {
   id: string;
   instrument: InstrumentDataJsonValue;
 };
+
+/** `ordered`: sent by the host, which is the single sequencer of instrument commands. */
+type WireCommand = { cmd: Command; ordered: boolean };
 
 type Preset = {
   name: string;
@@ -249,6 +258,32 @@ export class AppStore {
   sendState: ActionSender<InstrumentDataJsonValue[]>;
   sendInstrument: ActionSender<WrappedInstrument>;
   sendRemove: ActionSender<{ id: string }>;
+  sendCommand: ActionSender<WireCommand>;
+
+  /** Every command applied here, in order: a recording that can be replayed through `dispatch`. */
+  commandLog: { cmd: Command; origin: 'local' | 'remote' }[] = [];
+
+  /**
+   * The single entry point for UI intent. Instrument commands are applied locally right away (the UI
+   * feels instant) and sent to the host, which orders them; transport commands are routed to the transport.
+   */
+  dispatch = (cmd: Command) => {
+    this.commandLog.push({ cmd, origin: 'local' });
+    if (cmd.type === 'transport') {
+      if (cmd.action === 'toggle') void this.transport.toggle();
+      else this.transport.stop();
+      return;
+    }
+    if (!this.applyCommand(cmd)) return;
+    this.sendCommand({ cmd, ordered: this.host });
+  };
+  private applyCommand(cmd: InstrumentCommand): boolean {
+    return applyInstrumentCommand(
+      this.instrumentsData.instrumentsData,
+      cmd,
+      (data) => getInstrument(data)?.sequencer
+    );
+  }
 
   // deserializeInstrumentData(data: InstrumentDataJsonValue): InstrumentData {
   //   let res: InstrumentData = {...data, parts: data.parts.map(part => {
@@ -287,6 +322,18 @@ export class AppStore {
     const [sendInstrument, onReceiveInstrument] =
       this.room.makeAction<WrappedInstrument>('instrument');
     const [sendRemove, onReceiveRemove] = this.room.makeAction<{ id: string }>('remove');
+    const [sendCommand, onReceiveCommand] = this.room.makeAction<WireCommand>('cmd');
+    this.sendCommand = sendCommand;
+    // Host: takes unordered commands from clients, applies them and rebroadcasts them in the order it
+    // received them (including back to the sender). Clients: only take the host's ordered stream, so a
+    // peer-to-peer copy of someone else's command can never race the host's ordering.
+    onReceiveCommand((msg) => {
+      if (!isInstrumentCommand(msg?.cmd)) return;
+      if (this.host ? msg.ordered : !msg.ordered) return;
+      if (!this.applyCommand(msg.cmd)) return;
+      this.commandLog.push({ cmd: msg.cmd, origin: 'remote' });
+      if (this.host) this.sendCommand({ cmd: msg.cmd, ordered: true });
+    });
     this.sendState = sendState;
     this.sendInstrument = sendInstrument;
     this.sendRemove = sendRemove;

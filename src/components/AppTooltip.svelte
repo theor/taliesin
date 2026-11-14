@@ -19,6 +19,7 @@
   {pos}
   open={true}
   positioning={{ placement: 'top' }}
+  triggerClasses="pointer-events-none"
   positionerClasses="pointer-events-none select-none touch-none"
   contentBase="card bg-surface-200-800/70 p-4 space-y-4 max-w-[320px]"
 >

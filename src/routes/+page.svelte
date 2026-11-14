@@ -50,10 +50,10 @@
         drawerState = !drawerState;
         break;
       case 'Space':
-        store.transport.toggle();
+        store.dispatch({ type: 'transport', action: 'toggle' });
         break;
       case 'Escape':
-        store.transport.stop();
+        store.dispatch({ type: 'transport', action: 'stop' });
         break;
       case 'KeyA':
         store.preset();
@@ -101,6 +101,13 @@
     document.addEventListener('touchend', touchHandler, { passive: false });
     document.addEventListener('touchcancel', touchHandler, { passive: false });
   });
+
+  // Playhead: exact on the host, extrapolated from the host's messages on clients.
+  let position = $state(0);
+  onMount(() => {
+    const id = setInterval(() => (position = store.transport.position()), 100);
+    return () => clearInterval(id);
+  });
 </script>
 
 <AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block" toolbarClasses="">
@@ -110,7 +117,7 @@
   {/snippet}
   {#snippet trail()}
     <div class="hidden space-x-4 sm:flex">
-      <Transport />
+      <Transport playing={store.transport.playing} {position} dispatch={store.dispatch} />
     </div>
     <div class="block md:hidden">
       <Modal

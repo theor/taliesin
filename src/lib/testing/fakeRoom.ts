@@ -24,6 +24,12 @@ export interface FakeNetwork {
   settle(): void;
   /** In queued mode, deliver all pending messages (including ones queued while flushing). */
   flush(): void;
+  /**
+   * Queued mode: deliver pending messages in a random interleaving across links, but in order within each
+   * link (sender -> receiver), like an ordered WebRTC data channel. `max` caps how many are delivered, so
+   * a test can interleave sending and partial delivery. Messages sent while delivering are included.
+   */
+  flushRandom(rand: () => number, max?: number): void;
   /** Pending message count (queued mode). */
   readonly pending: number;
   /** All messages ever sent, for assertions. */
@@ -40,14 +46,14 @@ export function createFakeNetwork(opts: { queued?: boolean } = {}): FakeNetwork 
   const peers = new Map<string, FakePeer>();
   const announce: string[] = [];
   const connected = new Set<string>();
-  const queue: (() => void)[] = [];
+  const queue: { link: string; fn: () => void }[] = [];
   const log: FakeNetwork['log'] = [];
   const queued = opts.queued ?? false;
 
   const oneWay = (from: string, to: string) =>
     (peers.get(from)?.latencyMs ?? 0) + (peers.get(to)?.latencyMs ?? 0);
-  const deliver = (fn: () => void, delayMs: number) => {
-    if (queued) queue.push(fn);
+  const deliver = (fn: () => void, delayMs: number, link: string) => {
+    if (queued) queue.push({ link, fn });
     else if (delayMs > 0) setTimeout(fn, delayMs);
     else fn();
   };
@@ -79,7 +85,7 @@ export function createFakeNetwork(opts: { queued?: boolean } = {}): FakeNetwork 
             deliver(() => {
               const peer = peers.get(t);
               peer?.handlers.get(name)?.forEach((h) => h(wire && JSON.parse(wire), peerId));
-            }, oneWay(peerId, t));
+            }, oneWay(peerId, t), `${peerId}>${t}`);
           }
         };
         const receive = (h: Handler) => {
@@ -126,7 +132,15 @@ export function createFakeNetwork(opts: { queued?: boolean } = {}): FakeNetwork 
       }
     },
     flush() {
-      while (queue.length) queue.shift()!();
+      while (queue.length) queue.shift()!.fn();
+    },
+    flushRandom(rand, max = Infinity) {
+      for (let delivered = 0; queue.length && delivered < max; delivered++) {
+        const links = [...new Set(queue.map((q) => q.link))];
+        const link = links[Math.floor(rand() * links.length)];
+        const at = queue.findIndex((q) => q.link === link); // oldest message on that link
+        queue.splice(at, 1)[0].fn();
+      }
     },
     get pending() {
       return queue.length;
