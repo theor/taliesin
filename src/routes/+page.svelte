@@ -34,6 +34,7 @@
   }
   console.error('params', params, isJoin, isHost, room);
 
+  if (isDebug && typeof window !== 'undefined') installRtcDebug(); // before the room is joined
   const relay = params.get('relay');
   initStore(isHost, room!, {
     relayUrls: relay ? [relay] : undefined,
@@ -99,6 +100,7 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { getRelaySockets } from 'trystero/nostr';
+  import { installRtcDebug, rtcSummary } from '$lib/rtcDebug';
   import { WebAcoustics } from '$lib/calibration/webAcoustics';
   import { findChirp, makeChirp } from '$lib/calibration/dsp';
   const calibration = store.calibration;
@@ -118,10 +120,12 @@
 
   // `?debug` on a phone: are the signalling relays reachable?
   let relays = $state('');
+  let rtcLines = $state<string[]>([]);
   onMount(() => {
     if (!isDebug) return;
     const id = setInterval(() => {
       const sockets = Object.entries(getRelaySockets());
+      rtcLines = rtcSummary();
       relays = `relays ${sockets.filter(([, s]) => s.readyState === 1).length}/${sockets.length} open`;
     }, 1000);
     return () => clearInterval(id);
@@ -197,8 +201,9 @@
   <div class="flex flex-1 flex-col gap-4 p-4">
     {#if isDebug}
       <p class="text-sm" data-testid="net-debug">
-        {relays} · peers {store.peers.length} · secure context {String(window.isSecureContext)}
+        {relays} · peers {store.peers.length} · secure context {String(window.isSecureContext)} · turn servers {data.iceServers.length}
       </p>
+      {#each rtcLines as line}<p class="text-xs" data-testid="rtc-debug">{line}</p>{/each}
       <div
         class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden flex-col space-y-5 p-5 lg:flex"
       >
