@@ -114,6 +114,11 @@ ${code}`,
     await this.initPromise;
     await getAudioContext().resume();
   }
+  /** The page's AudioContext (the one the song plays through). */
+  audioContext(): AudioContext {
+    if (!this.repls) throw new Error('audio is not initialised yet');
+    return getAudioContext();
+  }
   /** Audio output delay in seconds (speakers vs bluetooth differ a lot). */
   get outputLatency(): number {
     try {
@@ -208,6 +213,9 @@ export const strudel = VITEST
       start: async () => {},
       shift: () => {},
       unlockAudio: async () => {},
+      audioContext: () => {
+        throw new Error('no audio under test');
+      },
       evaluate: async () => {},
       stop() {
         (this as any).isPlaying.set(false);

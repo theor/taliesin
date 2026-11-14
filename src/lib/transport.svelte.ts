@@ -141,11 +141,30 @@ export class Transport {
     }
   }
 
+  /**
+   * Client: measured offset (seconds) of how much later than the host this device sounds, from an acoustic
+   * calibration. It replaces the browser's reported output latency, which is often missing or wrong.
+   */
+  offset = $state<number | undefined>(undefined);
+
   /** Where the local scheduler should be: the host's position, shifted by the output-latency difference. */
   private target(): number | undefined {
     const last = this.last;
     if (!last?.playing) return undefined;
-    return this.position() + (this.player.outputLatency - (last.out ?? 0)) * last.cps;
+    const shift = this.offset ?? this.player.outputLatency - (last.out ?? 0);
+    return this.position() + shift * last.cps;
+  }
+
+  /** Client: apply (or with undefined, drop) a measured offset, correcting playback right away. */
+  setOffset(seconds: number | undefined) {
+    this.offset = seconds;
+    this.correct(0);
+  }
+
+  /** Client: re-measure the network delay to the host (smallest of the recent round trips), in seconds. */
+  async refreshLatency(hostPeerId: string): Promise<number> {
+    for (let i = 0; i < 3; i++) await this.measureLatency(hostPeerId);
+    return this.latencyMs / 1000;
   }
 
   /**

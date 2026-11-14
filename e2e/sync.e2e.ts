@@ -10,7 +10,10 @@ beforeAll(async () => {
   browser = await chromium.launch({
     args: [
       '--disable-features=WebRtcHideLocalIpsWithMdns',
-      '--autoplay-policy=no-user-gesture-required'
+      '--autoplay-policy=no-user-gesture-required',
+      // a fake microphone (it hears beeps, not the other page), and no permission prompt
+      '--use-fake-device-for-media-stream',
+      '--use-fake-ui-for-media-stream'
     ]
   });
 });
@@ -315,6 +318,47 @@ describe('synchronised playback (real audio engine)', () => {
     await host.evaluate(() => (window as any).__store.transport.stop());
     await expect.poll(async () => (await sample(client)).started, { timeout: 20_000 }).toBe(false);
     expect((await sample(late)).started).toBe(false);
+  });
+});
+
+describe('acoustic calibration (real Web Audio)', () => {
+  test('a probe played through the real audio graph is recorded by the real worklet, and found', async () => {
+    const { host } = await pair();
+    const result = await host.evaluate(async () => {
+      const w = window as any;
+      const ctx: AudioContext = w.__strudel.audioContext();
+      await ctx.resume();
+      // loop the speaker output back into the "microphone"
+      const loop = ctx.createMediaStreamDestination();
+      const ac = new w.__acoustics.WebAcoustics(ctx, {
+        output: loop,
+        getStream: async () => loop.stream
+      });
+      const rec = await ac.record();
+      await new Promise((r) => setTimeout(r, 300)); // let the capture settle
+      const t0 = ac.now();
+      ac.play('up');
+      await new Promise((r) => setTimeout(r, 700));
+      const { samples, start } = rec.stop();
+      const found = w.__acoustics.findChirp(samples, w.__acoustics.makeChirp(ctx.sampleRate, 'up'));
+      return found && { delay: start + found.index / ctx.sampleRate - t0, score: found.score };
+    });
+    expect(result).toBeTruthy();
+    expect(result!.score).toBeGreaterThan(0.5);
+    // one trip through the audio graph: a few render quanta, nowhere near a second
+    expect(result!.delay).toBeGreaterThanOrEqual(0);
+    expect(result!.delay).toBeLessThan(0.25);
+  });
+
+  test('the Calibrate button runs the whole protocol; a microphone that hears nothing is reported, not applied', async () => {
+    const { host, client } = await pair();
+    await host.getByRole('button', { name: 'Calibrate' }).click();
+    const note = () => host.getByTestId('calibration-note').textContent({ timeout: 1000 });
+    await expect.poll(note, { timeout: 10_000 }).toContain('Listening');
+    await expect.poll(note, { timeout: 30_000 }).toContain('could not hear');
+    expect(
+      await client.evaluate(() => (window as any).__store.transport.offset as number | undefined)
+    ).toBeUndefined();
   });
 });
 
