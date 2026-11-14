@@ -47,10 +47,10 @@
         drawerState = !drawerState;
         break;
       case 'Space':
-        strudel.toggle();
+        store.transport.toggle();
         break;
       case 'Escape':
-        strudel.stop();
+        store.transport.stop();
         break;
       case 'KeyA':
         store.preset();
