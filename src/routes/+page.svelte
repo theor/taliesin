@@ -30,7 +30,10 @@
   }
   console.error('params', params, isJoin, isHost, room);
 
-  initStore(isHost, room!);
+  const relay = params.get('relay');
+  initStore(isHost, room!, { relayUrls: relay ? [relay] : undefined });
+  // `?debug` exposes the store so e2e tests (and the console) can inspect and drive it
+  if (isDebug && typeof window !== 'undefined') (window as any).__store = store;
   setGlobalContext({
     host: isHost,
     debug: isDebug,

@@ -1,6 +1,6 @@
 import { initStrudel  } from '@strudel/web';
 // import { webaudioRepl,  initAudioOnFirstClick } from '@strudel/webaudio';
-import { writable, type Writable } from 'svelte/store';
+import { get, writable, type Writable } from 'svelte/store';
 
 // initStrudel({
 //     prebake: () => samples('github:tidalcycles/dirt-samples'),
@@ -62,6 +62,8 @@ class StrudelWrapper {
     await this.initPromise;
     // console.log(
     // console.log('Strudel evaluate!', this.repls);
+    // Strudel's evaluate() starts playback by default. Only (re)start when we are meant to be playing,
+    // otherwise loading the page or editing while stopped would play audio while the UI says "stopped".
     await this.repls.evaluate(`samples('github:tidalcycles/dirt-samples')
 const asChords = register("asChords", function(triads, pat) {
   return pat.fmap( x=> {
@@ -71,7 +73,7 @@ const asChords = register("asChords", function(triads, pat) {
   })
 });
 Pattern.prototype.asChords = function(...args)  { return asChords(...args,this);  }
-${code}`);
+${code}`, get(this.isPlaying));
 
     // console.log('Strudel evaluate!', this.repls.state.code);
     // return repls.evaluate(`${code}`)

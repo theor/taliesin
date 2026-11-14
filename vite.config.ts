@@ -19,7 +19,8 @@ export default defineConfig({
 			}
 		: undefined,
 	plugins: [
-		mkcert(),
+		// the e2e run serves plain http so pages can talk to a local ws:// relay without mixed-content issues
+		process.env.E2E ? null : mkcert(),
 		tailwindcss(),
 		sveltekit()
 	],

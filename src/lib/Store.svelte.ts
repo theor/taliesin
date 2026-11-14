@@ -359,12 +359,14 @@ export class AppStore {
 }
 
 export let store: AppStore = undefined!;
-export function initStore(host: boolean, roomId: string) {
+/** @param opts.relayUrls override the Nostr signalling relays (e2e tests point this at a local relay). */
+export function initStore(host: boolean, roomId: string, opts: { relayUrls?: string[] } = {}) {
   if (store) {
     console.warn('Store already initialized');
     return store;
   }
-  store = new AppStore(host, roomId);
+  const room = opts.relayUrls ? joinRoom({ ...config, relayUrls: opts.relayUrls }, roomId) : undefined;
+  store = new AppStore(host, roomId, room);
 }
 const instrumentMap: { [key: string]: Instrument } = {
   PianoScale: new PianoScale(),
