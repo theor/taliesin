@@ -64,40 +64,119 @@ async function pair() {
   return { room, host, client };
 }
 
-describe('instrument sync (real transport)', () => {
-  test('an edit made on the client reaches the host, and the other way round', async () => {
+// The page's own controls, driven like a user would. (Remove / randomize live in the "Effects" view.)
+const showEffects = (p: Page) =>
+  p.locator('header.instrument-header [data-testid="switch-control"]').click();
+const instrumentVolume = (p: Page, index: number) =>
+  p.evaluate((i) => (window as any).__store.instrumentsData.instrumentsData[i].volume as number, index);
+const masterVolume = (p: Page) =>
+  p.evaluate(() => (window as any).__store.instrumentsData.volume as number);
+const partField = (p: Page, partName: string, field: string) =>
+  p.evaluate(
+    ([name, f]) => {
+      const part = (window as any).__store.instrumentsData.instrumentsData[0].parts.find(
+        (x: any) => x.partName === name
+      );
+      return JSON.parse(JSON.stringify(part[f]));
+    },
+    [partName, field]
+  );
+/** Type a value into a tweakpane control's number field, as a user would. */
+async function setControl(p: Page, label: string, value: string) {
+  const input = p.locator(`.tp-lblv:has(.tp-lblv_l:text-is("${label}")) input.tp-txtv_i`).first();
+  await input.fill(value);
+  await input.press('Enter');
+}
+
+describe('instrument sync (real transport, real controls)', () => {
+  test('a rename dispatched on the client reaches the host, and the other way round', async () => {
     const { host, client } = await pair();
+    const rename = (p: Page, index: number, name: string) =>
+      p.evaluate(
+        ([i, n]) => {
+          const s = (window as any).__store;
+          s.dispatch({
+            type: 'setInstrumentFields',
+            instrumentId: s.instrumentsData.instrumentsData[i as number].id,
+            fields: { name: n }
+          });
+        },
+        [index, name]
+      );
 
-    await client.evaluate(() => {
-      const s = (window as any).__store;
-      const i = JSON.parse(JSON.stringify(s.instrumentsData.instrumentsData[0]));
-      i.name = 'from-client';
-      s.setInstrument(0, i);
-    });
+    await rename(client, 0, 'from-client');
     await expect.poll(async () => (await instruments(host))[0].name).toBe('from-client');
-
-    await host.evaluate(() => {
-      const s = (window as any).__store;
-      const i = JSON.parse(JSON.stringify(s.instrumentsData.instrumentsData[1]));
-      i.name = 'from-host';
-      s.setInstrument(1, i);
-    });
+    await rename(host, 1, 'from-host');
     await expect.poll(async () => (await instruments(client))[1].name).toBe('from-host');
   });
 
-  test('add and remove from the client propagate to the host', async () => {
+  test('the remove button on the client removes the instrument on the host', async () => {
     const { host, client } = await pair();
     const before = (await instruments(host)).length;
     const removedId = (await instruments(client))[0].id;
 
-    await client.evaluate(() => (window as any).__store.removeInstrument(0));
+    await showEffects(client);
+    await client.getByRole('button', { name: 'Remove instrument' }).click();
+
     await expect.poll(async () => (await instruments(host)).length).toBe(before - 1);
     expect((await instruments(host)).some((i: any) => i.id === removedId)).toBe(false);
+    expect((await instruments(client)).some((i: any) => i.id === removedId)).toBe(false);
+  });
 
-    await client.evaluate(() =>
-      (window as any).__store.createInstrumentPreset((window as any).__store.getPreset('Drum'))
+  test('adding a Drum from the Add menu shows up on the other peer, at the end', async () => {
+    const { host, client } = await pair();
+    const before = (await instruments(host)).length;
+
+    await client.locator('[title="Add"]:visible').click();
+    // the modal's slide-in transition never settles under headless Chromium, so coordinate-based clicks
+    // miss it; dispatching the click event still runs the real handler
+    await client.getByRole('button', { name: 'Drum' }).dispatchEvent('click');
+
+    await expect.poll(async () => (await instruments(host)).length).toBe(before + 1);
+    const last = (await instruments(host)).at(-1);
+    expect(last.instrumentName).toBe('Drum');
+    expect((await instruments(client)).at(-1).id).toBe(last.id);
+  });
+
+  test('moving an effects slider on the client changes the part on the host', async () => {
+    const { host, client } = await pair();
+    expect(await partField(host, 'PartEffects', 'reverb')).toBe(0.2); // precondition
+
+    await showEffects(client);
+    await setControl(client, 'Reverb', '0.7');
+
+    // tweakpane snaps to its step (0.05), which leaves float noise like 0.7000000000000001
+    await expect.poll(() => partField(host, 'PartEffects', 'reverb'), { timeout: 20_000 }).toBeCloseTo(0.7, 5);
+    expect(await partField(client, 'PartEffects', 'reverb')).toBeCloseTo(0.7, 5);
+  });
+
+  test('the dice button gives both peers the same random notes', async () => {
+    const { host, client } = await pair();
+    const initial = await partField(host, 'MonoSequence', 'notes');
+
+    await showEffects(client);
+    await client.getByRole('button', { name: 'Randomize' }).click();
+
+    await expect
+      .poll(async () => JSON.stringify(await partField(host, 'MonoSequence', 'notes')), { timeout: 20_000 })
+      .not.toBe(JSON.stringify(initial));
+    expect(await partField(host, 'MonoSequence', 'notes')).toEqual(
+      await partField(client, 'MonoSequence', 'notes')
     );
-    await expect.poll(async () => (await instruments(host)).length).toBe(before);
+  });
+
+  test('the Mixer sliders reach the other peer', async () => {
+    const { host, client } = await pair();
+    expect(await masterVolume(host)).toBe(0.8); // precondition
+    expect(await instrumentVolume(host, 0)).toBe(1);
+
+    await client.locator('[title="Mixer"]:visible').click();
+    await setControl(client, 'Master Volume', '0.3');
+    await setControl(client, 'Volume', '0.4'); // the first instrument's
+
+    // tweakpane rounds to its step, so compare with a tolerance
+    await expect.poll(() => masterVolume(host), { timeout: 20_000 }).toBeCloseTo(0.3, 5);
+    await expect.poll(() => instrumentVolume(host, 0), { timeout: 20_000 }).toBeCloseTo(0.4, 5);
   });
 });
 

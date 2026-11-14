@@ -29,12 +29,7 @@ import {
 } from './parts.svelte';
 import { VITEST, strudel } from './strudel';
 import { Transport, type PlayerLike } from './transport.svelte';
-import {
-  applyInstrumentCommand,
-  isInstrumentCommand,
-  type Command,
-  type InstrumentCommand
-} from './commands';
+import { applySongCommand, isSongCommand, type Command, type SongCommand } from './commands';
 
 export const mixerIndex = -1;
 
@@ -49,11 +44,6 @@ const config: BaseRoomConfig & RelayConfig = {
   // ]
 
   // relayUrls: ["wss://192.168.1.82:3334"]
-};
-
-type WrappedInstrument = {
-  id: string;
-  instrument: InstrumentDataJsonValue;
 };
 
 /** `ordered`: sent by the host, which is the single sequencer of instrument commands. */
@@ -147,52 +137,9 @@ export class AppStore {
   private room: Room = undefined!;
   /** Host-authoritative play/stop state; use this instead of calling strudel directly from the UI. */
   transport: Transport = undefined!;
-  updatePart<TPart extends InstrumentPartData>(
-    instrumentIndex: number,
-    partIndex: number,
-    partData: TPart
-  ) {
-    const instrument = this.instrumentsData.instrumentsData[instrumentIndex];
-    if (!instrument) {
-      console.error('Instrument not found', instrumentIndex);
-      return;
-    }
-    const part = instrument.parts[partIndex];
-    if (!part) {
-      console.error('Part not found', partIndex);
-      return;
-    }
-    // Update the part data
-    Object.assign(part, partData);
-    // Update the instrument
-    this.setInstrument(instrumentIndex, instrument);
-  }
   getPreset(name: string): Preset | undefined {
     const preset = presets.find((p) => p.name === name);
     return preset;
-  }
-  createInstrumentPreset(preset: Preset) {
-    const { instrument, parts } = preset;
-    this.instrumentsData.instrumentsData.push(createInstrument(instrument, parts, preset.name));
-    this.sendCreated(
-      this.instrumentsData.instrumentsData[this.instrumentsData.instrumentsData.length - 1]
-    );
-  }
-  /** An unknown id makes receivers append, so a creation is just an instrument update. */
-  private sendCreated(created: InstrumentData) {
-    // not wired yet while the constructor seeds the initial presets
-    this.sendInstrument?.({ id: created.id, instrument: $state.snapshot(created) as InstrumentData });
-  }
-  setInstrumentPart(selectedIndex: number, partIndex: number, p: InstrumentPartData): void {
-    this.instrumentsData.instrumentsData[selectedIndex].parts.splice(partIndex, 1, p);
-    this.setInstrument(selectedIndex, this.instrumentsData.instrumentsData[selectedIndex]);
-  }
-  randomize(index: number) {
-    const instr = getInstrument(this.instrumentsData.instrumentsData[index]);
-    if (instr) {
-      const data = instr.randomize(this.instrumentsData.instrumentsData[index]);
-      this.setInstrumentPartial(index, data);
-    }
   }
 
   cycle() {
@@ -251,21 +198,15 @@ export class AppStore {
     // not wired yet while the constructor seeds the initial presets
     this.sendState?.(this.snapshotInstruments());
   }
-  private findIndexById(id: string): number {
-    return this.instrumentsData.instrumentsData.findIndex((i) => i.id === id);
-  }
-
   sendState: ActionSender<InstrumentDataJsonValue[]>;
-  sendInstrument: ActionSender<WrappedInstrument>;
-  sendRemove: ActionSender<{ id: string }>;
   sendCommand: ActionSender<WireCommand>;
 
   /** Every command applied here, in order: a recording that can be replayed through `dispatch`. */
   commandLog: { cmd: Command; origin: 'local' | 'remote' }[] = [];
 
   /**
-   * The single entry point for UI intent. Instrument commands are applied locally right away (the UI
-   * feels instant) and sent to the host, which orders them; transport commands are routed to the transport.
+   * The single entry point for UI intent. Song commands are applied locally right away (the UI feels
+   * instant) and sent to the host, which orders them; transport commands go to the transport.
    */
   dispatch = (cmd: Command) => {
     this.commandLog.push({ cmd, origin: 'local' });
@@ -277,12 +218,11 @@ export class AppStore {
     if (!this.applyCommand(cmd)) return;
     this.sendCommand({ cmd, ordered: this.host });
   };
-  private applyCommand(cmd: InstrumentCommand): boolean {
-    return applyInstrumentCommand(
-      this.instrumentsData.instrumentsData,
-      cmd,
-      (data) => getInstrument(data)?.sequencer
-    );
+  private applyCommand(cmd: SongCommand): boolean {
+    return applySongCommand(this.instrumentsData, cmd, {
+      sequencerFor: (data) => getInstrument(data)?.sequencer,
+      isKnownInstrument: (name) => name in instrumentMap
+    });
   }
 
   // deserializeInstrumentData(data: InstrumentDataJsonValue): InstrumentData {
@@ -319,45 +259,33 @@ export class AppStore {
     this.transport = new Transport(this.room, host, player);
 
     const [sendState, onReceiveState] = this.room.makeAction<InstrumentDataJsonValue[]>('state');
-    const [sendInstrument, onReceiveInstrument] =
-      this.room.makeAction<WrappedInstrument>('instrument');
-    const [sendRemove, onReceiveRemove] = this.room.makeAction<{ id: string }>('remove');
-    const [sendCommand, onReceiveCommand] = this.room.makeAction<WireCommand>('cmd');
+    // Command is JSON, but its union type is wider than Trystero's payload constraint allows
+    const [sendCommand, onReceiveCommand] = this.room.makeAction<any>('cmd') as unknown as [
+      ActionSender<WireCommand>,
+      (cb: (msg: WireCommand, peerId: string) => void) => void
+    ];
+    this.sendState = sendState;
     this.sendCommand = sendCommand;
+
     // Host: takes unordered commands from clients, applies them and rebroadcasts them in the order it
     // received them (including back to the sender). Clients: only take the host's ordered stream, so a
     // peer-to-peer copy of someone else's command can never race the host's ordering.
     onReceiveCommand((msg) => {
-      if (!isInstrumentCommand(msg?.cmd)) return;
+      if (!isSongCommand(msg?.cmd)) return;
       if (this.host ? msg.ordered : !msg.ordered) return;
       if (!this.applyCommand(msg.cmd)) return;
       this.commandLog.push({ cmd: msg.cmd, origin: 'remote' });
       if (this.host) this.sendCommand({ cmd: msg.cmd, ordered: true });
     });
-    this.sendState = sendState;
-    this.sendInstrument = sendInstrument;
-    this.sendRemove = sendRemove;
-    onReceiveRemove((data) => {
-      const index = data?.id ? this.findIndexById(data.id) : -1;
-      if (index >= 0) this.instrumentsData.instrumentsData.splice(index, 1);
-    });
 
     this.room.onPeerJoin((peerId) => this.peerJoined(peerId));
     this.room.onPeerLeave((peerId) => this.peerLeft(peerId));
 
+    // Full state: sent by the host when a peer connects (and by cycle()). Everything after that is commands.
     onReceiveState((data, peerId) => {
       console.log('receiveState', data, peerId);
       if (!Array.isArray(data)) return;
-      // Applied directly to the state: never go through the setters, which would echo it back.
       this.instrumentsData.instrumentsData = data.map((i) => ({ ...i, id: i.id ?? newId() }));
-    });
-    onReceiveInstrument((data, peerId) => {
-      console.log('receiveInstrument', data, peerId);
-      if (!data?.instrument || !data.id) return;
-      const index = this.findIndexById(data.id);
-      const instrument = { ...data.instrument, id: data.id };
-      if (index >= 0) this.instrumentsData.instrumentsData.splice(index, 1, instrument);
-      else this.instrumentsData.instrumentsData.push(instrument);
     });
   }
   private init(host: boolean, roomId: string, room?: Room) {
@@ -365,43 +293,15 @@ export class AppStore {
 
     const r = room ?? joinRoom(config, roomId);
 
-    if (this.instrumentsData.instrumentsData.length === 0) this.preset();
+    if (this.instrumentsData.instrumentsData.length === 0) this.seed();
     return { room: r };
   }
-  preset() {
-    this.createInstrumentPreset(this.getPreset('Piano')!);
-    this.createInstrumentPreset(this.getPreset('Bass')!);
-    this.createInstrumentPreset(this.getPreset('Drum')!);
-  }
-  createInstrument<T extends Instrument>(name: Constructor<T>) {
-    this.instrumentsData.instrumentsData.push(
-      createInstrument(
-        name
-        //  notes: [1, 2, 3,undefined,4,5,3,undefined]
-      )
-    );
-    const created =
-      this.instrumentsData.instrumentsData[this.instrumentsData.instrumentsData.length - 1];
-    this.sendCreated(created);
-    return created;
-  }
-  setInstrument(index: number, data: InstrumentData) {
-    // console.log('setInstrument', index, data);
-    const snapshot = data;
-    this.instrumentsData.instrumentsData.splice(index, 1, snapshot);
-    this.sendInstrument({ id: snapshot.id, instrument: snapshot });
-  }
-  setInstrumentPartial = (index: number, data: Partial<InstrumentData>) => {
-    this.instrumentsData.instrumentsData[index] = {
-      ...this.instrumentsData.instrumentsData[index],
-      ...data
-    };
-    const updated = $state.snapshot(this.instrumentsData.instrumentsData[index]) as InstrumentData;
-    this.sendInstrument({ id: updated.id, instrument: updated });
-  };
-  removeInstrument(index: number): any {
-    const removed = this.instrumentsData.instrumentsData.splice(index, 1)[0];
-    if (removed) this.sendRemove({ id: removed.id });
+  /** The initial song, built locally (peers get the host's version when they connect). */
+  private seed() {
+    for (const name of ['Piano', 'Bass', 'Drum']) {
+      const { instrument, parts, name: presetName } = this.getPreset(name)!;
+      this.instrumentsData.instrumentsData.push(createInstrument(instrument, parts, presetName));
+    }
   }
 }
 

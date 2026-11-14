@@ -56,7 +56,7 @@
         store.dispatch({ type: 'transport', action: 'stop' });
         break;
       case 'KeyA':
-        store.preset();
+        presetCommands().forEach(store.dispatch);
         break;
       default:
         break;
@@ -84,6 +84,7 @@
   import InstrumentView from '../components/InstrumentView.svelte';
   import { initStore, mixerIndex } from '$lib/Store.svelte';
   import Mixer from '../components/Mixer.svelte';
+  import { presetCommands } from '$lib/commandBuilders';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   let drawerState = $state(false);
@@ -134,7 +135,7 @@
       >
         {#snippet trigger()}<Menu size={20} />{/snippet}
         {#snippet content()}
-          <AppMenu {drawerClose} bind:selectedIndex />
+          <AppMenu {drawerClose} bind:selectedIndex dispatch={store.dispatch} />
         {/snippet}
       </Modal>
     </div>
@@ -144,7 +145,7 @@
 
 <div class="flex h-full flex-row">
   <div class="card border-surface-100-900 hidden flex-col border-[1px] md:flex">
-    <AppMenu bind:selectedIndex />
+    <AppMenu bind:selectedIndex dispatch={store.dispatch} />
   </div>
 
   <div class="flex flex-1 flex-col gap-4 p-4">
@@ -164,9 +165,13 @@
     {/if}
 
     {#if selectedIndex === mixerIndex}
-      <Mixer />
+      <Mixer song={store.instrumentsData} dispatch={store.dispatch} />
     {:else if currentInstrument}
-      <InstrumentView bind:instrumentData={currentInstrument} index={selectedIndex} />
+      <InstrumentView
+        bind:instrumentData={currentInstrument}
+        index={selectedIndex}
+        dispatch={store.dispatch}
+      />
       <!-- {@render instrumentCard(currentInstrument, selectedIndex)} -->
     {/if}
 

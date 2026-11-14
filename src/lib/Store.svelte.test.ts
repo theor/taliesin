@@ -1,6 +1,9 @@
 import { expect, test, describe, vi, afterEach } from 'vitest';
-import { AppStore, makePartData } from './Store.svelte.js';
-import { PartSteps } from './parts.svelte.js';
+import { AppStore, createInstrument, makePartData } from './Store.svelte.js';
+import { PartEffects, PartSteps } from './parts.svelte.js';
+import { getPart } from './instruments.js';
+import { presetCommands } from './commandBuilders.js';
+import type { Command } from './commands.js';
 import { PianoScale } from './instruments/MonoSynth.js';
 import { createFakeNetwork } from './testing/fakeRoom.js';
 import { Status } from './interfaces.js';
@@ -41,12 +44,21 @@ function setup(
 // JSON round-trip: the wire format turns `undefined` (rests in note arrays) into `null`
 const snap = (s: AppStore) => JSON.parse(JSON.stringify(s.instrumentsData.instrumentsData));
 
-test('Multiplier', () => {
+const idOf = (s: AppStore, index: number): string => s.instrumentsData.instrumentsData[index].id;
+const rename = (s: AppStore, index: number, name: string): Command => ({
+  type: 'setInstrumentFields',
+  instrumentId: idOf(s, index),
+  fields: { name }
+});
+const effects = (s: AppStore, index: number) =>
+  getPart(PartEffects, s.instrumentsData.instrumentsData[index])!;
+
+test('creating an instrument', () => {
   makePartData(PartSteps);
-  const store = new AppStore(true, 'r', createFakeNetwork().join('host'));
-  const i = store.createInstrument(PianoScale);
+  const i = createInstrument(PianoScale);
   expect(i).toBeDefined();
   expect(i.name).toBe('PianoScale');
+  expect(i.id).toBeTruthy();
 });
 
 describe('instrument sync', () => {
@@ -58,34 +70,51 @@ describe('instrument sync', () => {
 
   test('edit propagates host -> clients', () => {
     const { host, a, b } = setup();
-    const inst = { ...snap(host)[0], name: 'renamed' };
-    host.setInstrument(0, inst);
+    host.dispatch(rename(host, 0, 'renamed'));
     expect(snap(a)[0].name).toBe('renamed');
     expect(snap(b)[0].name).toBe('renamed');
   });
 
   test('edit propagates client -> host and other clients', () => {
     const { host, a, b } = setup();
-    a.setInstrument(0, { ...snap(a)[0], name: 'from-a' });
+    a.dispatch(rename(a, 0, 'from-a'));
     expect(snap(host)[0].name).toBe('from-a');
     expect(snap(b)[0].name).toBe('from-a');
   });
 
-  // Regression: isReceiving was set on the first remote update and never cleared,
+  // Regression: a flag set on the first remote update was never cleared,
   // so every later local edit was silently not sent.
   test('local edit is still sent after receiving a remote update', () => {
     const { host, a } = setup();
-    host.setInstrument(0, { ...snap(host)[0], name: 'remote' });
+    host.dispatch(rename(host, 0, 'remote'));
     expect(snap(a)[0].name).toBe('remote');
 
-    a.setInstrument(0, { ...snap(a)[0], name: 'local-after-remote' });
+    a.dispatch(rename(a, 0, 'local-after-remote'));
     expect(snap(host)[0].name).toBe('local-after-remote');
   });
 
-  test('randomize (setInstrumentPartial) propagates', () => {
-    const { host, a } = setup();
-    a.setInstrumentPartial(1, { volume: 0.123 });
-    expect(snap(host)[1].volume).toBe(0.123);
+  test('part fields propagate (what a slider or randomize produces)', () => {
+    const { host, a, b } = setup();
+    a.dispatch({
+      type: 'setPartFields',
+      instrumentId: idOf(a, 1),
+      partName: 'PartEffects',
+      fields: { reverb: 0.9, delay: 0.25 }
+    });
+    for (const s of [host, a, b]) {
+      expect(effects(s, 1).reverb).toBe(0.9);
+      expect(effects(s, 1).delay).toBe(0.25);
+    }
+  });
+
+  test('instrument and master volume propagate', () => {
+    const { host, a, b } = setup();
+    b.dispatch({ type: 'setInstrumentFields', instrumentId: idOf(b, 1), fields: { volume: 0.25 } });
+    a.dispatch({ type: 'setMasterVolume', volume: 0.5 });
+    for (const s of [host, a, b]) {
+      expect(snap(s)[1].volume).toBe(0.25);
+      expect(s.instrumentsData.volume).toBe(0.5);
+    }
   });
 
   test('instruments get distinct stable ids', () => {
@@ -100,7 +129,8 @@ describe('structural sync', () => {
   test('add propagates from a client to host and peers, at the end', () => {
     const { host, a, b } = setup();
     const before = snap(host).length;
-    const created = a.createInstrument(PianoScale);
+    const created = createInstrument(PianoScale);
+    a.dispatch({ type: 'addInstrument', instrument: created as any });
     for (const s of [host, a, b]) expect(snap(s).length).toBe(before + 1);
     expect(snap(host)[before].id).toBe(created.id);
     expect(snap(b)).toEqual(snap(host));
@@ -108,28 +138,37 @@ describe('structural sync', () => {
 
   test('preset propagates', () => {
     const { host, b } = setup();
-    host.createInstrumentPreset(host.getPreset('Drum')!);
+    presetCommands(['Drum']).forEach(host.dispatch);
     expect(snap(b)).toEqual(snap(host));
+    expect(snap(b).at(-1).instrumentName).toBe('Drum');
   });
 
   test('remove propagates from a client', () => {
     const { host, a, b } = setup();
-    const removedId = snap(a)[0].id;
-    a.removeInstrument(0);
+    const removedId = idOf(a, 0);
+    a.dispatch({ type: 'removeInstrument', instrumentId: removedId });
     for (const s of [host, a, b]) {
       expect(snap(s).some((i: any) => i.id === removedId)).toBe(false);
     }
     expect(snap(b)).toEqual(snap(host));
   });
 
+  test('a command added to the added instrument can follow it immediately', () => {
+    const { host, a } = setup();
+    const created = createInstrument(PianoScale);
+    a.dispatch({ type: 'addInstrument', instrument: created as any });
+    a.dispatch({ type: 'setInstrumentFields', instrumentId: created.id, fields: { name: 'mine' } });
+    expect(snap(host).at(-1).name).toBe('mine');
+  });
+
   test('concurrent remove + edit: the edit lands on the right instrument (addressed by id)', () => {
     const { net, host, a, b } = setup({ queued: true });
     net.flush(); // deliver the join-time state
     expect(snap(b)).toEqual(snap(host));
-    const targetId = snap(b)[2].id;
+    const targetId = idOf(b, 2);
 
-    a.removeInstrument(0); // shifts every index on a and, once delivered, on everyone else
-    b.setInstrument(2, { ...snap(b)[2], name: 'edited' });
+    a.dispatch({ type: 'removeInstrument', instrumentId: idOf(a, 0) }); // shifts every index
+    b.dispatch(rename(b, 2, 'edited'));
     net.flush();
 
     for (const s of [host, a, b]) {
@@ -140,34 +179,63 @@ describe('structural sync', () => {
     expect(snap(a)).toEqual(snap(host));
     expect(snap(b)).toEqual(snap(host));
   });
+
+  test('two clients adding at the same time end up with the same order everywhere', () => {
+    const { net, host, a, b } = setup({ queued: true });
+    net.flush();
+    const x = createInstrument(PianoScale, undefined, 'X');
+    const y = createInstrument(PianoScale, undefined, 'Y');
+    a.dispatch({ type: 'addInstrument', instrument: x as any });
+    b.dispatch({ type: 'addInstrument', instrument: y as any });
+    net.flush();
+
+    const order = (s: AppStore) => snap(s).map((i: any) => i.name).slice(-2);
+    expect(order(a)).toEqual(order(host));
+    expect(order(b)).toEqual(order(host));
+    expect(new Set(order(host))).toEqual(new Set(['X', 'Y']));
+  });
 });
 
 describe('robustness', () => {
-  test('unknown instrument id appends instead of overwriting something', () => {
+  test('edits for an unknown instrument are ignored, not appended', () => {
     const { host, a } = setup();
-    const before = snap(host).length;
-    a.setInstrument(0, { ...snap(a)[0], id: 'brand-new', name: 'new' });
-    // setInstrument replaces local index 0 (same slot) but peers only know the new id:
-    expect(snap(host).length).toBe(before + 1);
+    const before = snap(host);
+    a.dispatch({ type: 'setInstrumentFields', instrumentId: 'ghost', fields: { name: 'boo' } });
+    expect(snap(host)).toEqual(before);
+    expect(snap(a)).toEqual(before);
   });
 
-  test('malformed payloads are ignored', async () => {
+  test('malformed or hostile payloads are ignored', async () => {
     const net = createFakeNetwork();
-    const host = new AppStore(true, 'r', net.join('host'));
+    const host = new AppStore(true, 'r', net.join('host'), fakePlayer());
     const rogueRoom = net.join('rogue');
     net.settle();
     const [sendState] = rogueRoom.makeAction<any>('state');
-    const [sendInstrument] = rogueRoom.makeAction<any>('instrument');
-    const [sendRemove] = rogueRoom.makeAction<any>('remove');
+    const [sendCmd] = rogueRoom.makeAction<any>('cmd');
+    const target = idOf(host, 1);
     const before = snap(host);
+    const send = (cmd: any) => sendCmd({ cmd, ordered: false }, 'host');
 
     await sendState('nope' as any);
-    await sendInstrument({} as any);
-    await sendInstrument({ id: 'x' } as any);
-    await sendRemove({} as any);
-    await sendRemove({ id: 'missing' } as any);
+    await sendCmd({} as any);
+    await sendCmd({ cmd: 'x', ordered: false } as any);
+    await send({ type: 'setCells', instrumentId: target, track: 0, cells: 'x' });
+    await send({ type: 'removeInstrument' });
+    await send({ type: 'removeInstrument', instrumentId: 'missing' });
+    await send({ type: 'addInstrument', instrument: {} });
+    await send({ type: 'addInstrument', instrument: { ...snap(host)[0], instrumentName: 'Nope' } });
+    await send({ type: 'setInstrumentFields', instrumentId: target, fields: { volume: 5 } });
+    await send({ type: 'setInstrumentFields', instrumentId: target, fields: { id: 'stolen' } });
+    await send({ type: 'setMasterVolume', volume: 'loud' });
+    // parts: unknown key, wrong type, partName rewrite, prototype poisoning
+    const part = (fields: any) => ({ type: 'setPartFields', instrumentId: target, partName: 'PartEffects', fields });
+    await send(part({ evil: 1 }));
+    await send(part({ reverb: 'wet' }));
+    await send(part({ partName: 'Other' }));
+    await send(JSON.parse('{"type":"setPartFields","instrumentId":"' + target + '","partName":"PartEffects","fields":{"__proto__":{"polluted":true}}}'));
 
     expect(snap(host)).toEqual(before);
+    expect(({} as any).polluted).toBeUndefined();
   });
 
   test('state without ids (older peers) gets ids assigned', async () => {

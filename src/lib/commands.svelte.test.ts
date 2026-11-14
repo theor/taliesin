@@ -1,9 +1,11 @@
 import { describe, expect, test, vi } from 'vitest';
-import { AppStore } from './Store.svelte.js';
+import { AppStore, createInstrument } from './Store.svelte.js';
+import { PianoScale } from './instruments/MonoSynth.js';
 import { getPart } from './instruments.js';
 import { MonoSequence, PartTrackNotes } from './parts.svelte.js';
 import { createFakeNetwork } from './testing/fakeRoom.js';
 import { fakePlayer } from './testing/fakePlayer.js';
+import { randomizeCommands } from './commandBuilders.js';
 import type { Command } from './commands.js';
 
 // code generation reads the Svelte context (key / scale), which only exists inside a component
@@ -113,6 +115,27 @@ describe('command log and replay', () => {
   });
 });
 
+describe('randomize', () => {
+  test('the randomness is resolved into commands, so every peer gets the same notes', () => {
+    const { host, a, b } = trio();
+    const cmds = randomizeCommands($state.snapshot(a.instrumentsData.instrumentsData[BASS]) as any);
+    expect(cmds).toHaveLength(1);
+    expect(cmds[0]).toMatchObject({ type: 'setPartFields', partName: 'MonoSequence' });
+    cmds.forEach(a.dispatch);
+
+    const notes = bassNotes(a);
+    expect(notes).toHaveLength(16);
+    expect(notes.every((n) => Number.isInteger(n) && n! >= 0 && n! < 7)).toBe(true);
+    expect(JSON.stringify(bassNotes(host))).toBe(JSON.stringify(notes));
+    expect(JSON.stringify(bassNotes(b))).toBe(JSON.stringify(notes));
+  });
+
+  test('an instrument with nothing to randomize produces no commands', () => {
+    const s = solo();
+    expect(randomizeCommands($state.snapshot(s.instrumentsData.instrumentsData[DRUM]) as any)).toEqual([]);
+  });
+});
+
 describe('commands over the network', () => {
   test('a client command reaches the host and the other client', () => {
     const { host, a, b } = trio();
@@ -174,28 +197,62 @@ function mulberry32(seed: number) {
 }
 
 describe('convergence (randomised)', () => {
-  test('3 peers, random commands, random delivery order: all end up identical', () => {
-    for (let seed = 1; seed <= 150; seed++) {
+  /** A random command of any kind, aimed at an instrument that exists or has existed. */
+  function randomCommand(rand: () => number, known: string[]): Command {
+    const int = (n: number) => Math.floor(rand() * n);
+    const id = known[int(known.length)];
+    switch (int(8)) {
+      case 0:
+      case 1:
+      case 2:
+        return {
+          type: 'setCells',
+          instrumentId: id,
+          track: int(8),
+          cells: Array.from({ length: 1 + int(3) }, () => ({ step: int(8), on: rand() < 0.5 }))
+        };
+      case 3:
+        return { type: 'setInstrumentFields', instrumentId: id, fields: { volume: int(11) / 10 } };
+      case 4:
+        return { type: 'setInstrumentFields', instrumentId: id, fields: { name: `n${int(5)}` } };
+      case 5:
+        return {
+          type: 'setPartFields',
+          instrumentId: id,
+          partName: 'PartEffects',
+          fields: { reverb: int(11) / 10, delay: int(11) / 10 }
+        };
+      case 6: {
+        const instrument = createInstrument(PianoScale, undefined, `i${int(100)}`);
+        known.push(instrument.id);
+        return { type: 'addInstrument', instrument: instrument as any };
+      }
+      default:
+        return rand() < 0.5
+          ? { type: 'removeInstrument', instrumentId: id }
+          : { type: 'setMasterVolume', volume: int(11) / 10 };
+    }
+  }
+
+  test('3 peers, random commands of every kind, random delivery order: all end up identical', () => {
+    for (let seed = 1; seed <= 200; seed++) {
       const rand = mulberry32(seed);
-      const int = (n: number) => Math.floor(rand() * n);
       const { net, host, a, b } = trio({ queued: true });
       const peers = [host, a, b];
-      const ids = [PIANO, BASS, DRUM].map((i) => idOf(host, i));
+      const known = [PIANO, BASS, DRUM].map((i) => idOf(host, i));
 
-      for (let step = 0; step < 40; step++) {
-        if (rand() < 0.6) {
-          const peer = peers[int(3)];
-          const cells = Array.from({ length: 1 + int(3) }, () => ({ step: int(8), on: rand() < 0.5 }));
-          peer.dispatch({ type: 'setCells', instrumentId: ids[int(3)], track: int(8), cells });
-        } else {
-          net.flushRandom(rand, 1 + int(3));
-        }
+      for (let step = 0; step < 50; step++) {
+        if (rand() < 0.6) peers[Math.floor(rand() * 3)].dispatch(randomCommand(rand, known));
+        else net.flushRandom(rand, 1 + Math.floor(rand() * 3));
       }
       net.flushRandom(rand);
 
       const expected = snap(host);
       expect(snap(a), `seed ${seed}: a differs from host`).toEqual(expected);
       expect(snap(b), `seed ${seed}: b differs from host`).toEqual(expected);
+      for (const s of [a, b]) {
+        expect(s.instrumentsData.volume, `seed ${seed}: master volume`).toBe(host.instrumentsData.volume);
+      }
     }
   });
 });
