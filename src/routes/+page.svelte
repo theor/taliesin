@@ -7,6 +7,7 @@
   import Network from '../components/Network.svelte';
   import Transport from '../components/Transport.svelte';
   import { setGlobalContext } from '$lib/context';
+  import { base } from '$app/paths';
 
   function searchParamsHelper() {
     const params = page.url.searchParams;
@@ -27,7 +28,7 @@
   const room = params.get('room');
   const isDebug = params.has('debug');
   if (!room || (!isJoin && !isHost)) {
-    goto('/home');
+    goto(`${base}/home`);
   }
   console.error('params', params, isJoin, isHost, room);
 
