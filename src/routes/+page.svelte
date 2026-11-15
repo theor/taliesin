@@ -102,8 +102,8 @@
   import { presetCommands } from '$lib/commandBuilders';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { getRelaySockets as getNostrSockets } from 'trystero/nostr';
-  import { getRelaySockets as getMqttSockets } from 'trystero/mqtt';
+  import { getRelaySockets as getNostrSockets } from 'trystero';
+  import { getRelaySockets as getMqttSockets } from '@trystero-p2p/mqtt';
   import { installRtcDebug, refreshRtcStats, relaySummary, rtcSummary } from '$lib/rtcDebug';
   import { WebAcoustics } from '$lib/calibration/webAcoustics';
   import { findChirp, makeChirp } from '$lib/calibration/dsp';
