@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
-import { fetchIceServers } from './turn';
+import { fetchIceServers, trimIceServers } from './turn';
 import { handle } from '../../worker/turn';
 
 const json = (body: unknown, init?: ResponseInit) =>
@@ -27,6 +27,41 @@ describe('fetchIceServers', () => {
   test('drops entries that are not ICE servers (it is network input)', async () => {
     const f = async () => json({ iceServers: [turn, { urls: 'http://evil' }, { urls: 5 }, null, {}] });
     expect(await fetchIceServers('u', f as any)).toEqual([turn]);
+  });
+});
+
+describe('trimIceServers', () => {
+  test('keeps one STUN, one UDP TURN and one TLS-443 TURN address of what Cloudflare lists', () => {
+    const cloudflare = [
+      { urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.cloudflare.com:443'] },
+      {
+        urls: [
+          'turn:turn.cloudflare.com:3478?transport=udp',
+          'turn:turn.cloudflare.com:3478?transport=tcp',
+          'turns:turn.cloudflare.com:5349?transport=tcp',
+          'turn:turn.cloudflare.com:443?transport=udp',
+          'turn:turn.cloudflare.com:80?transport=tcp',
+          'turns:turn.cloudflare.com:443?transport=tcp'
+        ],
+        username: 'u',
+        credential: 'c'
+      }
+    ];
+    expect(trimIceServers(cloudflare)).toEqual([
+      { urls: ['stun:stun.cloudflare.com:3478'] },
+      {
+        urls: ['turn:turn.cloudflare.com:3478?transport=udp', 'turns:turn.cloudflare.com:443?transport=tcp'],
+        username: 'u',
+        credential: 'c'
+      }
+    ]);
+  });
+  test('falls back to whatever is there, and drops servers with nothing usable', () => {
+    expect(trimIceServers([{ urls: 'turn:t.example:3478?transport=tcp', username: 'u', credential: 'c' }])).toEqual([
+      { urls: ['turn:t.example:3478?transport=tcp'], username: 'u', credential: 'c' }
+    ]);
+    expect(trimIceServers([{ urls: ['turns:t.example:5349'] }])).toEqual([{ urls: ['turns:t.example:5349'] }]);
+    expect(trimIceServers([])).toEqual([]);
   });
 });
 
