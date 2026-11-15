@@ -54,35 +54,62 @@ if (import.meta.hot) {
     setupInterval();
   });
 }
-class StrudelWrapper {
-  repls: any;
-  private initPromise: Promise<void>;
-  async evaluate(code: string): Promise<void> {
-    if (code === '') return Promise.resolve();
-    await this.initPromise;
-    // console.log(
-    // console.log('Strudel evaluate!', this.repls);
-    // Strudel's evaluate() starts playback by default. Only (re)start when we are meant to be playing,
-    // otherwise loading the page or editing while stopped would play audio while the UI says "stopped".
-    // Only the very first successful evaluation unblocks start(): it needs a pattern.
-    const done = await this.repls.evaluate(
-      `samples('github:tidalcycles/dirt-samples')
-const asChords = register("asChords", function(triads, pat) {
+const ASCHORDS_PRELUDE = `const asChords = register("asChords", function(triads, pat) {
   return pat.fmap( x=> {
     const [pc,acc,oct] =  tokenizeNote(x.note)
     const {note,  ...prev} = x;
     return {...prev, chord:pc+acc+triads, anchor: x.note}
   })
 });
-Pattern.prototype.asChords = function(...args)  { return asChords(...args,this);  }
-${code}`,
-      get(this.isPlaying)
-    );
-    if (done) this.resolveFirstEval();
+Pattern.prototype.asChords = function(...args)  { return asChords(...args,this);  }`;
 
-    // console.log('Strudel evaluate!', this.repls.state.code);
-    // return repls.evaluate(`${code}`)
-    // );
+class StrudelWrapper {
+  repls: any;
+  private initPromise: Promise<void>;
+  /**
+   * Evaluate the song code. Every edit regenerates the code, and a phone needs well over 100 ms per
+   * evaluation, so edits must not pile up: only one evaluation runs at a time and, while it runs, only the
+   * newest code is kept (older edits are superseded, identical code is skipped).
+   */
+  evaluate(code: string): Promise<void> {
+    if (code === '') return Promise.resolve();
+    this.pendingCode = code;
+    this.evaluating ??= this.drain().finally(() => (this.evaluating = undefined));
+    return this.evaluating;
+  }
+  private pendingCode: string | undefined;
+  private evaluating: Promise<void> | undefined;
+  private lastEvaluated: string | undefined;
+  private preludeDone = false;
+
+  private async drain(): Promise<void> {
+    await this.initPromise;
+    while (this.pendingCode !== undefined) {
+      const code = this.pendingCode;
+      this.pendingCode = undefined;
+      if (code === this.lastEvaluated) continue;
+      // Strudel's evaluate() starts playback by default. Only (re)start when we are meant to be playing,
+      // otherwise loading the page or editing while stopped would play audio while the UI says "stopped".
+      // Only the very first successful evaluation unblocks start(): it needs a pattern.
+      // The samples are loaded once by initStrudel's prebake, and `asChords` stays registered on the
+      // Pattern prototype, so only the first evaluation carries the prelude (each evaluation costs the
+      // phone's main thread, and the audio scheduler shares it).
+      let done: unknown;
+      try {
+        done = await this.repls.evaluate(
+          this.preludeDone ? code : `${ASCHORDS_PRELUDE}
+${code}`,
+          get(this.isPlaying)
+        );
+      } catch (e) {
+        console.error('could not evaluate the song', e); // a newer edit may still be pending
+      }
+      if (done) {
+        this.lastEvaluated = code;
+        this.preludeDone = true;
+        this.resolveFirstEval();
+      }
+    }
   }
   isPlaying: Writable<boolean> = writable(false);
   /** False while the browser keeps the AudioContext suspended (before the first user gesture). */

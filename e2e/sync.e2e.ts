@@ -321,6 +321,48 @@ describe('synchronised playback (real audio engine)', () => {
   });
 });
 
+describe('playback stays in sync while the song is edited', () => {
+  test('a slow client (CPU x6) keeps up with a stream of host edits', async () => {
+    const { host, client } = await pair();
+    await host.evaluate(() => (window as any).__store.transport.toggle());
+    await expect
+      .poll(async () => (await sample(client)).started && (await sample(host)).started, { timeout: 30_000 })
+      .toBe(true);
+    await client.waitForTimeout(3000); // let the post-start correction settle
+    const cdp = await client.context().newCDPSession(client);
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+
+    // every edit regenerates the code, which every peer evaluates: on a phone-class CPU a pile-up of
+    // evaluations used to delay the audio scheduler by more than a second
+    const id = await host.evaluate(() => (window as any).__store.instrumentsData.instrumentsData[0].id);
+    let k = 0;
+    const edits = setInterval(
+      () =>
+        host
+          .evaluate(
+            ([i, n]) =>
+              (window as any).__store.dispatch({
+                type: 'setInstrumentFields',
+                instrumentId: i,
+                fields: { volume: 0.5 + 0.4 * Math.sin(n as number) }
+              }),
+            [id, k++] as const
+          )
+          .catch(() => {}),
+      300
+    );
+    const skews: number[] = [];
+    const end = Date.now() + 12_000;
+    while (Date.now() < end) {
+      skews.push(Math.abs(await skewRaw(host, client)));
+      await host.waitForTimeout(250);
+    }
+    clearInterval(edits);
+    skews.sort((a, b) => a - b);
+    expect(skews[Math.floor(skews.length * 0.9)]).toBeLessThan(0.15);
+  });
+});
+
 describe('acoustic calibration (real Web Audio)', () => {
   test('a probe played through the real audio graph is recorded by the real worklet, and found', async () => {
     const { host } = await pair();
