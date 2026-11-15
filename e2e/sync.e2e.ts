@@ -406,6 +406,9 @@ describe('TURN credentials', () => {
     const lines = () => client.getByTestId('rtc-debug').allTextContents();
     await expect.poll(async () => (await lines()).join(' '), { timeout: 15_000 }).toMatch(/conn=connected/);
     expect((await lines()).join(' ')).toMatch(/turn=yes/);
+    // ...and what the signalling relay did with our events
+    const relayLines = (await client.getByTestId('relay-debug').allTextContents()).join(' ');
+    expect(relayLines).toMatch(/relay .* sent=[1-9]\d* ok=[1-9]\d* rejected=0 recv=[1-9]/);
   });
 });
 

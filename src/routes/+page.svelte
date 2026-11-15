@@ -100,7 +100,7 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { getRelaySockets } from 'trystero/nostr';
-  import { installRtcDebug, refreshRtcStats, rtcSummary } from '$lib/rtcDebug';
+  import { installRtcDebug, refreshRtcStats, relaySummary, rtcSummary } from '$lib/rtcDebug';
   import { WebAcoustics } from '$lib/calibration/webAcoustics';
   import { findChirp, makeChirp } from '$lib/calibration/dsp';
   const calibration = store.calibration;
@@ -121,6 +121,7 @@
   // `?debug` on a phone: are the signalling relays reachable?
   let relays = $state('');
   let rtcLines = $state<string[]>([]);
+  let relayLines = $state<string[]>([]);
   /** Nostr relays drop events stamped before the receiver's subscription, so a skewed clock breaks signalling. */
   let skew = $state('');
   async function measureSkew() {
@@ -141,6 +142,7 @@
     const text = [
       `${relays} · peers ${store.peers.length} · secure context ${window.isSecureContext} · turn servers ${data.iceServers.length}`,
       `time ${new Date().toISOString()} · ${skew} · ${navigator.userAgent}`,
+      ...relayLines,
       ...rtcLines
     ].join('\n');
     try {
@@ -159,6 +161,7 @@
       const sockets = Object.entries(getRelaySockets());
       void refreshRtcStats();
       rtcLines = rtcSummary();
+      relayLines = relaySummary();
       relays = `relays ${sockets.filter(([, s]) => s.readyState === 1).length}/${sockets.length} open`;
     }, 1000);
     return () => clearInterval(id);
@@ -241,6 +244,7 @@
         data-testid="copy-debug"
         onclick={copyDebug}>{copied ? 'Copied' : 'Copy debug text'}</button
       >
+      {#each relayLines as line}<p class="text-xs" data-testid="relay-debug">{line}</p>{/each}
       {#each rtcLines as line}<p class="text-xs" data-testid="rtc-debug">{line}</p>{/each}
       <div
         class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden flex-col space-y-5 p-5 lg:flex"

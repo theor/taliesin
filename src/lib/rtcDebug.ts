@@ -11,12 +11,80 @@ interface Tracked {
   pairs: string;
 }
 
+interface RelayStats {
+  url: string;
+  sent: number;
+  maxBytes: number;
+  recv: number;
+  ok: number;
+  rejected: Record<string, number>;
+  notices: number;
+}
+
 const tracked: Tracked[] = [];
+const relays: RelayStats[] = [];
+const own = new WeakMap<WebSocket, RelayStats>();
 let installed = false;
+
+/** Count what every signalling WebSocket sends, receives and has rejected (relays fail silently otherwise). */
+function trackSockets() {
+  const Native = WebSocket;
+  window.WebSocket = class extends Native {
+    constructor(url: string | URL, protocols?: string | string[]) {
+      super(url, protocols);
+      const name = String(url).replace(/^wss?:\/\//, '').replace(/\/$/, '');
+      // a reconnecting relay keeps adding to the same counters
+      let stats = relays.find((r) => r.url === name);
+      if (!stats) {
+        stats = { url: name, sent: 0, maxBytes: 0, recv: 0, ok: 0, rejected: {}, notices: 0 };
+        relays.push(stats);
+      }
+      own.set(this, stats);
+      this.addEventListener('message', (e) => {
+        if (typeof e.data !== 'string') return;
+        try {
+          const [type, , accepted, reason] = JSON.parse(e.data);
+          if (type === 'EVENT') stats.recv++;
+          else if (type === 'NOTICE') stats.notices++;
+          else if (type === 'OK') {
+            if (accepted) stats.ok++;
+            else {
+              const why = String(reason ?? '?').slice(0, 40);
+              stats.rejected[why] = (stats.rejected[why] ?? 0) + 1;
+            }
+          }
+        } catch {
+          // not nostr
+        }
+      });
+    }
+    override send(data: string | ArrayBufferLike | Blob | ArrayBufferView) {
+      if (typeof data === 'string' && data.startsWith('["EVENT"')) {
+        const stats = own.get(this);
+        if (stats) {
+          stats.sent++;
+          stats.maxBytes = Math.max(stats.maxBytes, data.length);
+        }
+      }
+      super.send(data);
+    }
+  } as typeof WebSocket;
+}
+
+/** One line per signalling relay: events sent / accepted / rejected, events received, biggest event. */
+export function relaySummary(): string[] {
+  return relays.map((r) => {
+    const rej = Object.entries(r.rejected)
+      .map(([why, n]) => `${n}x"${why}"`)
+      .join(' ');
+    return `relay ${r.url} sent=${r.sent} ok=${r.ok} rejected=${rej || 0} recv=${r.recv} max=${r.maxBytes}B`;
+  });
+}
 
 export function installRtcDebug() {
   if (installed || typeof RTCPeerConnection === 'undefined') return;
   installed = true;
+  trackSockets();
   const Native = RTCPeerConnection;
   window.RTCPeerConnection = class extends Native {
     constructor(config?: RTCConfiguration) {
