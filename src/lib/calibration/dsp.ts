@@ -5,23 +5,31 @@
 
 export type ChirpKind = 'up' | 'down';
 
-const CHIRP_SECONDS = 0.06;
+/**
+ * Long on purpose: the matched filter's gain grows with the sweep's duration x bandwidth, so a longer sweep is
+ * found at a lower volume (400 ms hears a probe ~9 dB quieter than 60 ms at the same false-alarm rate).
+ */
+const CHIRP_SECONDS = 0.4;
 const F_LOW = 1500;
 const F_HIGH = 8000;
-/** Minimum normalised correlation to accept a detection (random noise peaks around 0.13). */
-export const MIN_SCORE = 0.25;
+/** Minimum normalised correlation to accept a detection (white noise alone peaks around 0.04 for this sweep). */
+export const MIN_SCORE = 0.1;
 
 /**
  * A short windowed frequency sweep. A sweep (rather than a click) correlates sharply with itself yet barely
  * with room noise, speech or music, so arrival times can be found to a fraction of a millisecond. The up
  * and down sweeps are nearly orthogonal, so the host's own probe and a guest's can be told apart.
  */
-export function makeChirp(sampleRate: number, kind: ChirpKind): Float32Array {
-  const n = Math.round(CHIRP_SECONDS * sampleRate);
+export function makeChirp(
+  sampleRate: number,
+  kind: ChirpKind,
+  seconds = CHIRP_SECONDS
+): Float32Array {
+  const n = Math.round(seconds * sampleRate);
   const hi = Math.min(F_HIGH, 0.45 * sampleRate);
   const [f0, f1] = kind === 'up' ? [F_LOW, hi] : [hi, F_LOW];
   const out = new Float32Array(n);
-  const k = (f1 - f0) / CHIRP_SECONDS;
+  const k = (f1 - f0) / seconds;
   for (let i = 0; i < n; i++) {
     const t = i / sampleRate;
     const hann = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1));
@@ -85,7 +93,11 @@ export interface Detection {
  * only a small *fraction* of its energy is the probe's shape. Returns undefined when nothing matches well
  * enough (the other device was silent, too far, or drowned by noise).
  */
-export function findChirp(recording: Float32Array, probe: Float32Array): Detection | undefined {
+export function findChirp(
+  recording: Float32Array,
+  probe: Float32Array,
+  minScore = MIN_SCORE
+): Detection | undefined {
   const m = probe.length;
   const span = recording.length - m;
   if (span < 1) return undefined;
@@ -124,7 +136,7 @@ export function findChirp(recording: Float32Array, probe: Float32Array): Detecti
       at = i;
     }
   }
-  if (!(best >= MIN_SCORE)) return undefined;
+  if (!(best >= minScore)) return undefined;
 
   // parabolic interpolation around the peak for sub-sample precision
   let index = at;

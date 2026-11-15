@@ -74,6 +74,25 @@ describe('probe detection', () => {
     expect(findChirp(rec, probe)!.index).toBeCloseTo(5000, 0);
   });
 
+  test('finds a probe 15 dB below the room noise (a quiet phone speaker), without false alarms', () => {
+    const noise = (seed: number, sigma: number) => {
+      const rec = new Float32Array(20000);
+      let s = seed;
+      const uniform = () => ((s = (s * 16807) % 2147483647) / 2147483647 - 0.5) * Math.sqrt(12);
+      for (let i = 0; i < rec.length; i++) rec[i] = sigma * ((uniform() + uniform() + uniform() + uniform()) / 2);
+      return rec;
+    };
+    const sigma = 2.19; // noise power 0.15 x 31.6: the probe is 15 dB below the noise
+    for (const seed of [11, 12, 13, 14, 15, 16]) {
+      const rec = noise(seed, sigma);
+      makeChirp(SR, 'up').forEach((v, i) => (rec[6000 + i] += v));
+      const found = findChirp(rec, probe);
+      expect(found, `probe in noise, seed ${seed}`).toBeDefined();
+      expect(found!.index).toBeCloseTo(6000, 0);
+      expect(findChirp(noise(seed + 100, sigma), probe), `noise only, seed ${seed}`).toBeUndefined();
+    }
+  });
+
   test('ignores loud sounds that are not the probe: a beep, a clap', () => {
     const beep = new Float32Array(20000);
     for (let i = 6000; i < 10800; i++) beep[i] = 0.8 * Math.sin((2 * Math.PI * 1000 * i) / SR);

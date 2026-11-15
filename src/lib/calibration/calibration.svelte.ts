@@ -34,10 +34,10 @@ export interface CalibrationTarget {
 
 /** Probes played by the host itself to learn its own speaker-to-microphone delay. */
 const HOST_PROBES = 2;
-const HOST_WINDOW_S = 0.6;
+const HOST_WINDOW_S = 1.0;
 /** Probes asked of each guest. */
 const GUEST_PROBES = 4;
-const GUEST_WINDOW_S = 1.0;
+const GUEST_WINDOW_S = 1.4;
 const MIN_GOOD_PROBES = 3;
 /** Probes of one guest may disagree by this much (seconds) before the result is not trusted. */
 const MAX_SPREAD_S = 0.06;
