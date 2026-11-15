@@ -7,11 +7,13 @@ vi.mock('$app/state', () => ({
   page: { url: new URL('http://localhost/?host=true&room=test') }
 }));
 vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
-vi.mock('trystero/nostr', async () => {
+vi.mock('trystero', async () => {
   const { createFakeNetwork } = await import('$lib/testing/fakeRoom');
   const net = createFakeNetwork();
-  return { joinRoom: () => net.join('host') };
+  return { joinRoom: () => net.join('host'), getRelaySockets: () => ({}) };
 });
+// the fake room already has the app's own room shape, so there is nothing to adapt
+vi.mock('$lib/netRoom', () => ({ adaptRoom: (room: unknown) => room }));
 
 import Page from './+page.svelte';
 

@@ -1,7 +1,8 @@
 import { Status } from './interfaces';
-import { joinRoom, type BaseRoomConfig, type RelayConfig } from 'trystero/nostr';
-import { joinRoom as joinRoomMqtt } from 'trystero/mqtt';
-import { selfId, type ActionSender, type JsonValue, type Room } from 'trystero';
+import { joinRoom, type JoinRoomConfig } from 'trystero';
+import { joinRoom as joinRoomMqtt } from '@trystero-p2p/mqtt';
+import { adaptRoom, type ActionSender, type Room } from './netRoom';
+import type { JsonValue } from 'trystero';
 import {
   getPart,
   newId,
@@ -57,8 +58,7 @@ const turnConfig = turnUrls.length
     ]
   : undefined;
 
-// `turnConfig` is read by Trystero's peer setup but missing from its typings
-const config = { appId: 'taliesin', turnConfig } as BaseRoomConfig & RelayConfig;
+const config: JoinRoomConfig = { appId: 'taliesin', turnConfig };
 
 /** `ordered`: sent by the host, which is the single sequencer of instrument commands. */
 type WireCommand = { cmd: Command; ordered: boolean };
@@ -183,13 +183,15 @@ export class AppStore {
       .join('\n')
       .replace(/[\r\n]{2,}/g, '\n\n');
   };
+  /** Our own peer id (known once the room is joined). */
+  selfPeerId = $state('');
   /** Ids of the peers currently connected to us. */
   peers = $state<string[]>([]);
   status(): Status {
     return this.peers.length > 0 ? Status.connected : Status.disconnected;
   }
   id() {
-    return selfId; // this.webrtcProvider.doc.clientID;
+    return this.selfPeerId;
   }
   host: boolean = false;
   peerJoined(peerId: string) {
@@ -431,7 +433,8 @@ export class AppStore {
   private init(host: boolean, roomId: string, room?: Room) {
     this.host = host;
 
-    const r = room ?? joinRoom(config, roomId);
+    const r = room ?? adaptRoom(joinRoom(config, roomId));
+    void r.selfId?.().then((id) => (this.selfPeerId = id));
 
     if (host && this.restore()) console.log('restored the saved song');
     if (this.instrumentsData.instrumentsData.length === 0) this.seed();
@@ -472,13 +475,15 @@ export function initStore(
   const turn = [...(turnConfig ?? []), ...(opts.iceServers ?? [])];
   const room =
     opts.relayUrls || opts.iceServers?.length || opts.signal === 'mqtt'
-      ? (opts.signal === 'mqtt' ? joinRoomMqtt : joinRoom)(
-          {
-            ...config,
-            ...(opts.relayUrls ? { relayUrls: opts.relayUrls } : {}),
-            ...({ turnConfig: turn.length ? turn : undefined } as object)
-          },
-          roomId
+      ? adaptRoom(
+          (opts.signal === 'mqtt' ? joinRoomMqtt : joinRoom)(
+            {
+              ...config,
+              ...(opts.relayUrls ? { relayConfig: { urls: opts.relayUrls } } : {}),
+              turnConfig: turn.length ? turn : undefined
+            },
+            roomId
+          )
         )
       : undefined;
   store = new AppStore(host, roomId, room, undefined, safeLocalStorage());

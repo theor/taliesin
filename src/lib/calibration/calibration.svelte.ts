@@ -1,4 +1,4 @@
-import type { ActionSender, Room } from 'trystero';
+import type { ActionSender, Room } from '../netRoom';
 import { findChirp, makeChirp, median, type ChirpKind } from './dsp';
 
 /** The audio hardware a calibration needs; the app uses Web Audio, tests inject a simulation. */

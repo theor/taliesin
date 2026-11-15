@@ -1,4 +1,4 @@
-import type { Room } from 'trystero';
+import type { Room } from '../netRoom';
 
 type Handler = (data: any, peerId: string) => void;
 type Listener = (peerId: string) => void;

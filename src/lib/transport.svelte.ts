@@ -1,4 +1,4 @@
-import type { ActionSender, Room } from 'trystero';
+import type { ActionSender, Room } from './netRoom';
 import { get, type Readable } from 'svelte/store';
 
 /** The slice of the Strudel wrapper the transport needs; tests inject a fake. */
