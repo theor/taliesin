@@ -43,6 +43,8 @@ Vitest has three workspaces: `client` (jsdom, `*.svelte.{test,spec}.ts`), `serve
 
 **TURN relay (`src/lib/turn.ts`, `worker/`)**: peers on mobile data or strict NATs need a TURN relay. `routes/+page.ts` fetches short-lived ICE servers from `VITE_TURN_ENDPOINT` (or `?turn=<url>`) before the room is joined; failure just means no relay. `worker/turn.ts` is the Cloudflare Worker that holds the API token (setup in `worker/README.md`). Static `VITE_TURN_URLS/USERNAME/CREDENTIAL` also work for providers with fixed credentials.
 
+**Connectivity problems**: see `docs/connectivity.md` (what fixed phone-to-PC connections, the secure-context and clock-skew traps, and how to read the `?debug` panel).
+
 ## Notes
 
 README todos: presets, add part, transport sync for client playheads, song mode, mixer, LFO.
