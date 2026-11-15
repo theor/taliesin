@@ -121,11 +121,26 @@
   // `?debug` on a phone: are the signalling relays reachable?
   let relays = $state('');
   let rtcLines = $state<string[]>([]);
+  /** Nostr relays drop events stamped before the receiver's subscription, so a skewed clock breaks signalling. */
+  let skew = $state('');
+  async function measureSkew() {
+    try {
+      const t0 = Date.now();
+      const res = await fetch(`${location.origin}${base}/`, { method: 'HEAD', cache: 'no-store' });
+      const t1 = Date.now();
+      const server = Date.parse(res.headers.get('date') ?? '');
+      if (Number.isNaN(server)) return;
+      const secs = Math.round((t0 + t1) / 2000 - server / 1000);
+      skew = `clock ${secs >= 0 ? '+' : ''}${secs}s vs server (±1s)`;
+    } catch {
+      skew = 'clock unknown';
+    }
+  }
   let copied = $state(false);
   async function copyDebug() {
     const text = [
       `${relays} · peers ${store.peers.length} · secure context ${window.isSecureContext} · turn servers ${data.iceServers.length}`,
-      `time ${new Date().toISOString()} · ${navigator.userAgent}`,
+      `time ${new Date().toISOString()} · ${skew} · ${navigator.userAgent}`,
       ...rtcLines
     ].join('\n');
     try {
@@ -139,6 +154,7 @@
   }
   onMount(() => {
     if (!isDebug) return;
+    void measureSkew();
     const id = setInterval(() => {
       const sockets = Object.entries(getRelaySockets());
       void refreshRtcStats();
@@ -218,7 +234,7 @@
   <div class="flex flex-1 flex-col gap-4 p-4">
     {#if isDebug}
       <p class="text-sm" data-testid="net-debug">
-        {relays} · peers {store.peers.length} · secure context {String(window.isSecureContext)} · turn servers {data.iceServers.length}
+        {relays} · peers {store.peers.length} · secure context {String(window.isSecureContext)} · turn servers {data.iceServers.length} · {skew}
       </p>
       <button
         class="btn preset-outlined w-fit"
