@@ -100,7 +100,7 @@
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { getRelaySockets } from 'trystero/nostr';
-  import { installRtcDebug, rtcSummary } from '$lib/rtcDebug';
+  import { installRtcDebug, refreshRtcStats, rtcSummary } from '$lib/rtcDebug';
   import { WebAcoustics } from '$lib/calibration/webAcoustics';
   import { findChirp, makeChirp } from '$lib/calibration/dsp';
   const calibration = store.calibration;
@@ -125,6 +125,7 @@
     if (!isDebug) return;
     const id = setInterval(() => {
       const sockets = Object.entries(getRelaySockets());
+      void refreshRtcStats();
       rtcLines = rtcSummary();
       relays = `relays ${sockets.filter(([, s]) => s.readyState === 1).length}/${sockets.length} open`;
     }, 1000);
