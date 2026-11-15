@@ -121,6 +121,22 @@
   // `?debug` on a phone: are the signalling relays reachable?
   let relays = $state('');
   let rtcLines = $state<string[]>([]);
+  let copied = $state(false);
+  async function copyDebug() {
+    const text = [
+      `${relays} · peers ${store.peers.length} · secure context ${window.isSecureContext} · turn servers ${data.iceServers.length}`,
+      `time ${new Date().toISOString()} · ${navigator.userAgent}`,
+      ...rtcLines
+    ].join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // clipboard blocked: fall back to selecting nothing; the text is still on screen
+      return;
+    }
+    copied = true;
+    setTimeout(() => (copied = false), 1500);
+  }
   onMount(() => {
     if (!isDebug) return;
     const id = setInterval(() => {
@@ -204,6 +220,11 @@
       <p class="text-sm" data-testid="net-debug">
         {relays} · peers {store.peers.length} · secure context {String(window.isSecureContext)} · turn servers {data.iceServers.length}
       </p>
+      <button
+        class="btn preset-outlined w-fit"
+        data-testid="copy-debug"
+        onclick={copyDebug}>{copied ? 'Copied' : 'Copy debug text'}</button
+      >
       {#each rtcLines as line}<p class="text-xs" data-testid="rtc-debug">{line}</p>{/each}
       <div
         class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden flex-col space-y-5 p-5 lg:flex"
