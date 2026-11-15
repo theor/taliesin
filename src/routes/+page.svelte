@@ -36,8 +36,11 @@
 
   if (isDebug && typeof window !== 'undefined') installRtcDebug(); // before the room is joined
   const relay = params.get('relay');
+  // ?signal=mqtt: signal over public MQTT brokers instead of Nostr relays
+  const signal = params.get('signal') === 'mqtt' ? 'mqtt' : 'nostr';
   initStore(isHost, room!, {
     relayUrls: relay ? [relay] : undefined,
+    signal,
     iceServers: data.iceServers
   });
   // `?debug` exposes the store so e2e tests (and the console) can inspect and drive it
@@ -99,7 +102,8 @@
   import { presetCommands } from '$lib/commandBuilders';
   import { goto } from '$app/navigation';
   import { onMount } from 'svelte';
-  import { getRelaySockets } from 'trystero/nostr';
+  import { getRelaySockets as getNostrSockets } from 'trystero/nostr';
+  import { getRelaySockets as getMqttSockets } from 'trystero/mqtt';
   import { installRtcDebug, refreshRtcStats, relaySummary, rtcSummary } from '$lib/rtcDebug';
   import { WebAcoustics } from '$lib/calibration/webAcoustics';
   import { findChirp, makeChirp } from '$lib/calibration/dsp';
@@ -158,7 +162,7 @@
     if (!isDebug) return;
     void measureSkew();
     const id = setInterval(() => {
-      const sockets = Object.entries(getRelaySockets());
+      const sockets = Object.entries(signal === 'mqtt' ? getMqttSockets() : getNostrSockets());
       void refreshRtcStats();
       rtcLines = rtcSummary();
       relayLines = relaySummary();

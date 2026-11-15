@@ -1,5 +1,6 @@
 import { Status } from './interfaces';
 import { joinRoom, type BaseRoomConfig, type RelayConfig } from 'trystero/nostr';
+import { joinRoom as joinRoomMqtt } from 'trystero/mqtt';
 import { selfId, type ActionSender, type JsonValue, type Room } from 'trystero';
 import {
   getPart,
@@ -455,11 +456,14 @@ function safeLocalStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
   }
 }
 export let store: AppStore = undefined!;
-/** @param opts.relayUrls override the Nostr signalling relays (e2e tests point this at a local relay). */
+/**
+ * @param opts.relayUrls override the signalling relays/brokers (e2e tests point this at a local relay).
+ * @param opts.signal which public signalling network to use: Nostr relays (default) or MQTT brokers.
+ */
 export function initStore(
   host: boolean,
   roomId: string,
-  opts: { relayUrls?: string[]; iceServers?: IceServer[] } = {}
+  opts: { relayUrls?: string[]; iceServers?: IceServer[]; signal?: 'nostr' | 'mqtt' } = {}
 ) {
   if (store) {
     console.warn('Store already initialized');
@@ -467,8 +471,8 @@ export function initStore(
   }
   const turn = [...(turnConfig ?? []), ...(opts.iceServers ?? [])];
   const room =
-    opts.relayUrls || opts.iceServers?.length
-      ? joinRoom(
+    opts.relayUrls || opts.iceServers?.length || opts.signal === 'mqtt'
+      ? (opts.signal === 'mqtt' ? joinRoomMqtt : joinRoom)(
           {
             ...config,
             ...(opts.relayUrls ? { relayUrls: opts.relayUrls } : {}),
