@@ -362,6 +362,31 @@ describe('acoustic calibration (real Web Audio)', () => {
   });
 });
 
+describe('share link', () => {
+  test('carries the debug and signal flags, so every device uses the same signalling', async () => {
+    const context = await browser.newContext();
+    contexts.push(context);
+    const page = await context.newPage();
+    const room = newRoom();
+    await page.goto(`${APP_URL}/?host&room=${room}&relay=${encodeURIComponent(RELAY_URL)}&debug&signal=nostr`);
+    await page.getByRole('button', { name: /share/i }).first().click();
+    const href = await page.getByRole('link', { name: /open link/i }).getAttribute('href');
+    const url = new URL(href!);
+    expect(url.searchParams.has('join')).toBe(true);
+    expect(url.searchParams.get('room')).toBe(room);
+    expect(url.searchParams.has('debug')).toBe(true);
+    expect(url.searchParams.get('signal')).toBe('nostr');
+
+    // and a plain jam keeps a plain link
+    const plain = await context.newPage();
+    await plain.goto(`${APP_URL}/?host&room=${room}x&relay=${encodeURIComponent(RELAY_URL)}`);
+    await plain.getByRole('button', { name: /share/i }).first().click();
+    const plainUrl = new URL((await plain.getByRole('link', { name: /open link/i }).getAttribute('href'))!);
+    expect(plainUrl.searchParams.has('debug')).toBe(false);
+    expect(plainUrl.searchParams.has('signal')).toBe(false);
+  });
+});
+
 describe('TURN credentials', () => {
   test('credentials fetched from ?turn= reach the peer connections, and the jam still connects', async () => {
     const room = newRoom();

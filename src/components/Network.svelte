@@ -14,6 +14,10 @@
     const url = new URL(window.location.href.split('?')[0]);
         url.searchParams.set('join', 'true');
         url.searchParams.set('room', ctx.roomId);
+    // diagnostics and the signalling network must match on every device, so the link carries them along
+    const here = new URLSearchParams(window.location.search);
+    if (here.has('debug')) url.searchParams.set('debug', '');
+    if (here.get('signal')) url.searchParams.set('signal', here.get('signal')!);
 
     function share() {
         navigator.clipboard.writeText(url.toString()).then(() => {
