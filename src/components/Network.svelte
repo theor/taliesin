@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { store } from "$lib";
     import { getGlobalContext } from "$lib/context";
-    import { RouterIcon, Share, ShareIcon } from "@lucide/svelte";
+    import { RouterIcon, ShareIcon, UsersIcon } from "@lucide/svelte";
     import { Modal } from "@skeletonlabs/skeleton-svelte";
     import QrCode from "./QRCode.svelte";
 
@@ -28,11 +28,10 @@
     }
     let showShareModal = $state(false);
 </script>
-<div class="flex items-center gap-4">
-    <p></p>
+<div class="flex items-center gap-2 sm:gap-4">
     <p class="chip {store.host ? "preset-filled" : "preset-outlined"}">
         {#if store.host} <RouterIcon size=16/>{/if}
-        {store.id().substring(0,4)}
+        {store.host ? 'Host' : 'Guest'}<span class="hidden sm:inline"> · {store.id().substring(0,4)}</span>
     </p>
    
 
@@ -64,8 +63,13 @@
       </footer>
     {/snippet}
   </Modal>
-    <p class="chip {store.status() === 'connected' ? 'preset-filled-success-500' : 'preset-outlined'}">
-        {store.status()} · {store.peers.length}
+    <p
+        class="chip {store.status() === 'connected' ? 'preset-filled-success-500' : 'preset-outlined'}"
+        title={store.status()}
+    >
+        <UsersIcon size={14} />
+        <span class="hidden sm:inline">{store.status()} ·</span>
+        {store.peers.length}
     </p>
 
 </div>

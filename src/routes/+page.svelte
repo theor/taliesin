@@ -1,6 +1,6 @@
 <script lang="ts">
   import { AppBar } from '@skeletonlabs/skeleton-svelte';
-  import Menu from '@lucide/svelte/icons/menu';
+  import { SettingsIcon } from '@lucide/svelte';
   import { page } from '$app/state';
   import { strudel, store } from '$lib';
   import '../main.scss';
@@ -58,12 +58,10 @@
   });
 
   function onKeyDown(event: KeyboardEvent) {
-    console.log(event, event.code);
+    // keys typed into a slider or text field belong to that control, not to the song
+    if ((event.target as HTMLElement | null)?.closest?.('input, textarea, select')) return;
 
     switch (event.code) {
-      case 'Backquote':
-        drawerState = !drawerState;
-        break;
       case 'Space':
         store.dispatch({ type: 'transport', action: 'toggle' });
         break;
@@ -90,12 +88,12 @@
     code = store.code();
     strudel.evaluate(code); // every peer plays the song itself, following the host's clock
     if (selectedIndex >= instrumentsData.instrumentsData.length) {
-      selectedIndex = instrumentsData.instrumentsData.length - 1;
+      selectedIndex = Math.max(0, instrumentsData.instrumentsData.length - 1);
     }
   });
 
-  import { Modal } from '@skeletonlabs/skeleton-svelte';
   import AppMenu from '../components/AppMenu.svelte';
+  import MobileNav from '../components/MobileNav.svelte';
   import InstrumentView from '../components/InstrumentView.svelte';
   import { initStore, mixerIndex } from '$lib/Store.svelte';
   import Mixer from '../components/Mixer.svelte';
@@ -116,10 +114,13 @@
       )
       .join(' · ');
   });
-  let drawerState = $state(false);
-
-  function drawerClose() {
-    drawerState = false;
+  let settingsOpen = $state(false);
+  let playing = $derived(store.transport.playing);
+  /** A guest's browser keeps audio locked until their first tap. */
+  let needsTap = $derived(!isHost && playing && !$audioRunning);
+  function startBeat() {
+    presetCommands().forEach(store.dispatch);
+    selectedIndex = 0;
   }
 
   // `?debug` on a phone: are the signalling relays reachable?
@@ -174,7 +175,7 @@
   // Playhead: exact on the host, extrapolated from the host's messages on clients.
   let position = $state(0);
   onMount(() => {
-    const id = setInterval(() => (position = store.transport.position()), 100);
+    const id = setInterval(() => (position = store.transport.position()), 50);
     return () => clearInterval(id);
   });
 </script>
@@ -185,60 +186,80 @@
     <Network />
   {/snippet}
   {#snippet trail()}
-    <div class="hidden space-x-4 sm:flex">
-      <Transport playing={store.transport.playing} {position} dispatch={store.dispatch} />
-      {#if !isHost && store.transport.playing && !$audioRunning}
-        <button class="btn preset-filled" onclick={() => strudel.unlockAudio()}>Tap to hear</button>
+    <div class="flex items-center space-x-4">
+      <!-- on a phone the transport lives in the bottom bar, within thumb's reach -->
+      <div class="hidden items-center space-x-4 md:flex">
+        <Transport playing={store.transport.playing} {position} dispatch={store.dispatch} />
+        {#if needsTap}
+          <button class="btn preset-filled" onclick={() => strudel.unlockAudio()}>Tap to hear</button>
+        {/if}
+      </div>
+      {#if isHost || calibration.applied !== undefined}
+        <div class="relative">
+          <button
+            class="btn-icon preset-tonal"
+            aria-label="Settings"
+            aria-expanded={settingsOpen}
+            onclick={() => (settingsOpen = !settingsOpen)}><SettingsIcon size={20} /></button
+          >
+          {#if settingsOpen}
+            <div
+              class="card bg-surface-100-900 border-surface-300-700 absolute top-full right-0 z-50 mt-2 w-72 space-y-2 border p-3 shadow-xl"
+              data-testid="settings-panel"
+            >
+              <h3 class="h6">Sound sync</h3>
+              {#if isHost}
+                {#if store.peers.length > 0}
+                  <button
+                    class="btn preset-tonal w-full"
+                    disabled={calibration.running || store.transport.playing}
+                    title="The host's microphone listens while each device plays a test sound, so every device can be lined up with this one. Stop the song and keep the room quiet."
+                    onclick={() => calibration.run(store.peers)}>Calibrate</button
+                  >
+                  {#if calibrationNote}<p class="text-sm" data-testid="calibration-note">
+                      {calibrationNote}
+                    </p>{/if}
+                  <p class="text-xs opacity-70">
+                    Lines every device up with this one when they sit in the same room. Stop the song
+                    first and keep the room quiet.
+                  </p>
+                {:else}
+                  <p class="text-sm opacity-70">
+                    Calibration is offered once someone has joined the jam.
+                  </p>
+                {/if}
+              {:else if calibration.applied !== undefined}
+                <button
+                  class="btn preset-outlined w-full"
+                  title="Calibrated by the host. Click to go back to the browser's own estimate."
+                  onclick={() => calibration.reset()}
+                  >Synced {Math.round(calibration.applied * 1000)} ms ✕</button
+                >
+              {/if}
+            </div>
+          {/if}
+        </div>
       {/if}
-      {#if isHost && store.peers.length > 0}
-        <button
-          class="btn preset-tonal"
-          disabled={calibration.running || store.transport.playing}
-          title="The host's microphone listens while each device plays a test sound, so every device can be lined up with this one. Stop the song and keep the room quiet."
-          onclick={() => calibration.run(store.peers)}>Calibrate</button
-        >
-        {#if calibrationNote}<span class="self-center text-sm" data-testid="calibration-note"
-            >{calibrationNote}</span
-          >{/if}
-      {/if}
-      {#if !isHost && calibration.applied !== undefined}
-        <button
-          class="btn preset-outlined"
-          title="Calibrated by the host. Click to go back to the browser's own estimate."
-          onclick={() => calibration.reset()}
-          >Synced {Math.round(calibration.applied * 1000)} ms ✕</button
-        >
-      {/if}
-    </div>
-    <div class="block md:hidden">
-      <Modal
-        open={drawerState}
-        onOpenChange={(e) => (drawerState = e.open)}
-        triggerBase="btn preset-tonal"
-        contentBase="card border-surface-100-900 border-[1px] space-y-4 shadow-xl  h-screen"
-        positionerJustify="justify-start"
-        positionerAlign=""
-        positionerPadding=""
-        closeOnInteractOutside={true}
-        transitionsPositionerIn={{ x: -480, duration: 200 }}
-        transitionsPositionerOut={{ x: -480, duration: 200 }}
-      >
-        {#snippet trigger()}<Menu size={20} />{/snippet}
-        {#snippet content()}
-          <AppMenu {drawerClose} bind:selectedIndex dispatch={store.dispatch} />
-        {/snippet}
-      </Modal>
     </div>
   {/snippet}
   <span>{title}</span>
+  <span class="text-surface-600-400 ml-2 hidden text-xs sm:inline" data-testid="room-code">{room}</span>
 </AppBar>
+
+<MobileNav
+  bind:selectedIndex
+  dispatch={store.dispatch}
+  {playing}
+  {needsTap}
+  onTap={() => strudel.unlockAudio()}
+/>
 
 <div class="flex h-full flex-row">
   <div class="card border-surface-100-900 hidden flex-col border-[1px] md:flex">
     <AppMenu bind:selectedIndex dispatch={store.dispatch} />
   </div>
 
-  <div class="flex flex-1 flex-col gap-4 p-4">
+  <div class="flex min-w-0 flex-1 flex-col gap-4 p-4 pb-44 md:pb-4">
     {#if isDebug}
       <p class="text-sm" data-testid="net-debug">
         {relays} · peers {store.peers.length} · secure context {String(window.isSecureContext)} · turn servers {data.iceServers.length} · {skew}
@@ -275,8 +296,16 @@
         bind:instrumentData={currentInstrument}
         index={selectedIndex}
         dispatch={store.dispatch}
+        {position}
+        {playing}
+        editedByOther={store.activity[currentInstrument.id]}
       />
-      <!-- {@render instrumentCard(currentInstrument, selectedIndex)} -->
+    {:else}
+      <div class="card preset-outlined-surface-200-800 space-y-4 p-8 text-center">
+        <p class="text-lg">Nothing playing yet.</p>
+        <button class="btn preset-filled-primary-500" onclick={startBeat}>Start with a beat</button>
+        <p class="text-sm opacity-70">Adds piano, bass and drums. Use Add for a single instrument.</p>
+      </div>
     {/if}
 
     <!-- {#each instrumentsData.instrumentsData as instrumentData, index}

@@ -1,26 +1,30 @@
 <script lang="ts">
   import { Instrument, type IDispatchingInstrumentViewProps } from '$lib';
-  import { commitStroke, previewStroke, strideOf, type Cell } from '$lib/gesture';
+  import { commitStroke, playheadStep, previewStroke, strideOf, type Cell } from '$lib/gesture';
   import { getInstrument } from '$lib/Store.svelte';
+  import { getGlobalContext } from '$lib/context';
   import {
     ArrowLeftIcon,
     ArrowRightIcon,
     ChevronFirstIcon,
     ChevronLastIcon,
     EllipsisIcon,
-    EraserIcon,
     HelpCircleIcon
   } from '@lucide/svelte';
-  import { Pagination, Progress, Switch } from '@skeletonlabs/skeleton-svelte';
-  import { writable } from 'svelte/store';
-  import { gestures, pointer, SwipeDirection } from '$lib/utils/hammerAction';
+  import { Pagination } from '@skeletonlabs/skeleton-svelte';
+  import { pointer } from '$lib/utils/hammerAction';
   import { SvelteMap } from 'svelte/reactivity';
 
-
   // The view only reads state and dispatches commands; it never mutates instrument data itself.
-  const { instrumentData = $bindable(), dispatch }: IDispatchingInstrumentViewProps = $props();
+  const {
+    instrumentData = $bindable(),
+    dispatch,
+    position,
+    playing
+  }: IDispatchingInstrumentViewProps = $props();
   const instr: Instrument | undefined = getInstrument(instrumentData);
   const seq = instr?.sequencer!;
+  const scale = getGlobalContext() ?? { scaleKey: 'A', scaleMode: 'minor' };
 
   const buttonClassOn = 'preset-filled-primary-500';
   const buttonClassOff = 'preset-outlined-primary-500';
@@ -28,14 +32,15 @@
   const buttonClassOffOdd = 'preset-outlined-tertiary-500';
   const buttonClassModifiedOn = 'preset-filled-secondary-500';
   const buttonClassModifiedOff = 'preset-tonal-secondary';
-  const buttonClassModifiedOffErase = 'preset-gradient';
-  let progress = writable(0); //derived(instr?.progress(instrumentData)!, (x:number) => Number.isNaN(x) ? 0 : x!*100)!;
+  const buttonClassErasing = 'preset-gradient';
 
   let panWillTurnOn: boolean | undefined = $state(undefined);
   let start: Cell | undefined; // where the current stroke began
   let last: Cell | undefined; // where the pointer is now
+  let erasing = $state(false); // the stroke began on a note, so it erases instead of painting
   let stride = $state(1);
   let modifiedSteps = new SvelteMap<number, number>(); // live preview of the stroke, not yet committed
+  let showHelp = $state(false);
 
   function onPointer(e: PointerEvent) {
     if (e.type === 'pointerup') {
@@ -46,12 +51,14 @@
         const { track, cells } = commitStroke({
           start,
           last,
-          eraseEmpty,
+          eraseEmpty: false,
+          erase: erasing,
           isOn: (step) => seq.getCell(instrumentData, from.track, step)
         });
         if (cells.length) dispatch({ type: 'setCells', instrumentId: instrumentData.id, track, cells });
       }
       stride = 1;
+      erasing = false;
       start = last = undefined;
       return;
     }
@@ -65,121 +72,140 @@
     if (start) stride = strideOf(start, last ?? cell);
     if (last && cell.step === last.step) return;
 
-    start ??= cell;
+    if (!start) {
+      start = cell;
+      erasing = seq.getCell(instrumentData, cell.track, cell.step);
+    }
     last = cell;
     panWillTurnOn ??= true;
-    stride = strideOf(start, cell);
+    stride = erasing ? 1 : strideOf(start, cell);
     modifiedSteps.clear();
-    for (const p of previewStroke(start, cell, eraseEmpty)) {
+    for (const p of previewStroke(start, cell, false, erasing)) {
       modifiedSteps.set(p.step + 1000 * start.track, p.offset);
     }
   }
 
+  /** A loop up to this long is shown whole; a longer one is paged. */
+  const MAX_VISIBLE_STEPS = 32;
   let page = $state(1);
-  let pages = $derived(paginate(page, instr));
-  let eraseEmpty = $state(false);
+  let pages = $derived(paginate(instr));
 
   $effect(() => {
     if (page - 1 >= pages.length) {
-      page = pages.length;
+      page = Math.max(1, pages.length);
     }
   });
 
-  function paginate(page: number, instr: Instrument | undefined) {
-    // console.log('paginate', page, instr);
-
+  function paginate(instr: Instrument | undefined) {
     if (!instr) return [];
     const length = instr.getLength(instrumentData);
     const totalLength = length.stepsPerMeasure * length.measures;
-    const stepsPerPage = 8;
-    const pagesCount = Math.ceil(totalLength / stepsPerPage);
+    const pagesCount = Math.ceil(totalLength / MAX_VISIBLE_STEPS);
     return Array.from({ length: pagesCount }, (_, i) => ({
       page: i + 1,
       label: `Page ${i + 1}`,
-      start: i * stepsPerPage,
-      end: Math.min((i + 1) * stepsPerPage, totalLength)
+      start: i * MAX_VISIBLE_STEPS,
+      end: Math.min((i + 1) * MAX_VISIBLE_STEPS, totalLength)
     }));
   }
 
-  function currentPageRange(pageIndex: number) {
+  function currentPageRange() {
     if (!instr || page > pages.length) return { start: 0, end: 0, length: 0 };
-
     const curPage = pages[page - 1];
     return { ...curPage, length: curPage.end - curPage.start };
   }
+
+  // grid rows run from the highest track (top) to the lowest
+  const rows = (seq?.tracks ?? []).map((track, trackIndex) => ({ track, trackIndex })).reverse();
+  const nowStep = $derived(
+    instr ? playheadStep(position ?? 0, playing ?? false, instr.getLength(instrumentData)) : undefined
+  );
 </script>
 
 {#if instr}
   {@const length = instr.getLength(instrumentData)}
-  {@const totalLength = length.stepsPerMeasure * length.measures}
-  <!-- {@const pages = Math.ceil(totalLength / 16)} -->
+  {@const currentRange = currentPageRange()}
 
-  <div class="my-4 ml-6 flex flex-1">
-
-    <Progress classes="" value={$progress} max={100} />
-  </div>
-
-  <div class="mb-2 flex flex-col touch-none " use:pointer={{ onPointer }}>
-    {#each seq.tracks.reverse() as track, rindex}
-      {@const trackIndex = seq.tracks.length - 1 - rindex}
-
-      {@const currentRange = currentPageRange(page)}
+  <div class="mb-2 flex touch-none flex-col" use:pointer={{ onPointer }}>
+    {#each rows as { track, trackIndex } (trackIndex)}
       <div class="flex flex-row">
-        <div class="mr-1 w-4 flex-none">{track}</div>
-        <div class="flex-1 grid grid-cols-8">
-        {#each currentRange, ri}
-          {@const i = currentRange.start + ri}
-
-          {@const modifiedCell = modifiedSteps.get(i + 1000 * trackIndex)}
-          {@const cell = seq.getCell(instrumentData, trackIndex, i)}
-          {@const odd = Math.floor(i / length.stepsPerMeasure) % 2 === 1}
-
-          <div
-            id="seq-{trackIndex}-{i}"
-            aria-label="seq-{trackIndex}-{i}"
-            data-x={i}
-            data-y={trackIndex}
-            class="flex-1 p-px flex "
-          >
-        <span class="flex-1 h-full pointer-events-none rounded-xs {modifiedCell === undefined
-          ? cell
-            ? odd
-              ? buttonClassOnOdd
-              : buttonClassOn
-            : odd
-              ? buttonClassOffOdd
-              : buttonClassOff
-          : modifiedCell % stride === 0
-            ? buttonClassModifiedOn
-            : (eraseEmpty ?buttonClassModifiedOffErase: buttonClassModifiedOff)}"></span>  
+        <div class="mr-1 w-8 flex-none self-center text-right text-xs">
+          {instr.trackLabel(track, scale)}
         </div>
-        {/each}
-      </div>
+        <div
+          class="grid flex-1"
+          style:grid-template-columns="repeat({Math.max(1, currentRange.length)}, minmax(0, 1fr))"
+        >
+          {#each { length: currentRange.length } as _, ri}
+            {@const i = currentRange.start + ri}
+            {@const modifiedCell = modifiedSteps.get(i + 1000 * trackIndex)}
+            {@const cell = seq.getCell(instrumentData, trackIndex, i)}
+            {@const odd = Math.floor(i / length.stepsPerMeasure) % 2 === 1}
+
+            <div
+              id="seq-{trackIndex}-{i}"
+              aria-label="seq-{trackIndex}-{i}"
+              data-x={i}
+              data-y={trackIndex}
+              class="flex h-8 p-px {i % 4 === 0 && ri > 0 ? 'border-surface-500/40 border-l-2' : ''} {nowStep ===
+              i
+                ? 'bg-warning-500/40'
+                : ''}"
+            >
+              <span
+                class="pointer-events-none h-full flex-1 rounded-xs {modifiedCell === undefined
+                  ? cell
+                    ? odd
+                      ? buttonClassOnOdd
+                      : buttonClassOn
+                    : odd
+                      ? buttonClassOffOdd
+                      : buttonClassOff
+                  : erasing
+                    ? buttonClassErasing
+                    : modifiedCell % stride === 0
+                      ? buttonClassModifiedOn
+                      : buttonClassModifiedOff}"
+              ></span>
+            </div>
+          {/each}
+        </div>
       </div>
     {/each}
   </div>
-  <!-- {#if pages > 0} -->
-  <div class="flex justify-between">
-    <Pagination data={pages} {page} pageSize={1} onPageChange={(e) => (page = e.page)}>
-      {#snippet labelEllipsis()}<EllipsisIcon class="size-4" />{/snippet}
-      {#snippet labelNext()}<ArrowRightIcon class="size-4" />{/snippet}
-      {#snippet labelPrevious()}<ArrowLeftIcon class="size-4" />{/snippet}
-      {#snippet labelFirst()}<ChevronFirstIcon class="size-4" />{/snippet}
-      {#snippet labelLast()}<ChevronLastIcon class="size-4" />{/snippet}
-    </Pagination>
+
+  <div class="flex items-center justify-between gap-2">
+    {#if pages.length > 1}
+      <Pagination data={pages} {page} pageSize={1} onPageChange={(e) => (page = e.page)}>
+        {#snippet labelEllipsis()}<EllipsisIcon class="size-4" />{/snippet}
+        {#snippet labelNext()}<ArrowRightIcon class="size-4" />{/snippet}
+        {#snippet labelPrevious()}<ArrowLeftIcon class="size-4" />{/snippet}
+        {#snippet labelFirst()}<ChevronFirstIcon class="size-4" />{/snippet}
+        {#snippet labelLast()}<ChevronLastIcon class="size-4" />{/snippet}
+      </Pagination>
+    {:else}
+      <span></span>
+    {/if}
     <div class="flex flex-row items-center gap-2">
-      {#if panWillTurnOn}
-        {stride}
+      {#if panWillTurnOn && !erasing && stride > 1}
+        <span class="text-sm">every {stride}</span>
+      {:else if panWillTurnOn && erasing}
+        <span class="text-sm">erasing</span>
       {/if}
-      <Switch  compact checked={eraseEmpty} onCheckedChange={() => (eraseEmpty = !eraseEmpty)}
-        label="Erase empty">
-        {#snippet inactiveChild()}<EraserIcon size="20" />{/snippet}
-        {#snippet activeChild()}<EraserIcon size="20" />{/snippet}
-      </Switch>
-      <HelpCircleIcon />
+      <button
+        class="btn-icon btn-icon-sm"
+        aria-label="How the grid works"
+        aria-expanded={showHelp}
+        onclick={() => (showHelp = !showHelp)}><HelpCircleIcon size={20} /></button
+      >
     </div>
   </div>
-  <!-- {/if} -->
+  {#if showHelp}
+    <p class="bg-surface-100-900 mt-2 rounded p-2 text-sm" data-testid="grid-help">
+      Tap a cell to switch it on or off. Drag across to fill a stretch; drag up or down as you go to
+      skip steps (every 2nd, 3rd…). Start a drag on a lit cell to erase instead.
+    </p>
+  {/if}
 {:else}
   <p>Instrument not found</p>
 {/if}

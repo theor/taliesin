@@ -130,9 +130,14 @@ describe('randomize', () => {
     expect(JSON.stringify(bassNotes(b))).toBe(JSON.stringify(notes));
   });
 
-  test('an instrument with nothing to randomize produces no commands', () => {
+  test('a drum kit randomizes only its own tracks, as one absolute command', () => {
     const s = solo();
-    expect(randomizeCommands($state.snapshot(s.instrumentsData.instrumentsData[DRUM]) as any)).toEqual([]);
+    const data = $state.snapshot(s.instrumentsData.instrumentsData[DRUM]) as any;
+    const cmds = randomizeCommands(data);
+    // (the odds of a random groove equalling the preset on all three tracks are negligible)
+    expect(cmds).toHaveLength(1);
+    expect(cmds[0]).toMatchObject({ type: 'setPartFields', partName: 'PartTrackNotes' });
+    expect(Object.keys((cmds[0] as any).fields.notes).sort()).toEqual(['bd', 'hh', 'sd']);
   });
 });
 

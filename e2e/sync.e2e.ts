@@ -76,9 +76,8 @@ async function pair() {
   return { room, host, client };
 }
 
-// The page's own controls, driven like a user would. (Remove / randomize live in the "Effects" view.)
-const showEffects = (p: Page) =>
-  p.locator('header.instrument-header [data-testid="switch-control"]').click();
+// The page's own controls, driven like a user would. (The fine-tuning panes sit under "More controls".)
+const showEffects = (p: Page) => p.locator('[data-testid="more-controls"] summary').click();
 const instrumentVolume = (p: Page, index: number) =>
   p.evaluate(
     (i) => (window as any).__store.instrumentsData.instrumentsData[i].volume as number,
@@ -130,8 +129,9 @@ describe('instrument sync (real transport, real controls)', () => {
     const before = (await instruments(host)).length;
     const removedId = (await instruments(client))[0].id;
 
-    await showEffects(client);
+    await client.getByRole('button', { name: 'Instrument menu' }).click();
     await client.getByRole('button', { name: 'Remove instrument' }).click();
+    await client.getByRole('button', { name: 'Yes, remove it' }).click(); // removing asks first
 
     await expect.poll(async () => (await instruments(host)).length).toBe(before - 1);
     expect((await instruments(host)).some((i: any) => i.id === removedId)).toBe(false);
@@ -171,7 +171,6 @@ describe('instrument sync (real transport, real controls)', () => {
     const { host, client } = await pair();
     const initial = await partField(host, 'MonoSequence', 'notes');
 
-    await showEffects(client);
     await client.getByRole('button', { name: 'Randomize' }).click();
 
     await expect
@@ -182,6 +181,20 @@ describe('instrument sync (real transport, real controls)', () => {
     expect(await partField(host, 'MonoSequence', 'notes')).toEqual(
       await partField(client, 'MonoSequence', 'notes')
     );
+  });
+
+  test('muting an instrument on the client reaches the host, and un-muting brings it back', async () => {
+    const { host, client } = await pair();
+    const state = (p: Page, i: number) =>
+      p.evaluate((n) => (window as any).__store.instrumentsData.instrumentsData[n].state as number, i);
+    // (which instruments end up in the song's code is covered by the unit tests)
+    expect(await state(host, 0)).toBe(0);
+
+    await client.getByRole('button', { name: 'Mute', exact: true }).click(); // the selected (first) instrument
+    await expect.poll(() => state(host, 0)).toBe(1);
+
+    await client.getByRole('button', { name: 'Mute', exact: true }).click(); // pressing it again un-mutes
+    await expect.poll(() => state(host, 0)).toBe(0);
   });
 
   test('the Mixer sliders reach the other peer', async () => {
@@ -394,6 +407,7 @@ describe('acoustic calibration (real Web Audio)', () => {
 
   test('the Calibrate button runs the whole protocol; a microphone that hears nothing is reported, not applied', async () => {
     const { host, client } = await pair();
+    await host.getByRole('button', { name: 'Settings' }).click(); // Calibrate lives in the settings panel
     await host.getByRole('button', { name: 'Calibrate' }).click();
     const note = () => host.getByTestId('calibration-note').textContent({ timeout: 1000 });
     await expect.poll(note, { timeout: 10_000 }).toContain('Listening');
@@ -480,7 +494,7 @@ describe('TURN credentials', () => {
 });
 
 describe('on a phone (touch input)', () => {
-  test('the menu drawer opens with a tap', async () => {
+  test('the transport and the instrument tabs are in the bottom bar, no menu to open first', async () => {
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 },
       hasTouch: true,
@@ -490,10 +504,18 @@ describe('on a phone (touch input)', () => {
     const page = await context.newPage();
     await page.goto(`${APP_URL}/?host&room=${newRoom()}&relay=${encodeURIComponent(RELAY_URL)}&debug`);
     await page.waitForFunction(() => (window as any).__store);
-    const menuItems = page.locator('[title="Mixer"]:visible');
-    expect(await menuItems.count()).toBe(0); // the desktop sidebar is hidden at this width
-    await page.locator('[class~="md:hidden"] button').first().tap();
-    await expect.poll(() => menuItems.count(), { timeout: 5000 }).toBeGreaterThan(0);
+    // the desktop header's transport is hidden at this width; the bottom bar's is the visible one
+    const play = page.getByRole('button', { name: 'Play' });
+    await expect.poll(() => play.isVisible()).toBe(true);
+    await play.tap();
+    await expect
+      .poll(() => page.evaluate(() => (window as any).__store.transport.playing as boolean))
+      .toBe(true);
+    await page.getByRole('button', { name: 'Stop' }).tap();
+    // tapping a tab switches instruments
+    const tabs = page.locator('nav[aria-label="Instruments and transport"] button[title]');
+    await tabs.nth(1).tap();
+    await expect.poll(() => tabs.nth(1).getAttribute('aria-current')).toBe('true');
   });
 });
 

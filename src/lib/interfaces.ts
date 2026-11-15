@@ -19,6 +19,11 @@ export interface IInstrumentViewProps {
 /** Views that edit data get a `dispatch`: they never mutate instrument state themselves. */
 export interface IDispatchingInstrumentViewProps extends IInstrumentViewProps {
   dispatch: Dispatch;
+  /** The transport, for views that show a playhead: position in cycles, and whether it is running. */
+  position?: number;
+  playing?: boolean;
+  /** When someone else last edited this instrument (changes → the view flashes). */
+  editedByOther?: number;
 }
 export interface ITypedInstrumentViewProps<T extends InstrumentData> {
   instrumentData: T;

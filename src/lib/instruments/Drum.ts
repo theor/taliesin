@@ -6,7 +6,22 @@ import { Sequencer, TrackSequencer } from "$lib/sequencer";
 
 
 export class Drum extends Instrument {
+    /** A new groove on the tracks the kit already has: kick on the downbeats, snare on the backbeats. */
     public randomize(data: InstrumentData): InstrumentData {
+      const part = getPart(PartTrackNotes, data);
+      if (!part) return data;
+      const { stepsPerMeasure: per, measures } = this.getLength(data);
+      const odds: Partial<Record<DrumNote, (i: number) => number>> = {
+        [DrumNote.kick]: (i) => (i % per === 0 ? 1 : 0.15),
+        [DrumNote.snare]: (i) => (per > 1 && i % per === Math.floor(per / 2) ? 1 : 0.1),
+        [DrumNote.hiHat]: () => 0.75
+      };
+      for (const track of Object.keys(part.notes) as DrumNote[]) {
+        const odd = odds[track] ?? (() => 0.15);
+        part.notes[track] = Array.from({ length: per * measures }, (_, i) =>
+          Math.random() < odd(i) ? 1 : 0
+        );
+      }
       return data;
     }
     public generate_(data: InstrumentData): string {

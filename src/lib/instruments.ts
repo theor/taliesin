@@ -26,6 +26,10 @@ export abstract class Instrument {
     return { stepsPerMeasure: 4, measures: 1 };
   }
   abstract randomize(data: InstrumentData): InstrumentData;
+  /** What a grid row is called (e.g. a note name instead of a scale degree). */
+  trackLabel(track: string, _scale: { scaleKey: string; scaleMode: string }): string {
+    return track;
+  }
   sequencer: ISequencer | undefined;
   // abstract sequencer(data: InstrumentData): ISequencer|undefined ;
   notes: string[] = [];

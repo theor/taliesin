@@ -74,11 +74,28 @@ describe('SequencerView', () => {
 
   test('moving a row away while dragging sets a stride of 2', async () => {
     const { dispatch, gesture } = mount();
-    await gesture([[0, 0], [2, 0], [4, 1]]);
+    await gesture([[1, 0], [3, 0], [5, 1]]); // starts on an empty cell, so it paints
     expect(dispatch.mock.calls[0][0]).toMatchObject({
       track: 0,
-      cells: [0, 2, 4].map((step) => ({ step, on: true }))
+      cells: [1, 3, 5].map((step) => ({ step, on: true }))
     });
+  });
+
+  test('a drag that starts on a lit cell erases everything it covers', async () => {
+    const { dispatch, cell, gesture } = mount();
+    await gesture([[4, 0], [5, 0], [6, 0]], false); // the kick is on at step 4
+    expect(cell(5, 0).firstElementChild).toHaveClass('preset-gradient'); // erase preview
+    await gesture([], true);
+    expect(dispatch.mock.calls[0][0]).toMatchObject({
+      track: 0,
+      cells: [4, 5, 6].map((step) => ({ step, on: false }))
+    });
+  });
+
+  test('every step of the loop is shown, without paging', () => {
+    const { container } = mount();
+    expect(container.querySelectorAll('[data-y="0"]')).toHaveLength(8);
+    expect(container.querySelector('nav[aria-label="pagination"], [data-part="root"]')).toBeNull();
   });
 
   test('nothing is dispatched until the pointer is released, but the stroke is previewed', async () => {

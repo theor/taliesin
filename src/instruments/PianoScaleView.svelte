@@ -7,7 +7,7 @@
     import { getInstrument } from '$lib/Store.svelte';
 	import SequencerView from './SequencerView.svelte';
 
-	let {index, instrumentData = $bindable(), dispatch}: IDispatchingInstrumentViewProps = $props();
+	let {index, instrumentData = $bindable(), dispatch, position, playing}: IDispatchingInstrumentViewProps = $props();
 
 	const instr: Instrument | undefined = getInstrument(instrumentData);
 	const seq = instr?.sequencer;
@@ -19,7 +19,7 @@
 	{#if seq}
 	<!-- TODO should not be keyed ? at least index is better than instrument data -->
 	{#key index}
-	<SequencerView bind:instrumentData={instrumentData} index={index} {dispatch} />
+	<SequencerView bind:instrumentData={instrumentData} index={index} {dispatch} {position} {playing} />
 	{/key}
 	{/if}
 </div>

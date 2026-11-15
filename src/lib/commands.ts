@@ -22,7 +22,7 @@ export type Command =
     }
   /** Set some fields of one part (effects, filter, steps, notes...). Only fields the part already has. */
   | { type: 'setPartFields'; instrumentId: string; partName: string; fields: { [key: string]: Json } }
-  | { type: 'setInstrumentFields'; instrumentId: string; fields: { name?: string; volume?: number } }
+  | { type: 'setInstrumentFields'; instrumentId: string; fields: { name?: string; volume?: number; state?: number } }
   /** Appends the instrument (or moves it to the end if it is already there): the host's order wins. */
   | { type: 'addInstrument'; instrument: InstrumentData & { [key: string]: Json } }
   | { type: 'removeInstrument'; instrumentId: string }
@@ -157,14 +157,18 @@ function applySetInstrumentFields(
 ): boolean {
   const f = cmd.fields;
   if (!isId(cmd.instrumentId) || typeof f !== 'object' || f === null) return false;
-  if (Object.keys(f).some((k) => k !== 'name' && k !== 'volume')) return false;
+  if (Object.keys(f).some((k) => k !== 'name' && k !== 'volume' && k !== 'state')) return false;
   if (f.name !== undefined && (typeof f.name !== 'string' || f.name.length > MAX_STRING)) return false;
   if (f.volume !== undefined && !(typeof f.volume === 'number' && f.volume >= 0 && f.volume <= 1))
+    return false;
+  // 0 playing, 1 muted, 2 solo (TrackState)
+  if (f.state !== undefined && !(Number.isInteger(f.state) && f.state >= 0 && f.state <= 2))
     return false;
   const data = song.instrumentsData.find((i) => i.id === cmd.instrumentId);
   if (!data) return false;
   if (f.name !== undefined) data.name = f.name;
   if (f.volume !== undefined) data.volume = f.volume;
+  if (f.state !== undefined) data.state = f.state;
   return true;
 }
 

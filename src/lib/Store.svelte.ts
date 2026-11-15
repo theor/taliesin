@@ -9,7 +9,8 @@ import {
   type Constructor,
   type Instrument,
   type InstrumentData,
-  type InstrumentDataJsonValue
+  type InstrumentDataJsonValue,
+  TrackState
 } from './instruments';
 import { PianoScale } from './instruments/MonoSynth';
 import { Drum } from './instruments/Drum';
@@ -38,6 +39,12 @@ import { applySongCommand, isSongCommand, type Command, type SongCommand } from 
 
 export const mixerIndex = -1;
 
+/** Which instruments make sound: any soloed ones alone, otherwise everything that is not muted. */
+export function audibleInstruments(all: InstrumentData[]): InstrumentData[] {
+  const soloed = all.filter((i) => i.state === TrackState.Solo);
+  return soloed.length > 0 ? soloed : all.filter((i) => i.state !== TrackState.Muted);
+}
+
 if (VITEST) {
 }
 
@@ -61,7 +68,8 @@ const turnConfig = turnUrls.length
 const config: JoinRoomConfig = { appId: 'taliesin', turnConfig };
 
 /** `ordered`: sent by the host, which is the single sequencer of instrument commands. */
-type WireCommand = { cmd: Command; ordered: boolean };
+/** `from`: the peer that made the edit, stamped by the host when it rebroadcasts (only used to show who is editing). */
+type WireCommand = { cmd: Command; ordered: boolean; from?: string };
 
 type Preset = {
   name: string;
@@ -175,14 +183,30 @@ export class AppStore {
     );
   }
   code = () => {
-    return this.instrumentsData.instrumentsData
+    const code = audibleInstruments(this.instrumentsData.instrumentsData)
       .map((i) => {
         const instr = getInstrument(i);
         return instr ? `$: ${instr.generate(i)}` : '';
       })
       .join('\n')
       .replace(/[\r\n]{2,}/g, '\n\n');
+    // Strudel ignores an empty evaluation, which would leave the previous song playing
+    return code.trim() === '' ? '$: silence' : code;
   };
+  /**
+   * When someone else last edited each instrument (by instrument id, ms since epoch). A view can
+   * watch its entry to flash "someone just touched this". Your own edits never show up here.
+   */
+  activity = $state<Record<string, number>>({});
+  private noteActivity(cmd: SongCommand) {
+    const id =
+      cmd.type === 'addInstrument'
+        ? cmd.instrument?.id
+        : 'instrumentId' in cmd
+          ? cmd.instrumentId
+          : undefined;
+    if (typeof id === 'string' && id.length <= 128) this.activity[id] = Date.now();
+  }
   /** Our own peer id (known once the room is joined). */
   selfPeerId = $state('');
   /** Ids of the peers currently connected to us. */
@@ -247,7 +271,7 @@ export class AppStore {
     }
     if (!this.applyCommand(cmd)) return;
     this.scheduleSave();
-    this.emit(cmd, this.host);
+    this.emit(cmd, this.host, this.selfPeerId || undefined);
   };
 
   /** Where the host keeps the song between sessions (`localStorage`; none under test). */
@@ -297,7 +321,7 @@ export class AppStore {
    * (`navigator.webdriver`, e.g. the Playwright e2e run); only a real UI session throttles.
    */
   throttleMs = VITEST || (typeof navigator !== 'undefined' && navigator.webdriver) ? 0 : 50;
-  private pending = new Map<string, SongCommand>();
+  private pending = new Map<string, { cmd: SongCommand; from?: string }>();
   private pendingTimer: ReturnType<typeof setTimeout> | undefined;
 
   /** Commands that stream while a control is dragged, keyed by what they overwrite. */
@@ -313,21 +337,21 @@ export class AppStore {
   }
 
   /** Send a song command, throttling streaming ones. Order between different commands is preserved. */
-  private emit(cmd: SongCommand, ordered: boolean) {
+  private emit(cmd: SongCommand, ordered: boolean, from?: string) {
     const key = this.throttleMs > 0 ? AppStore.coalesceKey(cmd) : undefined;
     if (key === undefined) {
       this.flushPending();
-      this.sendCommand({ cmd, ordered });
+      this.sendCommand({ cmd, ordered, ...(ordered && from ? { from } : {}) });
       return;
     }
-    const waiting = this.pending.get(key);
+    const waiting = this.pending.get(key)?.cmd;
     if (waiting && 'fields' in waiting && 'fields' in cmd) {
       this.pending.set(key, {
-        ...cmd,
-        fields: { ...waiting.fields, ...cmd.fields }
-      } as SongCommand);
+        cmd: { ...cmd, fields: { ...waiting.fields, ...cmd.fields } } as SongCommand,
+        from
+      });
     } else {
-      this.pending.set(key, cmd);
+      this.pending.set(key, { cmd, from });
     }
     this.pendingTimer ??= setTimeout(() => this.flushPending(), this.throttleMs);
   }
@@ -337,7 +361,8 @@ export class AppStore {
     this.pendingTimer = undefined;
     const batch = [...this.pending.values()];
     this.pending.clear();
-    for (const cmd of batch) this.sendCommand({ cmd, ordered: this.host });
+    for (const { cmd, from } of batch)
+      this.sendCommand({ cmd, ordered: this.host, ...(this.host && from ? { from } : {}) });
   }
   private applyCommand(cmd: SongCommand): boolean {
     return applySongCommand(this.instrumentsData, cmd, {
@@ -407,14 +432,17 @@ export class AppStore {
     // Host: takes unordered commands from clients, applies them and rebroadcasts them in the order it
     // received them (including back to the sender). Clients: only take the host's ordered stream, so a
     // peer-to-peer copy of someone else's command can never race the host's ordering.
-    onReceiveCommand((msg) => {
+    onReceiveCommand((msg, peerId) => {
       if (!isSongCommand(msg?.cmd)) return;
       if (this.host ? msg.ordered : !msg.ordered) return;
       if (!this.applyCommand(msg.cmd)) return;
       this.commandLog.push({ cmd: msg.cmd, origin: 'remote' });
+      // the host knows who sent it; a client is told by the host (and ignores its own edits coming back)
+      const from = this.host ? peerId : typeof msg.from === 'string' ? msg.from : undefined;
+      if (from && from !== this.selfPeerId && this.selfPeerId !== '') this.noteActivity(msg.cmd);
       if (this.host) {
         this.scheduleSave();
-        this.emit(msg.cmd, true);
+        this.emit(msg.cmd, true, peerId);
       }
     });
 
