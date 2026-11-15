@@ -9,6 +9,8 @@ interface Tracked {
   turn: boolean;
   /** Candidate-pair states from getStats, refreshed by `refreshRtcStats`. */
   pairs: string;
+  /** State changes as `ice:checking@41.2` (seconds since page load), to see when a connection died. */
+  timeline: string[];
 }
 
 interface RelayStats {
@@ -93,11 +95,17 @@ export function installRtcDebug() {
         pc: this,
         candidates: {},
         pairs: '',
+        timeline: [],
         turn: (config?.iceServers ?? []).some((s) =>
           [s.urls].flat().some((u) => /^turns?:/.test(u))
         )
       };
       tracked.push(entry);
+      const mark = (what: string) =>
+        entry.timeline.push(`${what}@${(performance.now() / 1000).toFixed(1)}`);
+      this.addEventListener('signalingstatechange', () => mark(`sig:${this.signalingState}`));
+      this.addEventListener('iceconnectionstatechange', () => mark(`ice:${this.iceConnectionState}`));
+      this.addEventListener('connectionstatechange', () => mark(`conn:${this.connectionState}`));
       this.addEventListener('icecandidate', (e) => {
         const type = e.candidate?.type ?? (e.candidate?.candidate.split(' ')[7] || '?');
         if (e.candidate) entry.candidates[type] = (entry.candidates[type] ?? 0) + 1;
@@ -140,10 +148,10 @@ export async function refreshRtcStats() {
 
 /** One line per connection: signalling, ICE and connection state, candidates found, TURN configured. */
 export function rtcSummary(): string[] {
-  return tracked.map(({ pc, candidates, turn, pairs }, i) => {
+  return tracked.map(({ pc, candidates, turn, pairs, timeline }, i) => {
     const cands = Object.entries(candidates)
       .map(([t, n]) => `${t}${n}`)
       .join(',');
-    return `pc${i + 1} sig=${pc.signalingState} ice=${pc.iceConnectionState} conn=${pc.connectionState} cand=${cands || 'none'} remote=${remoteCandidates(pc)} pairs=${pairs || '-'} turn=${turn ? 'yes' : 'NO'}`;
+    return `pc${i + 1} sig=${pc.signalingState} ice=${pc.iceConnectionState} conn=${pc.connectionState} cand=${cands || 'none'} remote=${remoteCandidates(pc)} pairs=${pairs || '-'} turn=${turn ? 'yes' : 'NO'} t=[${timeline.slice(-6).join(' ')}]`;
   });
 }
