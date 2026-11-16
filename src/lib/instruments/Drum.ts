@@ -29,7 +29,7 @@ export class Drum extends Instrument {
     }
     override name: string = 'Drum';
     /** Drum tracks are independent rows of hits, which suits Euclidean circles. */
-    override views: InputView[] = ['grid', 'circle', 'rings'];
+    override views: InputView[] = ['grid', 'circle', 'rings', 'record'];
     constructor() {
       super();
       // this.sequencer = new DrumSequencer();

@@ -5,12 +5,13 @@
 		type IDispatchingInstrumentViewProps,
 	} from '$lib';
 	import { getInstrument } from '$lib/Store.svelte';
-	import { Grid3x3, Orbit, Target } from '@lucide/svelte';
+	import { CircleDot, Grid3x3, Orbit, Target } from '@lucide/svelte';
 	import CircleView from './CircleView.svelte';
 	import NestedCircleView from './NestedCircleView.svelte';
+	import RecordView from './RecordView.svelte';
 	import SequencerView from './SequencerView.svelte';
 
-	let {index, instrumentData = $bindable(), dispatch, position, playing}: IDispatchingInstrumentViewProps = $props();
+	let {index, instrumentData = $bindable(), dispatch, position, playing, now}: IDispatchingInstrumentViewProps = $props();
 
 	// The same component instance is reused when another instrument is selected, so everything
 	// that depends on the instrument is derived, not computed once.
@@ -21,7 +22,8 @@
 	const VIEW_META = {
 		grid: { label: 'Grid', aria: 'Grid view', icon: Grid3x3 },
 		circle: { label: 'Circles', aria: 'Circle view', icon: Orbit },
-		rings: { label: 'Rings', aria: 'Nested rings view', icon: Target }
+		rings: { label: 'Rings', aria: 'Nested rings view', icon: Target },
+		record: { label: 'Record', aria: 'Record view', icon: CircleDot }
 	} as const;
 
 	// Which input the user prefers is a per-device choice (not part of the song, not synced).
@@ -29,7 +31,7 @@
 	function loadView(id: string): InputView {
 		try {
 			const saved = localStorage.getItem(storageKey(id));
-			if (saved === 'grid' || saved === 'circle' || saved === 'rings') {
+			if (saved === 'grid' || saved === 'circle' || saved === 'rings' || saved === 'record') {
 				return views.includes(saved) ? saved : 'grid';
 			}
 		} catch {
@@ -73,6 +75,8 @@
 		{#key index}
 			{#if view === 'circle'}
 				<CircleView {instrumentData} {index} {dispatch} {position} {playing} />
+			{:else if view === 'record'}
+				<RecordView {instrumentData} {index} {dispatch} {position} {playing} {now} />
 			{:else if view === 'rings'}
 				<NestedCircleView {instrumentData} {index} {dispatch} {position} {playing} />
 			{:else}

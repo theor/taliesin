@@ -1,5 +1,5 @@
 import { makePartData } from "$lib/Store.svelte";
-import { Instrument,getPart,type InstrumentData } from "$lib/instruments";
+import { Instrument,getPart,type InputView, type InstrumentData } from "$lib/instruments";
 import { InstrumentPart, MonoSequence, PartEffects, PartFilter, PartOctave, PartSteps, type InstrumentPartData } from "$lib/parts.svelte";
 import { Sequencer, MonoSequenceSequencer } from "$lib/sequencer";
 import { degreeName } from "$lib/scale";
@@ -23,6 +23,8 @@ export class PianoScale extends Instrument {
       return `.sound("sawtooth").n(4)`;
     }
     override name: string = 'PianoScale';
+    /** One pad per scale degree to play the melody in. */
+    override views: InputView[] = ['grid', 'record'];
     override trackLabel(track: string, scale: { scaleKey: string; scaleMode: string }): string {
       return degreeName(scale.scaleKey, scale.scaleMode, Number(track));
     }

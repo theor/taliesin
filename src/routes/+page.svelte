@@ -321,6 +321,7 @@
         dispatch={store.dispatch}
         {position}
         {playing}
+        now={() => store.transport.heardPosition()}
         editedByOther={store.activity[currentInstrument.id]}
       />
     {:else}

@@ -358,6 +358,16 @@ describe('playhead sync', () => {
     expect(a.transport.position()).toBeCloseTo(11);
   });
 
+  test('heardPosition trails position by the host output delay, on the host and on clients', async () => {
+    vi.useFakeTimers();
+    const { host, a, players } = setup({ clocked: true });
+    players.host.outputLatency = 0.4; // 0.4 s at 0.5 cycles/s = 0.2 cycles
+    players.host.startCycle = 10;
+    await host.transport.toggle();
+    expect(host.transport.heardPosition()).toBeCloseTo(host.transport.position() - 0.2);
+    expect(a.transport.heardPosition()).toBeCloseTo(a.transport.position() - 0.2);
+  });
+
   test('uses the host tempo', async () => {
     vi.useFakeTimers();
     const { host, a, players } = setup({ clocked: true });

@@ -13,8 +13,8 @@ import {
 import type { ISequencer } from './sequencer';
 import { strudel } from './strudel';
 
-/** How an instrument's cells can be edited: the step grid, one Euclidean circle per track, or nested rings. */
-export type InputView = 'grid' | 'circle' | 'rings';
+/** How an instrument's cells can be edited: the step grid, one Euclidean circle per track, nested rings, or pads to play along on. */
+export type InputView = 'grid' | 'circle' | 'rings' | 'record';
 
 export interface Length {
   stepsPerMeasure: number;

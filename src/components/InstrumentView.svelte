@@ -41,6 +41,7 @@
     dispatch,
     position,
     playing,
+    now,
     editedByOther
   }: IDispatchingInstrumentViewProps = $props();
 
@@ -163,7 +164,7 @@
     </span>
   </header>
 
-  <PianoScaleView bind:instrumentData {index} {dispatch} {position} {playing} />
+  <PianoScaleView bind:instrumentData {index} {dispatch} {position} {playing} {now} />
 
   <section class="grid gap-x-6 gap-y-1 sm:grid-cols-2" aria-label="Quick controls">
     <MacroSlider

@@ -22,6 +22,8 @@ export interface IDispatchingInstrumentViewProps extends IInstrumentViewProps {
   /** The transport, for views that show a playhead: position in cycles, and whether it is running. */
   position?: number;
   playing?: boolean;
+  /** The song position (cycles) being heard right now, read live: for views that record live input. */
+  now?: () => number;
   /** When someone else last edited this instrument (changes → the view flashes). */
   editedByOther?: number;
 }

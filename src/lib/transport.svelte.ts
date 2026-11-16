@@ -236,6 +236,19 @@ export class Transport {
     return last.cycle + elapsedSec * last.cps;
   }
 
+  /**
+   * The cycle that is being *heard* right now (not just scheduled): `position()` minus the audio output
+   * delay, which on a client is the host's, since clients line up what is heard with the host. Live input
+   * (recording) should use this: people play along with what they hear. May be slightly negative
+   * just after starting.
+   */
+  heardPosition(): number {
+    const last = this.last;
+    const cps = this.host ? this.player.cps : (last?.cps ?? this.player.cps);
+    const out = this.host ? this.player.outputLatency : (last?.out ?? 0);
+    return this.position() - out * cps;
+  }
+
   toggle() {
     if (this.host) return this.player.toggle();
     return this.sendRequest({ action: 'toggle' });
