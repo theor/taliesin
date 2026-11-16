@@ -13,6 +13,9 @@ import {
 import type { ISequencer } from './sequencer';
 import { strudel } from './strudel';
 
+/** How an instrument's cells can be edited: the step grid, one Euclidean circle per track, or nested rings. */
+export type InputView = 'grid' | 'circle' | 'rings';
+
 export interface Length {
   stepsPerMeasure: number;
   measures: number;
@@ -31,6 +34,8 @@ export abstract class Instrument {
     return track;
   }
   sequencer: ISequencer | undefined;
+  /** The ways this instrument's cells can be edited; the first is the default. */
+  views: InputView[] = ['grid'];
   // abstract sequencer(data: InstrumentData): ISequencer|undefined ;
   notes: string[] = [];
   name: string = this.constructor.name;

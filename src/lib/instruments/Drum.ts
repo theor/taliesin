@@ -1,4 +1,4 @@
-import { Instrument, getPart, type InstrumentData } from "$lib/instruments";
+import { Instrument, getPart, type InputView, type InstrumentData } from "$lib/instruments";
 import { makePartData } from "$lib/Store.svelte";
 import { PartTrackNotes, PartSteps, PartEffects } from "$lib/parts.svelte";
 import {DrumNote  } from "$lib/parts.svelte";
@@ -28,6 +28,8 @@ export class Drum extends Instrument {
       return '';
     }
     override name: string = 'Drum';
+    /** Drum tracks are independent rows of hits, which suits Euclidean circles. */
+    override views: InputView[] = ['grid', 'circle', 'rings'];
     constructor() {
       super();
       // this.sequencer = new DrumSequencer();
