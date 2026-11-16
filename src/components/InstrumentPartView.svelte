@@ -23,6 +23,13 @@
     draft = copy($state.snapshot(partData)) as TPart;
   });
 
+  /** "PartArpeggiator" -> "Arpeggiator", "PartTrackNotes" -> "Track notes" */
+  const title = $derived(
+    partData.partName
+      .replace(/^Part/, '')
+      .replace(/([a-z])([A-Z])/g, (_, a, b) => `${a} ${b.toLowerCase()}`)
+  );
+
   /** The user changed a control: send what differs between the copy and the song. */
   async function onControlChange() {
     // let the control's new value reach the bound copy first
@@ -37,15 +44,15 @@
 
 <!-- Input and change events bubble up from the controls; the draft is diffed into a command. -->
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions, a11y_click_events_have_key_events -->
-<section
-  class="px-2"
-  aria-label={partData.partName}
+<fieldset
+  class="border-surface-200-800 rounded-container border px-3 pb-2"
   oninput={onControlChange}
   onchange={onControlChange}
   onclick={onControlChange}
 >
+  <legend class="px-1 text-xs font-semibold tracking-wide uppercase opacity-70">{title}</legend>
   <PartComponent
     part={getPartType(partData.partName) as InstrumentPartTyped<TPart>}
     bind:partData={draft}
   />
-</section>
+</fieldset>
