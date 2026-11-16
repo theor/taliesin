@@ -43,6 +43,15 @@
   let showHelp = $state(false);
 
   function onPointer(e: PointerEvent) {
+    if (e.type === 'pointercancel') {
+      // the browser took the gesture: drop the stroke without committing it
+      modifiedSteps.clear();
+      panWillTurnOn = undefined;
+      stride = 1;
+      erasing = false;
+      start = last = undefined;
+      return;
+    }
     if (e.type === 'pointerup') {
       modifiedSteps.clear();
       panWillTurnOn = undefined;
@@ -126,7 +135,7 @@
   {@const length = instr.getLength(instrumentData)}
   {@const currentRange = currentPageRange()}
 
-  <div class="mb-2 flex touch-none flex-col" use:pointer={{ onPointer }}>
+  <div class="mb-2 flex flex-col select-none" data-testid="sequencer-grid" use:pointer={{ onPointer }}>
     {#each rows as { track, trackIndex } (trackIndex)}
       <div class="flex flex-row">
         <div class="mr-1 w-8 flex-none self-center text-right text-xs">

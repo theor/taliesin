@@ -10,16 +10,30 @@ import type { Command } from '$lib/commands';
 // The view in isolation: no store, no network, no audio. It is handed state and a spy `dispatch`, and
 // the tests check which commands a gesture produces. Drum starts as
 //   bd (track 0): X . . . X . . .     sd (track 1): . . X . . . X .     hh (track 2): all on
+// jsdom has no PointerEvent, so testing-library would drop `pointerType`: provide a minimal one
+if (!('PointerEvent' in window)) {
+  class FakePointerEvent extends MouseEvent {
+    pointerType: string;
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init);
+      this.pointerType = init.pointerType ?? '';
+    }
+  }
+  (window as any).PointerEvent = FakePointerEvent;
+}
+
+let over: Element | null = null;
+let surface: HTMLElement;
+const mountSurface = () => mount();
 function mount() {
   const instrumentData = createInstrument(Drum);
   const dispatch = vi.fn<(cmd: Command) => void>();
   const { container } = render(SequencerView, { props: { index: 0, instrumentData, dispatch } });
-  const surface = container.querySelector('.touch-none') as HTMLElement;
+  surface = container.querySelector('[data-testid="sequencer-grid"]') as HTMLElement;
   const cell = (step: number, track: number) =>
     container.querySelector(`[data-x="${step}"][data-y="${track}"]`) as HTMLElement;
 
   // jsdom has no hit testing: point the "pointer" at whichever cell the test says it is over
-  let over: Element | null = null;
   document.elementFromPoint = () => over;
 
   /** Press on the first cell, move through the rest, release (or not). */
@@ -122,5 +136,53 @@ describe('SequencerView', () => {
     const { cell } = mount();
     expect(cell(0, 0).firstElementChild).toHaveClass('preset-filled-primary-500'); // kick on step 0
     expect(cell(1, 0).firstElementChild).toHaveClass('preset-outlined-primary-500'); // off
+  });
+
+  describe('with a finger (hold to paint, otherwise the page scrolls)', () => {
+    const touch = (x = 0, y = 0) => ({ pointerType: 'touch', clientX: x, clientY: y });
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    test('a quick tap still toggles the cell', async () => {
+      const { dispatch, instrumentData, cell } = mountSurface();
+      over = cell(1, 0);
+      await fireEvent.pointerDown(surface, touch());
+      await fireEvent.pointerUp(surface, touch());
+      expect(dispatch).toHaveBeenCalledWith({
+        type: 'setCells',
+        instrumentId: instrumentData.id,
+        track: 0,
+        cells: [{ step: 1, on: true }]
+      });
+    });
+
+    test('moving before the hold elapses is a scroll: nothing is painted', async () => {
+      const { dispatch, cell } = mountSurface();
+      over = cell(1, 0);
+      await fireEvent.pointerDown(surface, touch());
+      over = cell(2, 0);
+      await fireEvent.pointerMove(surface, touch(0, 40));
+      await vi.advanceTimersByTimeAsync(400);
+      await fireEvent.pointerCancel(surface, touch());
+      expect(dispatch).not.toHaveBeenCalled();
+    });
+
+    test('holding, then dragging, paints and blocks scrolling', async () => {
+      const { dispatch, cell } = mountSurface();
+      over = cell(1, 0);
+      await fireEvent.pointerDown(surface, touch());
+      await vi.advanceTimersByTimeAsync(300);
+      over = cell(2, 0);
+      await fireEvent.pointerMove(surface, touch(20, 0));
+      over = cell(3, 0);
+      await fireEvent.pointerMove(surface, touch(40, 0));
+      const move = new Event('touchmove', { cancelable: true, bubbles: true });
+      surface.dispatchEvent(move);
+      expect(move.defaultPrevented).toBe(true);
+      over = null;
+      await fireEvent.pointerUp(surface, touch(40, 0));
+      expect(dispatch).toHaveBeenCalledTimes(1);
+      expect(dispatch.mock.calls[0][0]).toMatchObject({ type: 'setCells', track: 0 });
+    });
   });
 });
