@@ -1,15 +1,11 @@
 <script lang="ts">
 	import { VoicingMode, type IPartViewProps, type PartChords } from '$lib';
-	import { Checkbox, Slider,List, type ListOptions } from 'svelte-tweakpane-ui';
-	// import { type Component } from 'svelte';
+	import ParamSelect from './ParamSelect.svelte';
+	import ParamToggle from './ParamToggle.svelte';
 
-	const { part,partData }: IPartViewProps<PartChords> = $props();
-	// $effect(() => {
-	// 	console.log('PartEffectsView c', part);
-	// });
-	const options: ListOptions<string> =VoicingMode;
+	const { partData }: IPartViewProps<PartChords> = $props();
+	const options = Object.values(VoicingMode) as string[];
 </script>
 
-<Checkbox bind:value={partData.enabled} label="Enabled"  />
-<List bind:value={partData.mode as string} label="Chords" {options}/>
-	
+<ParamToggle bind:value={partData.enabled} label="Enabled" />
+<ParamSelect bind:value={partData.mode as string} label="Chords" {options} />

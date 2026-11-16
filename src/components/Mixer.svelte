@@ -2,7 +2,7 @@
   import { getInstrumentIcon } from '$lib/Store.svelte';
   import type { Dispatch, Song } from '$lib/commands';
   import { Volume } from '@lucide/svelte';
-  import { Slider } from 'svelte-tweakpane-ui';
+  import ParamSlider from './ParamSlider.svelte';
 
   // Pure view: the song comes in as a prop, changes go out as commands.
   let { song, dispatch }: { song: Song; dispatch: Dispatch } = $props();
@@ -17,15 +17,12 @@
       <h3 class="h3">Main</h3>
     </header>
     <article class="h-64 space-y-4 overflow-y-auto p-4">
-      <Slider
+      <ParamSlider
         label="Master Volume"
-        value={song.volume}
+        bind:value={() => song.volume, (volume) => dispatch({ type: 'setMasterVolume', volume })}
         min={0}
         max={1}
         step={0.01}
-        on:change={(e) =>
-          e.detail.origin === 'internal' &&
-          dispatch({ type: 'setMasterVolume', volume: e.detail.value })}
       />
     </article>
   </div>
@@ -39,19 +36,20 @@
         <h3 class="h3">{instrumentData.name}</h3>
       </header>
       <article class="h-64 space-y-4 overflow-y-auto p-4">
-        <Slider
+        <ParamSlider
           label="Volume"
-          value={instrumentData.volume}
+          bind:value={
+            () => instrumentData.volume,
+            (volume) =>
+              dispatch({
+                type: 'setInstrumentFields',
+                instrumentId: instrumentData.id,
+                fields: { volume }
+              })
+          }
           min={0}
           max={1}
           step={0.01}
-          on:change={(e) =>
-            e.detail.origin === 'internal' &&
-            dispatch({
-              type: 'setInstrumentFields',
-              instrumentId: instrumentData.id,
-              fields: { volume: e.detail.value }
-            })}
         />
       </article>
     </div>

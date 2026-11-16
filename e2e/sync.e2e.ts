@@ -95,11 +95,9 @@ const partField = (p: Page, partName: string, field: string) =>
     },
     [partName, field]
   );
-/** Type a value into a tweakpane control's number field, as a user would. */
+/** Set a slider by its label, as a user dragging it would (fires input events). */
 async function setControl(p: Page, label: string, value: string) {
-  const input = p.locator(`.tp-lblv:has(.tp-lblv_l:text-is("${label}")) input.tp-txtv_i`).first();
-  await input.fill(value);
-  await input.press('Enter');
+  await p.getByRole('slider', { name: label, exact: true }).first().fill(value);
 }
 
 describe('instrument sync (real transport, real controls)', () => {
@@ -160,7 +158,7 @@ describe('instrument sync (real transport, real controls)', () => {
     await showEffects(client);
     await setControl(client, 'Reverb', '0.7');
 
-    // tweakpane snaps to its step (0.05), which leaves float noise like 0.7000000000000001
+    // the slider snaps to its step (0.05), which leaves float noise like 0.7000000000000001
     await expect
       .poll(() => partField(host, 'PartEffects', 'reverb'), { timeout: 20_000 })
       .toBeCloseTo(0.7, 5);
@@ -232,7 +230,7 @@ describe('instrument sync (real transport, real controls)', () => {
     await setControl(client, 'Master Volume', '0.3');
     await setControl(client, 'Volume', '0.4'); // the first instrument's
 
-    // tweakpane rounds to its step, so compare with a tolerance
+    // the slider rounds to its step, so compare with a tolerance
     await expect.poll(() => masterVolume(host), { timeout: 20_000 }).toBeCloseTo(0.3, 5);
     await expect.poll(() => instrumentVolume(host, 0), { timeout: 20_000 }).toBeCloseTo(0.4, 5);
   });

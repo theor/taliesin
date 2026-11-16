@@ -4,8 +4,6 @@
   import type { Dispatch } from '$lib/commands';
   import { diffFields } from '$lib/partFields';
   import { getPartType } from '$lib/Store.svelte';
-  import { Pane } from 'svelte-tweakpane-ui';
-  import { type Pane as TpPane } from 'tweakpane';
 
   interface Props {
     /** The part as it is in the song. Read-only here. */
@@ -25,10 +23,8 @@
     draft = copy($state.snapshot(partData)) as TPart;
   });
 
-  let pane: TpPane = $state(undefined! as TpPane);
-
   /** The user changed a control: send what differs between the copy and the song. */
-  async function onPaneChange() {
+  async function onControlChange() {
     // let the control's new value reach the bound copy first
     await new Promise((resolve) => setTimeout(resolve, 0));
     await tick();
@@ -37,16 +33,19 @@
       dispatch({ type: 'setPartFields', instrumentId, partName: partData.partName, fields });
     }
   }
-  $effect(() => {
-    if (!pane) return;
-    pane.on('change', onPaneChange);
-    return () => pane.off('change', onPaneChange);
-  });
 </script>
 
-<Pane position="inline" title={partData.partName} bind:tpPane={pane}>
+<!-- Input and change events bubble up from the controls; the draft is diffed into a command. -->
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions, a11y_click_events_have_key_events -->
+<section
+  class="px-2"
+  aria-label={partData.partName}
+  oninput={onControlChange}
+  onchange={onControlChange}
+  onclick={onControlChange}
+>
   <PartComponent
     part={getPartType(partData.partName) as InstrumentPartTyped<TPart>}
     bind:partData={draft}
   />
-</Pane>
+</section>

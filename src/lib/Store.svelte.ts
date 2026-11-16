@@ -153,6 +153,17 @@ export const presets: Preset[] = [
       makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
       makePartData(PartOctave, { octave: 2 })
     ]
+  },
+  {
+    name: 'Filter Bass',
+    instrument: PianoScale,
+    parts: [
+      makePartData(PartFilter, { freq: 400 }),
+      makePartData(PartEffects, { reverb: 0.2 }),
+      makePartData(MonoSequence, { notes: [1, undefined, 1, 3, 1, undefined, 5, 4] }),
+      makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
+      makePartData(PartOctave, { octave: 2 })
+    ]
   }
 ];
 export class AppStore {
