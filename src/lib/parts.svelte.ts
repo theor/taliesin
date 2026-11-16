@@ -128,6 +128,13 @@ export enum ArpeggiatorType {
   random = 'random'
 }
 
+const ARP_ORDERS: Record<ArpeggiatorType, string> = {
+  [ArpeggiatorType.up]: '0 1 2',
+  [ArpeggiatorType.down]: '2 1 0',
+  [ArpeggiatorType.upDown]: '0 1 2 1',
+  [ArpeggiatorType.random]: '0|1|2'
+};
+
 export class PartArpeggiator extends InstrumentPartTyped<{
   enabled: boolean;
   speed: number;
@@ -142,8 +149,10 @@ export class PartArpeggiator extends InstrumentPartTyped<{
     selfData: PartArpeggiator['_dataType'],
     length: Length
   ): string {
-    const seq = `[0 1 2 3] * ${selfData.speed}`;
-    return `${selfData.enabled ? `.arp("${seq}")` : ''}`;
+    if (!selfData.enabled) return '';
+    // indices into the chord's notes (a triad has three; an index past the end wraps round)
+    const order = ARP_ORDERS[selfData.arpeggiatorType] ?? ARP_ORDERS[ArpeggiatorType.up];
+    return `.arp("[${order}] * ${selfData.speed}")`;
   }
 }
 export class PartTrackNotes extends InstrumentPartTyped<{
