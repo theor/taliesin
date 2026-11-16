@@ -36,6 +36,8 @@ export type TransportState = {
    * other, and a stale "playing" must not override a newer "stopped".
    */
   seq: number;
+  /** The host's "only this device plays" setting: clients follow the playhead but stay silent. */
+  hostOnly?: boolean;
 };
 export type TransportRequest = { action: 'toggle' | 'stop' };
 
@@ -64,6 +66,17 @@ const PING_SAMPLES = 5;
  */
 export class Transport {
   playing = $state(false);
+  /**
+   * When true, only the host makes sound. Clients still mirror play/stop and the playhead, but never start
+   * their own scheduler. The host sets it (and tells everybody); clients just follow.
+   */
+  hostOnly = $state(false);
+  /** Host: choose whether everyone plays the song, or only this device. */
+  setHostOnly(value: boolean) {
+    if (!this.host || this.hostOnly === value) return;
+    this.hostOnly = value;
+    this.broadcast();
+  }
   /** Last state received from the host (clients only). */
   last = $state<TransportState | undefined>(undefined);
 
@@ -110,6 +123,7 @@ export class Transport {
         this.appliedSeq = state.seq;
         this.hostId = peerId;
         this.playing = state.playing;
+        this.hostOnly = state.hostOnly === true;
         this.last = state;
         this.receivedAt = this.now();
         // measure first, so even the first start uses a real latency estimate
@@ -174,7 +188,7 @@ export class Transport {
   private reconcile(fromMessage = false) {
     if (this.host || !this.last) return;
     const playingLocally = get(this.player.isPlaying);
-    if (!this.last.playing) {
+    if (!this.last.playing || this.hostOnly) {
       clearTimeout(this.settleTimer);
       this.settleTimer = undefined;
       if (playingLocally) this.player.stop();
@@ -241,7 +255,8 @@ export class Transport {
         cycle: this.player.now(),
         cps: this.player.cps,
         out: this.player.outputLatency,
-        seq: this.seq
+        seq: this.seq,
+        hostOnly: this.hostOnly
       },
       peerId
     );

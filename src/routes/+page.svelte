@@ -86,7 +86,8 @@
   $effect(() => {
     // console.log('store changed', $state.snapshot(instrumentsData.instrumentsData), instrumentsData.instrumentsData[0]);
     code = store.code();
-    strudel.evaluate(code); // every peer plays the song itself, following the host's clock
+    // every peer plays the song itself, following the host's clock (unless only the host makes sound)
+    if (isHost || !store.transport.hostOnly) strudel.evaluate(code);
     if (selectedIndex >= instrumentsData.instrumentsData.length) {
       selectedIndex = Math.max(0, instrumentsData.instrumentsData.length - 1);
     }
@@ -117,7 +118,7 @@
   let settingsOpen = $state(false);
   let playing = $derived(store.transport.playing);
   /** A guest's browser keeps audio locked until their first tap. */
-  let needsTap = $derived(!isHost && playing && !$audioRunning);
+  let needsTap = $derived(!isHost && playing && !store.transport.hostOnly && !$audioRunning);
   function startBeat() {
     presetCommands().forEach(store.dispatch);
     selectedIndex = 0;
@@ -207,6 +208,24 @@
               class="card bg-surface-100-900 border-surface-300-700 absolute top-full right-0 z-50 mt-2 w-72 space-y-2 border p-3 shadow-xl"
               data-testid="settings-panel"
             >
+              {#if isHost}
+                <h3 class="h6">Who plays the sound</h3>
+                <label class="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    class="checkbox mt-1"
+                    checked={store.transport.hostOnly}
+                    onchange={(e) => store.transport.setHostOnly(e.currentTarget.checked)}
+                  />
+                  <span>
+                    Only this device plays
+                    <span class="block text-xs opacity-70"
+                      >Everyone else follows the playhead but stays silent. Off: every device plays the
+                      song itself.</span
+                    >
+                  </span>
+                </label>
+              {/if}
               <h3 class="h6">Sound sync</h3>
               {#if isHost}
                 {#if store.peers.length > 0}
@@ -244,6 +263,9 @@
   {/snippet}
   <span>{title}</span>
   <span class="text-surface-600-400 ml-2 hidden text-xs sm:inline" data-testid="room-code">{room}</span>
+  {#if !isHost && store.transport.hostOnly}
+    <span class="chip preset-tonal ml-2 text-xs" data-testid="host-only-note">Sound from host</span>
+  {/if}
 </AppBar>
 
 <MobileNav
@@ -251,6 +273,7 @@
   dispatch={store.dispatch}
   {playing}
   {needsTap}
+  hostOnly={!isHost && store.transport.hostOnly}
   onTap={() => strudel.unlockAudio()}
 />
 

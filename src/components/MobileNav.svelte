@@ -15,7 +15,8 @@
     dispatch,
     playing,
     needsTap,
-    onTap
+    onTap,
+    hostOnly = false
   }: {
     selectedIndex: number;
     dispatch: Dispatch;
@@ -23,6 +24,8 @@
     /** A guest whose audio is still locked. */
     needsTap: boolean;
     onTap: () => void;
+    /** The host is the only device making sound. */
+    hostOnly?: boolean;
   } = $props();
 
   let addOpen = $state(false);
@@ -53,7 +56,9 @@
       aria-label="Stop"
       onclick={() => dispatch({ type: 'transport', action: 'stop' })}><Ban size={22} /></button
     >
-    <span class="text-surface-600-400 ml-auto text-xs">{store.peers.length + 1} here</span>
+    <span class="text-surface-600-400 ml-auto text-xs"
+      >{hostOnly ? 'Sound from host · ' : ''}{store.peers.length + 1} here</span
+    >
   </div>
   <div class="flex gap-1 overflow-x-auto px-2 py-2">
     {#each store.instrumentsData.instrumentsData as instrumentData, index (instrumentData.id)}

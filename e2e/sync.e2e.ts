@@ -197,6 +197,32 @@ describe('instrument sync (real transport, real controls)', () => {
     await expect.poll(() => state(host, 0)).toBe(0);
   });
 
+  test('the host can make itself the only device that plays; the client stays silent but follows', async () => {
+    const { host, client } = await pair();
+    const hostOnly = (p: Page) =>
+      p.evaluate(() => (window as any).__store.transport.hostOnly as boolean);
+    const localPlaying = (p: Page) =>
+      p.evaluate(() => (window as any).__strudel.isPlaying !== undefined && (window as any).__store.transport.playing as boolean);
+    expect(await hostOnly(client)).toBe(false);
+
+    await host.getByRole('button', { name: 'Settings' }).click();
+    await host.getByRole('checkbox', { name: /only this device plays/i }).check();
+    await expect.poll(() => hostOnly(client)).toBe(true);
+    await expect.poll(() => client.getByTestId('host-only-note').isVisible()).toBe(true);
+
+    await host.evaluate(() => (window as any).__store.dispatch({ type: 'transport', action: 'toggle' }));
+    await expect.poll(() => localPlaying(client)).toBe(true); // the client mirrors "playing"…
+    const scheduled = await client.evaluate(() => {
+      let on = false;
+      (window as any).__strudel.isPlaying.subscribe((v: boolean) => (on = v))();
+      return on;
+    });
+    expect(scheduled).toBe(false); // …but its own scheduler never started
+
+    await host.getByRole('checkbox', { name: /only this device plays/i }).uncheck();
+    await expect.poll(() => hostOnly(client)).toBe(false);
+  });
+
   test('the Mixer sliders reach the other peer', async () => {
     const { host, client } = await pair();
     expect(await masterVolume(host)).toBe(0.8); // precondition

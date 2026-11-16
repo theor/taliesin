@@ -596,6 +596,53 @@ describe('local playback on every peer', () => {
     expect(players.a.isPlayingNow()).toBe(false);
   });
 
+  test('with "only the host plays", clients follow the playhead but never start a scheduler', async () => {
+    vi.useFakeTimers();
+    const { host, a, players } = clocked();
+    host.transport.setHostOnly(true);
+    await settle(1000);
+    expect(a.transport.hostOnly).toBe(true);
+    await host.transport.toggle();
+    await settle(3000);
+    expect(players.host.isPlayingNow()).toBe(true);
+    expect(a.transport.playing).toBe(true); // the UI still shows it playing
+    expect(a.transport.position()).toBeGreaterThan(0); // and the playhead moves
+    expect(players.a.calls).not.toContain('start');
+    expect(players.b.calls).not.toContain('start');
+  });
+
+  test('turning it off again lets the clients join in sync; turning it on silences them', async () => {
+    vi.useFakeTimers();
+    const { host, players } = clocked();
+    host.transport.setHostOnly(true);
+    await host.transport.toggle();
+    await settle(3000);
+    expect(players.a.isPlayingNow()).toBe(false);
+
+    host.transport.setHostOnly(false);
+    await settle(3000);
+    expect(players.a.isPlayingNow()).toBe(true);
+    expect(players.a.now()).toBeCloseTo(players.host.now(), 1);
+
+    host.transport.setHostOnly(true);
+    await settle(1000);
+    expect(players.a.isPlayingNow()).toBe(false);
+    expect(players.host.isPlayingNow()).toBe(true); // the host keeps playing
+  });
+
+  test('only the host can change the setting, and a late joiner is told', async () => {
+    vi.useFakeTimers();
+    const { net, host, a } = clocked();
+    a.transport.setHostOnly(true); // a guest asking has no effect
+    expect(a.transport.hostOnly).toBe(false);
+    host.transport.setHostOnly(true);
+    await settle(500);
+    const late = new AppStore(false, 'r', net.join('late'), fakePlayer({ clocked: true }));
+    net.settle();
+    await settle(1000);
+    expect(late.transport.hostOnly).toBe(true);
+  });
+
   test('nothing starts before the audio is unlocked, then it joins in sync', async () => {
     vi.useFakeTimers();
     const players = {
