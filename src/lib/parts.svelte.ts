@@ -1,5 +1,6 @@
 import { derived } from 'svelte/store';
 import { getGlobalContext } from './context';
+import { triadQuality } from './scale';
 import { getPart, type InstrumentData, type Length } from './instruments';
 import { strudel } from './strudel';
 
@@ -106,7 +107,16 @@ export class PartChords extends InstrumentPartTyped<{ enabled: boolean; mode: Vo
     selfData: PartChords['_dataType'],
     length: Length
   ): string {
-    return selfData.enabled ? `.asChords("<m m>*2").mode('${selfData.mode}').voicing()` : '';
+    if (!selfData.enabled) return '';
+    // each melody note becomes the triad built on its scale degree (major / minor / dim), one
+    // quality per step, aligned with the notes; steps without a note get a filler (they are rests)
+    const notes = getPart(MonoSequence, data)?.notes ?? [];
+    const { scaleMode } = getGlobalContext();
+    const qualities = Array.from({ length: length.stepsPerMeasure * length.measures }, (_, i) => {
+      const degree = notes[i];
+      return degree === undefined ? 'm' : triadQuality(scaleMode, degree) || 'M';
+    });
+    return `.asChords("<${qualities.join(' ')}>").mode('${selfData.mode}').voicing()`;
   }
   // override generate(data: InstrumentData, selfData: infer T, length: Length): string {
   // }
