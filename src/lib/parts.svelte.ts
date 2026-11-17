@@ -192,6 +192,9 @@ export enum VoicingMode {
   below = 'below',
   duck = 'duck'
 }
+/** `triadQuality` names, as Strudel's triad dictionary spells them (it has no 'dim', only 'o'; an unknown symbol makes a chord silent). */
+const STRUDEL_TRIAD: Record<string, string> = { '': 'M', m: 'm', dim: 'o', aug: 'aug' };
+
 export class PartChords extends InstrumentPartTyped<{ enabled: boolean; mode: VoicingMode }> {
   override defaultData() {
     return { enabled: false, mode: VoicingMode.root };
@@ -208,9 +211,10 @@ export class PartChords extends InstrumentPartTyped<{ enabled: boolean; mode: Vo
     const { scaleMode } = getGlobalContext();
     const qualities = Array.from({ length: length.stepsPerMeasure * length.measures }, (_, i) => {
       const degree = notes[i];
-      return degree === undefined ? 'm' : triadQuality(scaleMode, degree) || 'M';
+      return degree === undefined ? 'm' : STRUDEL_TRIAD[triadQuality(scaleMode, degree)] ?? 'm';
     });
-    return `.asChords("<${qualities.join(' ')}>").mode('${selfData.mode}').voicing()`;
+    // the 'triads' dictionary: real three-note chords (the default one voices them as wide jazz shapes)
+    return `.asChords("<${qualities.join(' ')}>").dict('triads').mode('${selfData.mode}').voicing()`;
   }
   // override generate(data: InstrumentData, selfData: infer T, length: Length): string {
   // }
