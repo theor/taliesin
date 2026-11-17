@@ -94,7 +94,10 @@ export const VOICES = [
   'gm_pad_halo',
   'gm_string_ensemble_1',
   'gm_choir_aahs',
-  'gm_lead_2_sawtooth'
+  'gm_lead_2_sawtooth',
+  'gm_acoustic_guitar_nylon',
+  'gm_kalimba',
+  'gm_pizzicato_strings'
 ] as const;
 export type Voice = (typeof VOICES)[number];
 
@@ -110,6 +113,53 @@ export class PartVoice extends InstrumentPartTyped<{ sound: string }> {
   ): string {
     const sound = (VOICES as readonly string[]).includes(selfData.sound) ? selfData.sound : 'sawtooth';
     return `.sound("${sound}")`;
+  }
+}
+
+/** A number from a peer, kept finite and inside [min, max]. */
+const num = (v: unknown, min: number, max: number, fallback: number) =>
+  typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
+
+/** Frequency modulation: `index` is how much the modulator bends the pitch, `ratio` its frequency relative to the note. */
+export class PartFm extends InstrumentPartTyped<{ index: number; ratio: number; decay: number }> {
+  override defaultData() {
+    return { index: 4, ratio: 2, decay: 0 };
+  }
+  override generate(
+    data: InstrumentData,
+    selfData: PartFm['_dataType'],
+    length: Length
+  ): string {
+    const index = num(selfData.index, 0, 32, 0);
+    if (index === 0) return '';
+    const ratio = num(selfData.ratio, 0.25, 16, 1);
+    const decay = num(selfData.decay, 0, 4, 0);
+    // a decaying modulator gives bells and electric pianos: bright at the start, then mellow
+    const env = decay > 0 ? `.fmdecay(${decay}).fmsustain(0)` : '';
+    return `.fm(${index}).fmh(${ratio})${env}`;
+  }
+}
+
+/** Amplitude envelope. A short decay with no sustain turns any voice into a pluck. */
+export class PartEnvelope extends InstrumentPartTyped<{
+  attack: number;
+  decay: number;
+  sustain: number;
+  release: number;
+}> {
+  override defaultData() {
+    return { attack: 0.005, decay: 0.3, sustain: 0.6, release: 0.1 };
+  }
+  override generate(
+    data: InstrumentData,
+    selfData: PartEnvelope['_dataType'],
+    length: Length
+  ): string {
+    const a = num(selfData.attack, 0, 4, 0.005);
+    const d = num(selfData.decay, 0, 4, 0.3);
+    const s = num(selfData.sustain, 0, 1, 0.6);
+    const r = num(selfData.release, 0, 4, 0.1);
+    return `.attack(${a}).decay(${d}).sustain(${s}).release(${r})`;
   }
 }
 

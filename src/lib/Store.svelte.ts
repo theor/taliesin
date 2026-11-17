@@ -24,6 +24,8 @@ import {
   PartFilter,
   PartOctave,
   PartVoice,
+  PartFm,
+  PartEnvelope,
   PartChords,
   PartArpeggiator,
   PartTrackNotes,
@@ -87,6 +89,8 @@ export const parts: { part: Constructor<InstrumentPart>; partName: string }[] = 
   { partName: MonoSequence.name, part: MonoSequence },
   { partName: PartOctave.name, part: PartOctave },
   { partName: PartVoice.name, part: PartVoice },
+  { partName: PartFm.name, part: PartFm },
+  { partName: PartEnvelope.name, part: PartEnvelope },
   { partName: PartTrackNotes.name, part: PartTrackNotes }
 ];
 export const partMap: { [key: string]: InstrumentPart } = parts.reduce(
@@ -143,7 +147,11 @@ export const presets: Preset[] = [
   {
     name: 'Piano',
     instrument: PianoScale,
-    parts: [makePartData(PartChords), makePartData(PartArpeggiator)]
+    parts: [
+      makePartData(PartChords),
+      makePartData(PartArpeggiator),
+      makePartData(PartEnvelope, { attack: 0.005, decay: 0.6, sustain: 0.3, release: 0.3 })
+    ]
   },
   { name: 'Drum', instrument: Drum, parts: [] },
   {
@@ -151,6 +159,7 @@ export const presets: Preset[] = [
     instrument: PianoScale,
     parts: [
       makePartData(PartVoice, { sound: 'square' }),
+      makePartData(PartEnvelope, { attack: 0.005, decay: 0.2, sustain: 0.7, release: 0.1 }),
       makePartData(PartEffects, { reverb: 0.5 }),
       makePartData(MonoSequence, { notes: [1, 2, 3, undefined, 4, 5, 3, undefined] }),
       makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
@@ -162,6 +171,7 @@ export const presets: Preset[] = [
     instrument: PianoScale,
     parts: [
       makePartData(PartVoice, { sound: 'gm_pad_warm' }),
+      makePartData(PartEnvelope, { attack: 0.4, decay: 0.3, sustain: 0.8, release: 1 }),
       makePartData(PartChords, { enabled: true }),
       makePartData(PartEffects, { reverb: 0.6 }),
       makePartData(MonoSequence, { notes: [1, undefined, undefined, undefined, 4, undefined, undefined, undefined] }),
@@ -174,6 +184,7 @@ export const presets: Preset[] = [
     instrument: PianoScale,
     parts: [
       makePartData(PartVoice, { sound: 'gm_lead_2_sawtooth' }),
+      makePartData(PartEnvelope, { attack: 0.01, decay: 0.2, sustain: 0.8, release: 0.3 }),
       makePartData(PartEffects, { reverb: 0.3, delay: 0.3 }),
       makePartData(MonoSequence, { notes: [5, 6, 5, undefined, 3, undefined, 2, 3] }),
       makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
@@ -185,8 +196,46 @@ export const presets: Preset[] = [
     instrument: PianoScale,
     parts: [
       makePartData(PartVoice, { sound: 'gm_marimba' }),
+      makePartData(PartEnvelope, { attack: 0.002, decay: 0.4, sustain: 0, release: 0.2 }),
       makePartData(PartEffects, { reverb: 0.3 }),
       makePartData(MonoSequence, { notes: [1, 3, 5, 3, 1, 3, 5, 6] }),
+      makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
+      makePartData(PartOctave, { octave: 4 })
+    ]
+  },
+  {
+    name: 'FM Bell',
+    instrument: PianoScale,
+    parts: [
+      makePartData(PartVoice, { sound: 'sine' }),
+      makePartData(PartFm, { index: 6, ratio: 3.5, decay: 0.8 }),
+      makePartData(PartEnvelope, { attack: 0.005, decay: 1.2, sustain: 0, release: 0.8 }),
+      makePartData(PartEffects, { reverb: 0.5 }),
+      makePartData(MonoSequence, { notes: [1, undefined, 5, undefined, 3, undefined, 6, undefined] }),
+      makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
+      makePartData(PartOctave, { octave: 5 })
+    ]
+  },
+  {
+    name: 'FM Bass',
+    instrument: PianoScale,
+    parts: [
+      makePartData(PartVoice, { sound: 'sine' }),
+      makePartData(PartFm, { index: 3, ratio: 1, decay: 0.25 }),
+      makePartData(PartEnvelope, { attack: 0.005, decay: 0.3, sustain: 0.5, release: 0.1 }),
+      makePartData(MonoSequence, { notes: [1, undefined, 1, 3, 1, undefined, 5, 4] }),
+      makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
+      makePartData(PartOctave, { octave: 2 })
+    ]
+  },
+  {
+    name: 'Pluck',
+    instrument: PianoScale,
+    parts: [
+      makePartData(PartVoice, { sound: 'gm_acoustic_guitar_nylon' }),
+      makePartData(PartEnvelope, { attack: 0.002, decay: 0.4, sustain: 0, release: 0.2 }),
+      makePartData(PartEffects, { reverb: 0.3 }),
+      makePartData(MonoSequence, { notes: [1, 3, 5, 3, 2, 4, 6, 4] }),
       makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
       makePartData(PartOctave, { octave: 4 })
     ]
@@ -195,6 +244,7 @@ export const presets: Preset[] = [
     name: 'Filter Bass',
     instrument: PianoScale,
     parts: [
+      makePartData(PartEnvelope, { attack: 0.005, decay: 0.25, sustain: 0.5, release: 0.1 }),
       makePartData(PartFilter, { freq: 400 }),
       makePartData(PartEffects, { reverb: 0.2 }),
       makePartData(MonoSequence, { notes: [1, undefined, 1, 3, 1, undefined, 5, 4] }),

@@ -7,6 +7,8 @@
     PartOctave,
     PartSteps,
     PartVoice,
+    PartFm,
+    PartEnvelope,
     getPart,
     TrackState,
     type Constructor,
@@ -36,6 +38,8 @@
   import PartChordsView from './PartChordsView.svelte';
   import PartArpView from './PartArpView.svelte';
   import PartVoiceView from './PartVoiceView.svelte';
+  import PartFmView from './PartFmView.svelte';
+  import PartEnvelopeView from './PartEnvelopeView.svelte';
 
   let {
     index,
@@ -239,6 +243,8 @@
       {/snippet}
       <div class="space-y-1 p-2">
         {@render renderOptionalPart(PartVoice, PartVoiceView)}
+        {@render renderOptionalPart(PartFm, PartFmView)}
+        {@render renderOptionalPart(PartEnvelope, PartEnvelopeView)}
         {@render renderOptionalPart(PartChords, PartChordsView)}
         {@render renderOptionalPart(PartArpeggiator, PartArpView)}
         {@render renderOptionalPart(PartFilter, PartFilterView)}

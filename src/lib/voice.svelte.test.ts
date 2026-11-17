@@ -35,3 +35,47 @@ describe('PartVoice', () => {
     expect(inst.generate(data)).toContain('.sound("sawtooth")');
   });
 });
+
+describe('FM and envelope', () => {
+  const make = (name: string) => {
+    const p = presets.find((x) => x.name === name)!;
+    const data = createInstrument(p.instrument, p.parts, p.name);
+    return { data, inst: getInstrument(data)! };
+  };
+
+  it('FM Bell modulates the pitch with a decaying modulator', () => {
+    const { data, inst } = make('FM Bell');
+    const code = inst.generate(data);
+    expect(code).toContain('.fm(6).fmh(3.5).fmdecay(0.8).fmsustain(0)');
+    expect(code).toContain('.decay(1.2).sustain(0)');
+  });
+
+  it('Pluck has no sustain', () => {
+    const { data, inst } = make('Pluck');
+    expect(inst.generate(data)).toMatch(/\.sound\("gm_acoustic_guitar_nylon"\)[\s\S]*\.sustain\(0\)/);
+  });
+
+  it('clamps numbers from peers', () => {
+    const { data, inst } = make('FM Bell');
+    const fm = data.parts.find((p) => p.partName === 'PartFm') as any;
+    fm.index = 1e9;
+    fm.ratio = NaN;
+    const code = inst.generate(data);
+    expect(code).toContain('.fm(32).fmh(1)');
+    expect(code).not.toContain('NaN');
+  });
+
+  it('plain instruments get no FM', () => {
+    const { data, inst } = make('Bass');
+    expect(inst.generate(data)).not.toContain('.fm(');
+  });
+});
+
+describe('presets', () => {
+  it('every synth preset shapes its notes with an envelope', () => {
+    for (const p of presets.filter((x) => x.instrument.name === 'PianoScale')) {
+      const data = createInstrument(p.instrument, p.parts, p.name);
+      expect(getInstrument(data)!.generate(data), p.name).toContain('.attack(');
+    }
+  });
+});

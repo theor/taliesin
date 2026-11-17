@@ -1,6 +1,6 @@
 import { makePartData, getPartTypeAndData } from "$lib/Store.svelte";
-import { Instrument,getPart,type InputView, type InstrumentData } from "$lib/instruments";
-import { InstrumentPart, MonoSequence, PartEffects, PartFilter, PartOctave, PartSteps, PartVoice, type InstrumentPartData } from "$lib/parts.svelte";
+import { Instrument,getPart,type Constructor,type InputView, type InstrumentData } from "$lib/instruments";
+import { InstrumentPart, MonoSequence, PartEffects, PartFilter, PartOctave, PartSteps, PartVoice, PartFm, PartEnvelope, InstrumentPartTyped, type InstrumentPartData } from "$lib/parts.svelte";
 import { Sequencer, MonoSequenceSequencer } from "$lib/sequencer";
 import { degreeName } from "$lib/scale";
 
@@ -21,8 +21,12 @@ export class PianoScale extends Instrument {
     }
     protected generate_(data: InstrumentData): string {
       // an instrument saved before voices existed has no PartVoice: it keeps the sawtooth
-      const voice = getPartTypeAndData(PartVoice, data);
-      return voice.data ? voice.part.generate(data, { ...voice.data, partName: PartVoice.name }, this.getLength(data)) : `.sound("sawtooth")`;
+      const length = this.getLength(data);
+      const gen = (x: Constructor<InstrumentPartTyped<any>>) => {
+        const p = getPartTypeAndData(x, data);
+        return p.data ? p.part.generate(data, { ...p.data, partName: x.name }, length) : '';
+      };
+      return `${gen(PartVoice) || '.sound("sawtooth")'}${gen(PartFm)}${gen(PartEnvelope)}`;
     }
     override name: string = 'PianoScale';
     /** One pad per scale degree to play the melody in. */
@@ -34,6 +38,7 @@ export class PianoScale extends Instrument {
     override createData_(): InstrumentPartData[] {
       return [
         makePartData(PartVoice),
+        makePartData(PartEnvelope),
         makePartData(PartOctave, {octave:4}),
         makePartData(MonoSequence, {notes:[1, 2, 3, undefined, 4, 5, 3, undefined]}),
         makePartData(PartSteps, {stepsPerMeasure: 8, measures: 2, oddSignature: false}),
