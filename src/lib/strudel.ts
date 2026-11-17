@@ -126,7 +126,11 @@ ${code}`,
     this.firstEval = new Promise((resolve) => (this.resolveFirstEval = resolve));
     this.initPromise = (async () => {
       this.repls = await initStrudel({
-        prebake: () => samples('github:tidalcycles/dirt-samples')
+        prebake: async () => {
+          // imported here, not at the top: it is browser-only, and tests never get this far
+          const { registerSoundfonts } = await import('@strudel/soundfonts');
+          await Promise.all([samples('github:tidalcycles/dirt-samples'), registerSoundfonts()]);
+        }
       });
       const ctx = getAudioContext();
       const update = () => this.audioRunning.set(ctx.state === 'running');

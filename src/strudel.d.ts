@@ -6,3 +6,12 @@ declare module '@strudel/web' {
 
 /** Global injected by Strudel's `evalScope`, used in the prebake. */
 declare function samples(...args: any[]): any;
+
+declare module '@strudel/soundfonts' {
+  export function registerSoundfonts(): void;
+}
+
+declare module 'vite-plugin-bundle-audioworklet' {
+  import type { Plugin } from 'vite';
+  export default function bundleAudioWorklet(): Plugin;
+}

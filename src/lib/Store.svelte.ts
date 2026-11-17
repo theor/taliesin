@@ -23,6 +23,7 @@ import {
   PartSteps,
   PartFilter,
   PartOctave,
+  PartVoice,
   PartChords,
   PartArpeggiator,
   PartTrackNotes,
@@ -85,6 +86,7 @@ export const parts: { part: Constructor<InstrumentPart>; partName: string }[] = 
   { partName: PartArpeggiator.name, part: PartArpeggiator },
   { partName: MonoSequence.name, part: MonoSequence },
   { partName: PartOctave.name, part: PartOctave },
+  { partName: PartVoice.name, part: PartVoice },
   { partName: PartTrackNotes.name, part: PartTrackNotes }
 ];
 export const partMap: { [key: string]: InstrumentPart } = parts.reduce(
@@ -148,10 +150,45 @@ export const presets: Preset[] = [
     name: 'Bass',
     instrument: PianoScale,
     parts: [
+      makePartData(PartVoice, { sound: 'square' }),
       makePartData(PartEffects, { reverb: 0.5 }),
       makePartData(MonoSequence, { notes: [1, 2, 3, undefined, 4, 5, 3, undefined] }),
       makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
       makePartData(PartOctave, { octave: 2 })
+    ]
+  },
+  {
+    name: 'Pad',
+    instrument: PianoScale,
+    parts: [
+      makePartData(PartVoice, { sound: 'gm_pad_warm' }),
+      makePartData(PartChords, { enabled: true }),
+      makePartData(PartEffects, { reverb: 0.6 }),
+      makePartData(MonoSequence, { notes: [1, undefined, undefined, undefined, 4, undefined, undefined, undefined] }),
+      makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
+      makePartData(PartOctave, { octave: 3 })
+    ]
+  },
+  {
+    name: 'Lead',
+    instrument: PianoScale,
+    parts: [
+      makePartData(PartVoice, { sound: 'gm_lead_2_sawtooth' }),
+      makePartData(PartEffects, { reverb: 0.3, delay: 0.3 }),
+      makePartData(MonoSequence, { notes: [5, 6, 5, undefined, 3, undefined, 2, 3] }),
+      makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
+      makePartData(PartOctave, { octave: 5 })
+    ]
+  },
+  {
+    name: 'Marimba',
+    instrument: PianoScale,
+    parts: [
+      makePartData(PartVoice, { sound: 'gm_marimba' }),
+      makePartData(PartEffects, { reverb: 0.3 }),
+      makePartData(MonoSequence, { notes: [1, 3, 5, 3, 1, 3, 5, 6] }),
+      makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
+      makePartData(PartOctave, { octave: 4 })
     ]
   },
   {

@@ -975,6 +975,16 @@
   dependencies:
     "@strudel/core" "1.2.0"
 
+"@strudel/soundfonts@1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@strudel/soundfonts/-/soundfonts-1.2.0.tgz#c85a258b286c29ace6b5192a0670d9541fbb85a3"
+  integrity sha512-d5n4mN7J477l0TO9d3ugBGtDBT20cwSmRVOcf7Z72NU3opVGJQeTTArWPPdl8zjQHYqT6OiPsjcorqkyt4+pug==
+  dependencies:
+    "@strudel/core" "1.2.0"
+    "@strudel/webaudio" "1.2.0"
+    sfumato "^0.1.2"
+    soundfont2 "^0.5.0"
+
 "@strudel/tonal@1.2.0", "@strudel/tonal@^1.2.0":
   version "1.2.0"
   resolved "https://registry.yarnpkg.com/@strudel/tonal/-/tonal-1.2.0.tgz#57c2193d527a2aaaf7743c3e48c1c301ce80d33d"
@@ -1007,7 +1017,7 @@
     "@strudel/transpiler" "1.2.0"
     "@strudel/webaudio" "1.2.1"
 
-"@strudel/webaudio@1.2.1", "@strudel/webaudio@^1.2.1":
+"@strudel/webaudio@1.2.0", "@strudel/webaudio@1.2.1", "@strudel/webaudio@^1.2.1":
   version "1.2.1"
   resolved "https://registry.yarnpkg.com/@strudel/webaudio/-/webaudio-1.2.1.tgz#6f4c561d62e74ab7cd6a523117b517009bf5d4d4"
   integrity sha512-G03CdnnnxyipU8a7Y4hIa35Xcw6DKpfjCYaBZEgOppRwZ3NgRelqF0RucNRwiyVnW33Ixg1EL5d+SqYsMrF8BQ==
@@ -6191,6 +6201,13 @@ setprototypeof@1.2.0:
   resolved "https://registry.yarnpkg.com/setprototypeof/-/setprototypeof-1.2.0.tgz#66c9a24a73f9fc28cbe66b09fed3d33dcaf1b424"
   integrity sha512-E5LDX7Wrp85Kil5bhZv46j8jOeboKq5JMmYM3gVGdGH8xFpPWXUMsNrlODCrkoxMEeNi/XZIwuRvY4XNwYMJpw==
 
+sfumato@^0.1.2:
+  version "0.1.2"
+  resolved "https://registry.yarnpkg.com/sfumato/-/sfumato-0.1.2.tgz#d24cd491456dc3b3e4a3237a457b800b681b4387"
+  integrity sha512-j2s5BLUS5VUNtaK1l+v+yal3XjjV7JXCQIwE5Xs4yiQ3HJ+2Fc/dd3IkkrVHn0AJO2epShSWVoP3GnE0TvPdMg==
+  dependencies:
+    soundfont2 "^0.4.0"
+
 sha-1@0.1.1:
   version "0.1.1"
   resolved "https://registry.yarnpkg.com/sha-1/-/sha-1-0.1.1.tgz#2a39304bf41bbab11dd9efb7474ec25b1a92c257"
@@ -6294,6 +6311,16 @@ sorcery@^0.11.0:
     buffer-crc32 "^1.0.0"
     minimist "^1.2.0"
     sander "^0.5.0"
+
+soundfont2@^0.4.0:
+  version "0.4.0"
+  resolved "https://registry.yarnpkg.com/soundfont2/-/soundfont2-0.4.0.tgz#a1efd642f2ae247a5530cd530ae364a095126be5"
+  integrity sha512-537WiurDBRbDLVhJMxXLE06D6yWxJCidfPClnibZ0f8dKMDpv+0fIfwCQ8pELE0JqKX05SOJosNJgKzQobaAEA==
+
+soundfont2@^0.5.0:
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/soundfont2/-/soundfont2-0.5.0.tgz#e516c536dc4ea98dbae7f8f7d1254ae302d43c3d"
+  integrity sha512-dcmNVtHT/Y8BOOrtmjt7hn6Bk6bB1g+O2bWB9fa6emW7kfwiEiEL4VvGQfwVt8g0m58LyoqVyuQ4ZFukMLwGHQ==
 
 source-map-js@^1.2.0, source-map-js@^1.2.1:
   version "1.2.1"
@@ -7023,6 +7050,11 @@ vite-node@3.1.4:
     es-module-lexer "^1.7.0"
     pathe "^2.0.3"
     vite "^5.0.0 || ^6.0.0"
+
+vite-plugin-bundle-audioworklet@0.1.1:
+  version "0.1.1"
+  resolved "https://registry.yarnpkg.com/vite-plugin-bundle-audioworklet/-/vite-plugin-bundle-audioworklet-0.1.1.tgz#d97f10c270eb9a9a625b24ec560e04a51bc6d4ca"
+  integrity sha512-CYZArbUk7GxhYsMjibfbkqy6O0JK3wUo2WARWbwtYn+IAVHdxe1CGMSis9+vq3GoxhhdRaUsBq1bFrtfnR0uIw==
 
 vite-plugin-mkcert@^1.17.8:
   version "1.17.8"

@@ -69,6 +69,50 @@ export abstract class InstrumentPartTyped<
 export type PartType<T extends InstrumentPartTyped<any>> =
   T extends InstrumentPartTyped<infer U> ? U : never;
 
+/** Built-in Strudel synth sounds (no sample loading needed). */
+export const VOICES = [
+  'sawtooth',
+  'supersaw',
+  'square',
+  'triangle',
+  'sine',
+  'white',
+  'pink',
+  'brown',
+  'crackle',
+  // General MIDI soundfonts (@strudel/soundfonts): each is downloaded the first time it plays
+  'gm_piano',
+  'gm_epiano1',
+  'gm_vibraphone',
+  'gm_marimba',
+  'gm_music_box',
+  'gm_flute',
+  'gm_acoustic_bass',
+  'gm_synth_bass_1',
+  'gm_pad_warm',
+  'gm_pad_poly',
+  'gm_pad_halo',
+  'gm_string_ensemble_1',
+  'gm_choir_aahs',
+  'gm_lead_2_sawtooth'
+] as const;
+export type Voice = (typeof VOICES)[number];
+
+/** Which sound the instrument plays. The name comes from peers and ends up in code, so only known voices are emitted. */
+export class PartVoice extends InstrumentPartTyped<{ sound: string }> {
+  override defaultData() {
+    return { sound: 'sawtooth' };
+  }
+  override generate(
+    data: InstrumentData,
+    selfData: PartVoice['_dataType'],
+    length: Length
+  ): string {
+    const sound = (VOICES as readonly string[]).includes(selfData.sound) ? selfData.sound : 'sawtooth';
+    return `.sound("${sound}")`;
+  }
+}
+
 export class PartOctave extends InstrumentPartTyped<{ octave: number }> {
   override defaultData() {
     return { octave: 4 };
