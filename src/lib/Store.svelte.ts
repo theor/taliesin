@@ -403,7 +403,7 @@ export class AppStore {
       const saved = JSON.parse(this.storage?.getItem(this.storageKey) ?? 'null');
       if (!Array.isArray(saved?.instruments)) return false;
       for (const instrument of saved.instruments)
-        this.applyCommand({ type: 'addInstrument', instrument });
+        this.applyCommand({ type: 'addInstrument', instrument: withPartDefaults(instrument) });
       if (typeof saved.volume === 'number')
         this.applyCommand({ type: 'setMasterVolume', volume: saved.volume });
       return this.instrumentsData.instrumentsData.length > 0;
@@ -583,6 +583,18 @@ function safeLocalStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
   } catch {
     return undefined;
   }
+}
+/**
+ * Fill in the fields a saved part is missing (it was saved before they existed) from the part's defaults.
+ * `setPartFields` only changes fields a part already has, so without this the new controls could not touch them.
+ */
+export function withPartDefaults<T extends InstrumentData>(instrument: T): T {
+  if (!Array.isArray(instrument?.parts)) return instrument;
+  const parts = instrument.parts.map((p) => {
+    const part = p && typeof p === 'object' ? partMap[p.partName] : undefined;
+    return part ? { ...part.createData(), ...p } : p;
+  });
+  return { ...instrument, parts };
 }
 export let store: AppStore = undefined!;
 /**

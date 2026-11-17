@@ -194,10 +194,29 @@ export enum VoicingMode {
 }
 /** `triadQuality` names, as Strudel's triad dictionary spells them (it has no 'dim', only 'o'; an unknown symbol makes a chord silent). */
 const STRUDEL_TRIAD: Record<string, string> = { '': 'M', m: 'm', dim: 'o', aug: 'aug' };
+const quality = (mode: string, degree: number | null | undefined) =>
+  degree == null ? 'm' : (STRUDEL_TRIAD[triadQuality(mode, degree)] ?? 'm');
 
-export class PartChords extends InstrumentPartTyped<{ enabled: boolean; mode: VoicingMode }> {
+/** How long a chord lasts: a new chord on every melody note, or one held per half bar / bar. */
+export enum ChordHold {
+  step = 'step',
+  half = 'half',
+  bar = 'bar'
+}
+
+export class PartChords extends InstrumentPartTyped<{ enabled: boolean; mode: VoicingMode; hold: ChordHold }> {
   override defaultData() {
-    return { enabled: false, mode: VoicingMode.root };
+    return { enabled: false, mode: VoicingMode.below, hold: ChordHold.bar };
+  }
+  /** Steps per chord. Always divides the bar, so the chords stay aligned with the melody's loop. */
+  static holdSteps(hold: ChordHold, stepsPerMeasure: number): number {
+    if (hold === ChordHold.step) return 1;
+    if (hold === ChordHold.half && stepsPerMeasure % 2 === 0) return stepsPerMeasure / 2;
+    return stepsPerMeasure;
+  }
+  /** Whether the chords are a layer under the melody (anything but one chord per step). */
+  static isHeld(selfData: { enabled: boolean; hold: ChordHold } | undefined): boolean {
+    return !!selfData?.enabled && selfData.hold !== ChordHold.step;
   }
   override generate(
     data: InstrumentData,
@@ -205,19 +224,36 @@ export class PartChords extends InstrumentPartTyped<{ enabled: boolean; mode: Vo
     length: Length
   ): string {
     if (!selfData.enabled) return '';
-    // each melody note becomes the triad built on its scale degree (major / minor / dim), one
-    // quality per step, aligned with the notes; steps without a note get a filler (they are rests)
     const notes = getPart(MonoSequence, data)?.notes ?? [];
-    const { scaleMode } = getGlobalContext();
-    const qualities = Array.from({ length: length.stepsPerMeasure * length.measures }, (_, i) => {
-      const degree = notes[i];
-      return degree === undefined ? 'm' : STRUDEL_TRIAD[triadQuality(scaleMode, degree)] ?? 'm';
-    });
-    // the 'triads' dictionary: real three-note chords (the default one voices them as wide jazz shapes)
-    return `.asChords("<${qualities.join(' ')}>").dict('triads').mode('${selfData.mode}').voicing()`;
+    const { scaleKey, scaleMode } = getGlobalContext();
+    const total = length.stepsPerMeasure * length.measures;
+    const mode = (Object.values(VoicingMode) as string[]).includes(selfData.mode) ? selfData.mode : VoicingMode.below;
+    const hold = (Object.values(ChordHold) as string[]).includes(selfData.hold) ? selfData.hold : ChordHold.bar;
+
+    if (hold === ChordHold.step) {
+      // each melody note becomes the triad built on its scale degree, one quality per step, aligned
+      // with the notes; the note is the anchor, so in 'below' mode the melody stays the top voice
+      const qualities = Array.from({ length: total }, (_, i) => quality(scaleMode, notes[i]));
+      // the 'triads' dictionary: real three-note chords (the default one voices them as wide jazz shapes)
+      return `.asChords("<${qualities.join(' ')}>").dict('triads').mode('${mode}').voicing()`;
+    }
+
+    // Held: the melody keeps playing, with a chord under it per segment, built on the segment's first
+    // melody note. Every chord is aligned to the same fixed anchor (the key's root at the melody's
+    // octave), so consecutive chords move to their nearest inversion instead of jumping in parallel.
+    const k = PartChords.holdSteps(hold, length.stepsPerMeasure);
+    const segments = Array.from({ length: Math.ceil(total / k) }, (_, s) =>
+      notes.slice(s * k, s * k + k).find((x) => x != null)
+    );
+    const degrees = segments.map((d) => (d == null ? '~' : d)).join(' ');
+    const qualities = segments.map((d) => quality(scaleMode, d)).join(' ');
+    const octave = getPart(PartOctave, data)?.octave ?? 4;
+    const root = `${scaleKey}${octave}`;
+    const arp = getPart(PartArpeggiator, data);
+    // the arpeggio plays the held chord (not the melody); it runs at its usual rate per step
+    const arpCode = arp?.enabled ? PartArpeggiator.code(arp, k) : '';
+    return `.stack(n("<${degrees}>").scale("${root}:${scaleMode}").asChords("<${qualities}>").dict('triads').anchor("${root}").mode('${mode}').voicing()${arpCode}.velocity(0.6).slow(${k}))`;
   }
-  // override generate(data: InstrumentData, selfData: infer T, length: Length): string {
-  // }
 }
 export enum ArpeggiatorType {
   up = 'up',
@@ -248,9 +284,16 @@ export class PartArpeggiator extends InstrumentPartTyped<{
     length: Length
   ): string {
     if (!selfData.enabled) return '';
+    // held chords run their own arpeggio (this one would arpeggiate the melody along with them)
+    if (data?.parts && PartChords.isHeld(getPart(PartChords, data))) return '';
+    return PartArpeggiator.code(selfData, 1);
+  }
+  /** `stretch`: how many steps one cycle of the pattern lasts (a held chord is slowed down by its length). */
+  static code(selfData: PartType<PartArpeggiator>, stretch: number): string {
     // indices into the chord's notes (a triad has three; an index past the end wraps round)
     const order = ARP_ORDERS[selfData.arpeggiatorType] ?? ARP_ORDERS[ArpeggiatorType.up];
-    return `.arp("[${order}] * ${selfData.speed}")`;
+    const speed = Number.isFinite(selfData.speed) ? selfData.speed : 1;
+    return `.arp("[${order}] * ${speed * stretch}")`;
   }
 }
 export class PartTrackNotes extends InstrumentPartTyped<{

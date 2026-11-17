@@ -4,7 +4,7 @@ vi.mock('./context', () => ({
   getGlobalContext: () => ({ host: true, debug: false, roomId: 'r', scaleKey: 'A', scaleMode: 'minor' }),
   setGlobalContext: () => {}
 }));
-import { createInstrument, getInstrument, presets } from './Store.svelte';
+import { createInstrument, getInstrument, presets, withPartDefaults } from './Store.svelte';
 import { getPart } from './instruments';
 import { PartVoice } from './parts.svelte';
 
@@ -77,5 +77,21 @@ describe('presets', () => {
       const data = createInstrument(p.instrument, p.parts, p.name);
       expect(getInstrument(data)!.generate(data), p.name).toContain('.attack(');
     }
+  });
+});
+
+describe('withPartDefaults', () => {
+  it('gives a part saved before a field existed that field, keeping what was saved', () => {
+    const old = {
+      id: 'x', name: 'Piano', instrumentName: 'PianoScale', volume: 1, state: 0,
+      parts: [{ partName: 'PartChords', enabled: true, mode: 'root' }, { partName: 'Mystery', a: 1 }]
+    } as any;
+    expect(withPartDefaults(old).parts).toEqual([
+      { partName: 'PartChords', enabled: true, mode: 'root', hold: 'bar' },
+      { partName: 'Mystery', a: 1 } // unknown parts are left alone (the reducer decides about them)
+    ]);
+  });
+  it('leaves malformed input for the reducer to reject', () => {
+    expect(withPartDefaults({ parts: 'nope' } as any)).toEqual({ parts: 'nope' });
   });
 });
