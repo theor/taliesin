@@ -33,6 +33,12 @@ describe('which page is shown', () => {
     expect(desktopSelect(-1, ids)).toEqual({ screen: 'mixer' });
     expect(desktopSelect(2, ids)).toEqual({ screen: 'edit', instrumentId: 'c' });
   });
+
+  test('the pattern launcher is index -2 on the desktop, a screen of its own on the phone', () => {
+    expect(desktopIndex({ screen: 'patterns', instrumentId: 'b' }, ids)).toBe(-2);
+    expect(desktopSelect(-2, ids)).toEqual({ screen: 'patterns' });
+    expect(phoneScreen({ screen: 'patterns', instrumentId: 'gone' }, ids)).toBe('patterns');
+  });
 });
 
 describe('leaving the jam', () => {

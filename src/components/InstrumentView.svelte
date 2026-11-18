@@ -1,7 +1,10 @@
 <script lang="ts">
   import { TrackState, type IDispatchingInstrumentViewProps } from '$lib';
   import { randomizeCommands, setTrackStateCommand } from '$lib/commandBuilders';
-  import { getInstrument } from '$lib/Store.svelte';
+  import { getInstrument, patternEdit } from '$lib/Store.svelte';
+  import type { PatternCues } from '$lib/cues.svelte';
+  import PatternSlots from './PatternSlots.svelte';
+  import CueBanner from './CueBanner.svelte';
   import { trackColor, trackInitials, trackKind } from '$lib/trackColors';
   import { Dices, Headphones, VolumeX } from '@lucide/svelte';
   import InstrumentMenu from './InstrumentMenu.svelte';
@@ -20,13 +23,27 @@
     position,
     playing,
     now,
-    editedByOther
-  }: IDispatchingInstrumentViewProps = $props();
+    editedByOther,
+    cues,
+    hostOnly = false
+  }: IDispatchingInstrumentViewProps & {
+    /** This device's patterns (slots, cue); without it the views edit the live pattern. */
+    cues?: PatternCues;
+    /** Only the host makes sound in this jam. */
+    hostOnly?: boolean;
+  } = $props();
 
   const color = $derived(trackColor(index));
   const muted = $derived(instrumentData.state === TrackState.Muted);
   const soloed = $derived(instrumentData.state === TrackState.Solo);
   const length = $derived(getInstrument(instrumentData)?.getLength(instrumentData));
+  // the pattern open on this device: the views below work on its notes (a cue when it is not live)
+  const edit = $derived(
+    cues
+      ? patternEdit(instrumentData, cues.slot(instrumentData), dispatch)
+      : { data: instrumentData, dispatch }
+  );
+  const cueing = $derived(!!cues?.isCue(instrumentData));
 
   const button =
     'bg-surface-900 border-surface-700 hover:border-surface-500 flex h-10 items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-semibold';
@@ -62,7 +79,7 @@
       aria-label="Randomize"
       title="Randomize"
       class={button}
-      onclick={() => randomizeCommands(instrumentData).forEach((c) => dispatch(c))}
+      onclick={() => randomizeCommands(edit.data).forEach((c) => edit.dispatch(c))}
       ><Dices size={18} /><span class="hidden lg:inline">Randomize</span></button
     >
     <button
@@ -85,18 +102,51 @@
       onclick={() => dispatch(setTrackStateCommand(instrumentData, TrackState.Solo))}
       ><Headphones size={18} /></button
     >
-    <InstrumentMenu {instrumentData} {dispatch} buttonClass="{button} w-10 px-0" />
+    <InstrumentMenu
+      instrumentData={edit.data}
+      dispatch={edit.dispatch}
+      buttonClass="{button} w-10 px-0"
+    />
   </header>
 
-  <InputViewSwitcher bind:instrumentData {index} {dispatch} {position} {playing} {now} />
+  {#if cues}
+    <div class="max-w-xl">
+      <PatternSlots data={instrumentData} {cues} {color} />
+    </div>
+    {#if cueing}
+      <CueBanner
+        data={instrumentData}
+        {cues}
+        {color}
+        position={position ?? 0}
+        playing={playing ?? false}
+        {hostOnly}
+      />
+    {/if}
+  {/if}
+
+  <div class={cueing ? 'cue-edge rounded-2xl p-3' : ''} data-cue={cueing || undefined}>
+    <InputViewSwitcher
+      instrumentData={edit.data}
+      {index}
+      dispatch={edit.dispatch}
+      {position}
+      {playing}
+      {now}
+    />
+  </div>
 
   <div class="bg-surface-900 border-surface-700 rounded-2xl border px-4 py-2">
-    <QuickControls {instrumentData} {dispatch} columns="sm:grid-cols-2 xl:grid-cols-3" />
+    <QuickControls
+      instrumentData={edit.data}
+      dispatch={edit.dispatch}
+      columns="sm:grid-cols-2 xl:grid-cols-3"
+    />
   </div>
 
   <section aria-label="Rack" class="flex flex-col gap-3 pb-8">
     <h2 class="text-sm font-bold tracking-[0.08em] uppercase">Rack</h2>
-    <RackModules {instrumentData} {dispatch} layout="grid" />
+    <RackModules instrumentData={edit.data} dispatch={edit.dispatch} layout="grid" />
   </section>
 </div>
 

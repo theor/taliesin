@@ -239,7 +239,7 @@ describe('convergence (randomised)', () => {
   function randomCommand(rand: () => number, known: string[]): Command {
     const int = (n: number) => Math.floor(rand() * n);
     const id = known[int(known.length)];
-    switch (int(8)) {
+    switch (int(10)) {
       case 0:
       case 1:
       case 2:
@@ -247,8 +247,14 @@ describe('convergence (randomised)', () => {
           type: 'setCells',
           instrumentId: id,
           track: int(8),
-          cells: Array.from({ length: 1 + int(3) }, () => ({ step: int(8), on: rand() < 0.5 }))
+          cells: Array.from({ length: 1 + int(3) }, () => ({ step: int(8), on: rand() < 0.5 })),
+          // always a slot, as the views send it: sometimes the live one, sometimes one being launched
+          // at the same time (without a slot, "the live one" depends on which launches arrived first)
+          pattern: int(3)
         };
+      case 8:
+      case 9:
+        return { type: 'setLivePattern', instrumentId: id, pattern: int(3) };
       case 3:
         return { type: 'setInstrumentFields', instrumentId: id, fields: { volume: int(11) / 10 } };
       case 4:

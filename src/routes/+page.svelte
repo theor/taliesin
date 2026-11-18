@@ -84,10 +84,11 @@
 
   const instrumentsData = store.instrumentsData;
   // console.log($instrumentsData.instrumentsData);
-  let code = $state(store.code());
+  let code = $state(store.localCode());
   // let group = $state('0');
   $effect(() => {
-    code = store.code();
+    // the song, with this device's cues (patterns heard here only) in place of the live ones
+    code = store.localCode();
     // every peer plays the song itself, following the host's clock (unless only the host makes sound)
     if (isHost || !store.transport.hostOnly) strudel.evaluate(code);
   });

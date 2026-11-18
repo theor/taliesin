@@ -37,9 +37,19 @@ import { Transport, type PlayerLike } from './transport.svelte';
 import type { IceServer } from './turn';
 import { Calibration, type Acoustics } from './calibration/calibration.svelte';
 import { WebAcoustics } from './calibration/webAcoustics';
-import { applySongCommand, isSongCommand, type Command, type SongCommand } from './commands';
+import {
+  applySongCommand,
+  isSongCommand,
+  type Command,
+  type Dispatch,
+  type SongCommand
+} from './commands';
+import { PatternCues } from './cues.svelte';
+import { liveSlot, patternDispatch, withPattern } from './patterns';
 
 export const mixerIndex = -1;
+/** The desktop's `selectedIndex` for the pattern launcher (`nav.svelte.ts`). */
+export const patternsIndex = -2;
 /** Most instruments a song received from the network can have. */
 const MAX_INSTRUMENTS = 64;
 
@@ -232,9 +242,14 @@ export class AppStore {
   get scale(): Scale {
     return this.instrumentsData.scale;
   }
-  code = () => {
+  /**
+   * The song as Strudel code: every audible instrument's live pattern, or, with `heard`, the pattern
+   * slot it gives for an instrument (this device's cues: `localCode`).
+   */
+  code = (heard?: (data: InstrumentData) => number) => {
     const code = audibleInstruments(this.instrumentsData.instrumentsData)
-      .map((i) => {
+      .map((data) => {
+        const i = heard ? patternFor(data, heard(data)) : data;
         const code = getInstrument(i)?.generate(i, this.scale);
         return code ? `$: ${code}` : ''; // an instrument with nothing to play is left out
       })
@@ -243,6 +258,11 @@ export class AppStore {
     // Strudel ignores an empty evaluation, which would leave the previous song playing
     return code.trim() === '' ? '$: silence' : code;
   };
+  /** What this device plays: the song, with its own cues in place of those instruments' live patterns. */
+  localCode = () => this.code((data) => this.cues.heard(data));
+  /** This device's patterns: the slot open per instrument, cues, launches waiting for the next bar. */
+  cues: PatternCues = undefined!;
+
   /**
    * When someone else last edited each instrument (by instrument id, ms since epoch). A view can
    * watch its entry to flash "someone just touched this". Your own edits never show up here.
@@ -272,6 +292,7 @@ export class AppStore {
     console.log('peer joined', peerId);
     if (!this.peers.includes(peerId)) this.peers.push(peerId);
     this.transport.peerJoined(peerId);
+    this.cues.announce(peerId);
     // Both sides get onPeerJoin for each other, so the host always syncs a (re)connecting peer.
     if (this.host) {
       this.sendState(this.snapshotSong(), peerId);
@@ -283,6 +304,7 @@ export class AppStore {
     console.log('peer left', peerId);
     if (peerId === this.hostPeerId) this.hostPeerId = ''; // a host that comes back has a new id
     this.peers = this.peers.filter((p) => p !== peerId);
+    this.cues.peerLeft(peerId);
   }
 
   private snapshotInstruments(): InstrumentDataJsonValue[] {
@@ -395,7 +417,7 @@ export class AppStore {
   private static coalesceKey(cmd: SongCommand): string | undefined {
     switch (cmd.type) {
       case 'setPartFields':
-        return `p:${cmd.instrumentId}:${cmd.partName}`;
+        return `p:${cmd.instrumentId}:${cmd.partName}:${cmd.pattern ?? ''}`; // one slot's notes never merge into another's
       case 'setInstrumentFields':
         return `i:${cmd.instrumentId}`;
       case 'setMasterVolume':
@@ -432,6 +454,13 @@ export class AppStore {
       this.sendCommand({ cmd, ordered: this.host, ...(this.host && from ? { from } : {}) });
   }
   private applyCommand(cmd: SongCommand): boolean {
+    const applied = this.applySong(cmd);
+    // a slot open here that has just gone live (whoever launched it): follow the live one from now on
+    if (applied && cmd.type === 'setLivePattern')
+      this.cues?.followed(cmd.instrumentId, cmd.pattern);
+    return applied;
+  }
+  private applySong(cmd: SongCommand): boolean {
     return applySongCommand(this.instrumentsData, cmd, {
       sequencerFor: (data) => getInstrument(data)?.sequencer,
       instrumentInput: (name) =>
@@ -460,6 +489,19 @@ export class AppStore {
     const { room: r } = this.init(host, roomId, room);
     this.room = r;
     this.transport = new Transport(this.room, host, player);
+    const transport = this.transport;
+    this.cues = new PatternCues(
+      this.room,
+      (cmd) => this.dispatch(cmd),
+      {
+        get playing() {
+          return transport.playing;
+        },
+        position: () => transport.position(),
+        cps: () => transport.cps()
+      },
+      (id) => this.instrumentsData.instrumentsData.find((i) => i.id === id)
+    );
     let web: WebAcoustics | undefined;
     this.calibration = new Calibration(
       this.room,
@@ -593,6 +635,51 @@ export function getInstrumentIcon(name: string): Component {
     default:
       return Music;
   }
+}
+/** An instrument with one of its pattern slots' notes (`withPattern`): an empty slot plays nothing. */
+export function patternFor(data: InstrumentData, slot: number): InstrumentData {
+  if (slot === liveSlot(data)) return data;
+  const input = getInstrument(data)?.input;
+  if (!input) return data;
+  const type = getPartType(input.id)!;
+  return withPattern(data, slot, input.id, () => type.createData());
+}
+/**
+ * A slot's notes at a glance: `cells` cells (fewer for a shorter loop), each on when any step it covers
+ * holds a note. For the launcher's clips.
+ */
+export function patternStrip(data: InstrumentData, slot: number, cells = 16): boolean[] {
+  const i = patternFor(data, slot);
+  const instr = getInstrument(i);
+  const seq = instr?.sequencer;
+  if (!instr || !seq) return [];
+  const length = instr.getLength(i);
+  const total = length.stepsPerMeasure * length.measures;
+  const n = Math.min(total, cells);
+  const per = total / Math.max(n, 1);
+  return Array.from({ length: n }, (_, c) => {
+    for (let step = Math.floor(c * per); step < Math.floor((c + 1) * per); step++)
+      if (seq.tracks.some((_, track) => seq.getCell(i, track, step))) return true;
+    return false;
+  });
+}
+
+/**
+ * What the edit views work on for the slot open on this device: the instrument with that slot's notes,
+ * and a dispatch that addresses their note edits to it (`patternDispatch`), the live slot too: "the live
+ * one" is not absolute, a launch can land before the edit does.
+ */
+export function patternEdit(
+  data: InstrumentData,
+  slot: number,
+  dispatch: Dispatch
+): { data: InstrumentData; dispatch: Dispatch } {
+  const input = getInstrument(data)?.input;
+  if (!input) return { data, dispatch };
+  return {
+    data: patternFor(data, slot),
+    dispatch: patternDispatch(dispatch, data.id, slot, input.id)
+  };
 }
 export function getInstrument(data: InstrumentData): Instrument | undefined {
   if (!data) return undefined;

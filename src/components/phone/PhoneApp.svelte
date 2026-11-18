@@ -6,6 +6,7 @@
   import {
     ChevronLeft,
     Dices,
+    Grid3x3,
     Headphones,
     LayoutGrid,
     ListMusic,
@@ -27,6 +28,10 @@
   import QuickRack from './QuickRack.svelte';
   import RackModules from '../RackModules.svelte';
   import SessionView from './SessionView.svelte';
+  import PatternSlots from '../PatternSlots.svelte';
+  import CueBanner from '../CueBanner.svelte';
+  import PatternLauncher from '../PatternLauncher.svelte';
+  import { patternEdit } from '$lib/Store.svelte';
 
   /**
    * The phone layout: four screens (session, edit, rack, mixer) behind a bottom tab bar within thumb's
@@ -72,6 +77,11 @@
   const currentIndex = $derived(current ? song.instrumentsData.indexOf(current) : -1);
   const color = $derived(trackColor(currentIndex));
   const hasInstrument = $derived(!!current);
+  // the pattern open on this device: the edit views work on its notes (a cue when it is not live)
+  const edit = $derived(
+    current ? patternEdit(current, store.cues.slot(current), dispatch) : undefined
+  );
+  const cueing = $derived(!!current && store.cues.isCue(current));
 
   function open(index: number, to: Screen = 'edit') {
     selectedIndex = index;
@@ -96,6 +106,7 @@
     { id: 'session', label: 'Session', icon: ListMusic },
     { id: 'edit', label: 'Edit', icon: LayoutGrid },
     { id: 'rack', label: 'Rack', icon: Waves },
+    { id: 'patterns', label: 'Patterns', icon: Grid3x3 },
     { id: 'mixer', label: 'Mixer', icon: SlidersVertical }
   ] as const;
   const iconButton =
@@ -133,6 +144,7 @@
         {playing}
         {selectedIndex}
         activity={store.activity}
+        cues={store.cues}
         onSelect={(i) => open(i)}
         onAdd={() => (addOpen = true)}
       >
@@ -150,6 +162,22 @@
         {/snippet}
       </SessionView>
       {#if debug}<div class="space-y-2 px-4 pt-6">{@render debug()}</div>{/if}
+    {:else if screen === 'patterns'}
+      <header class="flex items-center gap-3 px-5 pt-4 pb-3">
+        <h1 class="flex-1 text-[22px] font-bold">Patterns</h1>
+        {@render playButton()}
+      </header>
+      <div class="px-4">
+        <PatternLauncher
+          song={store.instrumentsData}
+          cues={store.cues}
+          {dispatch}
+          {position}
+          {playing}
+          {hostOnly}
+          onEdit={(i) => open(i)}
+        />
+      </div>
     {:else if screen === 'mixer'}
       <header class="flex items-center gap-3 px-5 pt-4 pb-3">
         <h1 class="flex-1 text-[22px] font-bold">Mixer</h1>
@@ -190,12 +218,16 @@
             >
           </div>
           {@render playButton()}
-          <InstrumentMenu instrumentData={current} {dispatch} buttonClass={iconButton}>
+          <InstrumentMenu
+            instrumentData={edit?.data ?? current}
+            dispatch={edit?.dispatch ?? dispatch}
+            buttonClass={iconButton}
+          >
             {#snippet extra(close)}
               <button
                 class="btn preset-tonal justify-start"
                 onclick={() => {
-                  randomizeCommands(current).forEach((c) => dispatch(c));
+                  if (edit) randomizeCommands(edit.data).forEach((c) => edit.dispatch(c));
                   close();
                 }}><Dices size={16} /> Randomize</button
               >
@@ -240,18 +272,28 @@
           {/each}
         </div>
 
-        {#if screen === 'edit'}
+        {#if screen === 'edit' && edit}
           <div class="space-y-4 px-4">
-            <InputViewSwitcher
-              instrumentData={current}
-              index={currentIndex}
-              {dispatch}
-              {position}
-              {playing}
-              {now}
-              maxVisibleSteps={16}
+            <PatternSlots data={current} cues={store.cues} {color} />
+            {#if cueing}
+              <CueBanner data={current} cues={store.cues} {color} {position} {playing} {hostOnly} />
+            {/if}
+            <div class={cueing ? 'cue-edge rounded-2xl p-2' : ''} data-cue={cueing || undefined}>
+              <InputViewSwitcher
+                instrumentData={edit.data}
+                index={currentIndex}
+                dispatch={edit.dispatch}
+                {position}
+                {playing}
+                {now}
+                maxVisibleSteps={16}
+              />
+            </div>
+            <QuickRack
+              instrumentData={edit.data}
+              dispatch={edit.dispatch}
+              onOpenRack={() => (screen = 'rack')}
             />
-            <QuickRack instrumentData={current} {dispatch} onOpenRack={() => (screen = 'rack')} />
           </div>
         {:else}
           <div class="flex items-center justify-between px-5 pb-2">
@@ -259,7 +301,10 @@
             <span class="text-surface-300 text-xs">tap a module's name to fold it</span>
           </div>
           <div class="px-4">
-            <RackModules instrumentData={current} {dispatch} />
+            <RackModules
+              instrumentData={edit?.data ?? current}
+              dispatch={edit?.dispatch ?? dispatch}
+            />
           </div>
         {/if}
       </div>
@@ -275,7 +320,7 @@
         <Volume2 size={20} /> Tap to hear
       </button>
     {/if}
-    <div class="grid grid-cols-4 px-2 pt-1.5 pb-3">
+    <div class="grid grid-cols-5 px-1 pt-1.5 pb-3">
       {#each tabs as tab (tab.id)}
         {@const Icon = tab.icon}
         {@const disabled = (tab.id === 'edit' || tab.id === 'rack') && !hasInstrument}

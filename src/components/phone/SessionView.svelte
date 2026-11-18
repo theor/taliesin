@@ -7,6 +7,9 @@
   import { trackColor, trackInitials, trackKind } from '$lib/trackColors';
   import { Plus } from '@lucide/svelte';
   import type { Snippet } from 'svelte';
+  import type { PatternCues } from '$lib/cues.svelte';
+  import { patternLabel, shownSlots } from '$lib/patterns';
+  import PatternSlots from '../PatternSlots.svelte';
   import Transport from '../Transport.svelte';
 
   /**
@@ -22,7 +25,8 @@
     activity = {},
     onSelect,
     onAdd,
-    status
+    status,
+    cues
   }: {
     song: Song;
     dispatch: Dispatch;
@@ -35,7 +39,24 @@
     onAdd: () => void;
     /** A line under the transport: who is hosting, how many are here. */
     status?: Snippet;
+    /** This device's patterns (slots shown on each card when an instrument has more than one). */
+    cues?: PatternCues;
   } = $props();
+
+  /** The line under a card's pattern slots: a launch waiting, this device's cue, or someone else's. */
+  function cueNote(data: InstrumentData): string {
+    if (!cues) return '';
+    const queued = cues.queued[data.id];
+    if (queued !== undefined) return `${patternLabel(queued)} starts at the next bar`;
+    if (cues.isCue(data)) {
+      const open = patternLabel(cues.slot(data));
+      return cues.hearLive[data.id]
+        ? `Editing ${open}, not live`
+        : `Cueing ${open}: only you hear it`;
+    }
+    const other = cues.othersOn(data)[0];
+    return other ? `Someone is cueing ${patternLabel(other.slot)}` : '';
+  }
 
   /** The most steps a card shows; longer loops show their start. */
   const MAX_CELLS = 32;
@@ -75,11 +96,12 @@
     {@const muted = data.state === TrackState.Muted}
     {@const soloed = data.state === TrackState.Solo}
     {@const o = overview(data)}
+    {@const cueing = !!cues?.isCue(data)}
     <li
-      class="bg-surface-900 flex flex-col gap-2 rounded-2xl border p-2.5 pl-3 {selectedIndex ===
-      index
-        ? 'border-surface-500'
-        : 'border-surface-700'}"
+      class="flex flex-col gap-2 rounded-2xl p-2.5 pl-3 {cueing
+        ? 'cue-hatch cue-edge'
+        : `bg-surface-900 border ${selectedIndex === index ? 'border-surface-500' : 'border-surface-700'}`}"
+      data-cue={cueing || undefined}
     >
       <div class="flex items-center gap-2.5">
         <button
@@ -143,6 +165,14 @@
               style:opacity={on && muted ? 0.35 : 1}
             ></span>
           {/each}
+        </div>
+      {/if}
+      {#if cues && (shownSlots(data, cues.slot(data)).length > 1 || cues.othersOn(data).length)}
+        <div class="flex items-center gap-2.5">
+          <PatternSlots {data} {cues} {color} size="sm" onPick={() => onSelect(index)} />
+          <span class="text-surface-200 min-w-0 truncate text-xs font-medium" data-testid="cue-note"
+            >{cueNote(data)}</span
+          >
         </div>
       {/if}
     </li>

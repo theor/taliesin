@@ -122,5 +122,12 @@ export interface InstrumentData {
   parts: InstrumentPartData[];
   volume: number;
   state: TrackState;
+  /**
+   * The notes of the patterns that are not live, by slot (`lib/patterns.ts`): the input part's data, or
+   * null (the live slot, whose notes are in `parts`, and slots never written). Absent: one pattern.
+   */
+  patterns?: (InstrumentPartData | null)[];
+  /** The slot the host plays (absent: 0). */
+  livePattern?: number;
 }
 export type InstrumentDataJsonValue = InstrumentData & { [key: string]: any };

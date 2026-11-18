@@ -2,7 +2,8 @@ import type { Command } from './commands';
 import { diffFields } from './partFields';
 import { TrackState, type InstrumentData } from './instruments';
 import { getPart, PartSteps } from './parts.svelte';
-import { createInstrument, getInstrument, presets } from './Store.svelte';
+import { createInstrument, getInstrument, patternFor, presets } from './Store.svelte';
+import { isEmptyInput, isSlot } from './patterns';
 
 /**
  * Builders for commands that need something non-deterministic (new ids, random notes). The randomness
@@ -107,6 +108,36 @@ export function resizeLoopCommands(data: InstrumentData, direction: 'double' | '
   }
   return [...offs, ...ons, setMeasures(steps.measures * 2)];
 }
+
+/**
+ * Copy a column of patterns (slot `from` of every instrument) onto slot `to`: each instrument's notes,
+ * sent whole and addressed to the slot (absolute, like any note edit). An instrument with nothing in
+ * either slot is left alone, so copying never creates empty slots; one with nothing to copy onto
+ * notes gets them cleared, as the column is copied as it is.
+ */
+export function copyPatternCommands(
+  instruments: InstrumentData[],
+  from: number,
+  to: number
+): Command[] {
+  if (!isSlot(from) || !isSlot(to) || from === to) return [];
+  return instruments.flatMap((data): Command[] => {
+    const input = getInstrument(data)?.input?.id;
+    if (!input) return [];
+    const source = inputOf(patternFor(data, from));
+    if (!source || (isEmptyInput(source) && isEmptyInput(inputOf(patternFor(data, to))))) return [];
+    const { partName: _, ...fields } = json(source);
+    return [{ type: 'setPartFields', instrumentId: data.id, partName: input, fields, pattern: to }];
+  });
+}
+
+/** Whether a column holds any notes (copying onto it replaces them). */
+export const columnHasNotes = (instruments: InstrumentData[], slot: number) =>
+  instruments.some((data) => !isEmptyInput(inputOf(patternFor(data, slot))));
+const inputOf = (data: InstrumentData) => {
+  const input = getInstrument(data)?.input?.id;
+  return data.parts.find((p) => p.partName === input) ?? null;
+};
 
 /** Mute / solo toggles as absolute states: pressing the active one goes back to playing. */
 export function setTrackStateCommand(data: InstrumentData, wanted: TrackState): Command {

@@ -2,7 +2,8 @@
   import { store } from '$lib';
   import type { Dispatch } from '$lib/commands';
   import { presetCommands } from '$lib/commandBuilders';
-  import { mixerIndex } from '$lib/Store.svelte';
+  import { mixerIndex, patternsIndex } from '$lib/Store.svelte';
+  import PatternLauncher from '../PatternLauncher.svelte';
   import { SettingsIcon, Volume2 } from '@lucide/svelte';
   import type { Snippet } from 'svelte';
   import AddInstrumentModal from '../AddInstrumentModal.svelte';
@@ -115,6 +116,7 @@
         {dispatch}
         bind:selectedIndex
         activity={store.activity}
+        cues={store.cues}
         onAdd={() => (addOpen = true)}
       />
     </aside>
@@ -127,6 +129,19 @@
           <h1 class="text-xl font-bold">Mixer</h1>
           <Mixer {song} {dispatch} />
         </div>
+      {:else if selectedIndex === patternsIndex}
+        <div class="flex flex-col gap-3 pb-8">
+          <h1 class="text-xl font-bold">Patterns</h1>
+          <PatternLauncher
+            {song}
+            cues={store.cues}
+            {dispatch}
+            {position}
+            {playing}
+            hostOnly={store.transport.hostOnly}
+            onEdit={(i) => (selectedIndex = i)}
+          />
+        </div>
       {:else if current}
         <InstrumentView
           bind:instrumentData={song.instrumentsData[selectedIndex]}
@@ -136,6 +151,8 @@
           {playing}
           {now}
           editedByOther={store.activity[current.id]}
+          cues={store.cues}
+          hostOnly={store.transport.hostOnly}
         />
       {:else}
         <div

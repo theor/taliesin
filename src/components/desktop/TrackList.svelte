@@ -2,9 +2,11 @@
   import { TrackState } from '$lib';
   import type { Dispatch, Song } from '$lib/commands';
   import { setTrackStateCommand } from '$lib/commandBuilders';
-  import { mixerIndex } from '$lib/Store.svelte';
+  import { mixerIndex, patternsIndex } from '$lib/Store.svelte';
   import { trackColor, trackInitials, trackKind } from '$lib/trackColors';
-  import { Plus, SlidersVertical } from '@lucide/svelte';
+  import { Grid3x3, Plus, SlidersVertical } from '@lucide/svelte';
+  import type { PatternCues } from '$lib/cues.svelte';
+  import { liveSlot, patternLabel, shownSlots } from '$lib/patterns';
 
   /**
    * The desktop sidebar: one row per instrument (select it, mute or solo it), the mixer, and "Add".
@@ -15,7 +17,8 @@
     dispatch,
     selectedIndex = $bindable(),
     activity = {},
-    onAdd
+    onAdd,
+    cues
   }: {
     song: Song;
     dispatch: Dispatch;
@@ -23,7 +26,11 @@
     /** When someone else last edited each instrument, by id. */
     activity?: Record<string, number>;
     onAdd: () => void;
+    /** This device's patterns: each row shows its live slot, and the cue open here. */
+    cues?: PatternCues;
   } = $props();
+  const mini =
+    'flex size-5 flex-none items-center justify-center rounded-[5px] text-[10px] font-bold';
 
   const small = 'size-8 flex-none rounded-lg border text-xs font-bold';
 </script>
@@ -66,6 +73,23 @@
           <span class="text-surface-300 truncate text-[11px]">{trackKind(data.instrumentName)}</span
           >
         </span>
+        {#if cues && shownSlots(data, cues.slot(data)).length > 1}
+          <span class="ml-auto flex gap-0.5" data-testid="track-patterns">
+            <span
+              class="{mini} text-[#0B0C0F]"
+              style:background={color}
+              title="Live pattern"
+              data-state="live">{patternLabel(liveSlot(data))}</span
+            >
+            {#if cues.isCue(data)}
+              <span
+                class="{mini} cue-hatch border-surface-50 border-[1.5px] border-dashed"
+                title="Your cue: only you hear it"
+                data-state="cue">{patternLabel(cues.slot(data))}</span
+              >
+            {/if}
+          </span>
+        {/if}
       </button>
       <button
         class="{small} {muted
@@ -100,6 +124,15 @@
     title="Mixer"
     aria-current={selectedIndex === mixerIndex ? 'page' : undefined}
     onclick={() => (selectedIndex = mixerIndex)}><SlidersVertical size={18} /> Mixer</button
+  >
+  <button
+    class="flex h-11 items-center gap-2.5 rounded-xl border px-3 text-sm font-semibold {selectedIndex ===
+    patternsIndex
+      ? 'bg-surface-800 border-surface-600'
+      : 'hover:bg-surface-900 border-transparent'}"
+    title="Pattern launcher"
+    aria-current={selectedIndex === patternsIndex ? 'page' : undefined}
+    onclick={() => (selectedIndex = patternsIndex)}><Grid3x3 size={18} /> Patterns</button
   >
 </nav>
 

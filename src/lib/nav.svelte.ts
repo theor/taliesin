@@ -3,8 +3,8 @@
  * move between pages. Not song state: it is this device's, and never synced.
  */
 
-/** The phone's screens; the desktop only tells the mixer apart from an instrument. */
-export type Screen = 'session' | 'edit' | 'rack' | 'mixer';
+/** The phone's screens; the desktop tells the mixer and the pattern launcher apart from an instrument. */
+export type Screen = 'session' | 'edit' | 'rack' | 'mixer' | 'patterns';
 
 export interface NavState {
   screen: Screen;
@@ -13,8 +13,9 @@ export interface NavState {
 }
 
 export const START: NavState = { screen: 'session' };
-/** `selectedIndex` of the desktop's mixer (`Store.mixerIndex`). */
+/** `selectedIndex` of the desktop's mixer (`Store.mixerIndex`) and pattern launcher (`Store.patternsIndex`). */
 const MIXER_INDEX = -1;
+const PATTERNS_INDEX = -2;
 
 const same = (a: NavState, b: NavState) =>
   a.screen === b.screen && a.instrumentId === b.instrumentId;
@@ -33,14 +34,18 @@ export function phoneScreen(nav: NavState, ids: readonly string[]): Screen {
   return gone ? 'session' : nav.screen;
 }
 
-/** The desktop's selection: the mixer, or an instrument's index. */
+/** The desktop's selection: the mixer, the pattern launcher, or an instrument's index. */
 export function desktopIndex(nav: NavState, ids: readonly string[]): number {
-  return nav.screen === 'mixer' ? MIXER_INDEX : navIndex(nav, ids);
+  if (nav.screen === 'mixer') return MIXER_INDEX;
+  if (nav.screen === 'patterns') return PATTERNS_INDEX;
+  return navIndex(nav, ids);
 }
 
-/** The state after the desktop selects index `i` (an instrument, or the mixer). */
+/** The state after the desktop selects index `i` (an instrument, the mixer or the pattern launcher). */
 export function desktopSelect(i: number, ids: readonly string[]): Partial<NavState> {
-  return i === MIXER_INDEX ? { screen: 'mixer' } : { screen: 'edit', instrumentId: ids[i] };
+  if (i === MIXER_INDEX) return { screen: 'mixer' };
+  if (i === PATTERNS_INDEX) return { screen: 'patterns' };
+  return { screen: 'edit', instrumentId: ids[i] };
 }
 
 /**

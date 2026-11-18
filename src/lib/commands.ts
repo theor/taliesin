@@ -2,6 +2,7 @@ import type { InstrumentData } from './instruments';
 import type { InstrumentPart, InstrumentPartData, Scale } from './parts.svelte';
 import { KEYS, MODE_NAMES } from './scale';
 import type { ISequencer } from './sequencer';
+import { inputIndex, isSlot, liveSlot, MAX_PATTERNS, withPattern } from './patterns';
 
 /**
  * Everything the UI can ask for. Views never mutate state themselves: they `dispatch` one of these.
@@ -21,6 +22,12 @@ export type Command =
       instrumentId: string;
       track: number;
       cells: { step: number; on: boolean }[];
+      /**
+       * The pattern slot edited. Absent means the live one, which is only safe when nobody launches a
+       * pattern meanwhile (peers may disagree on which one is live until the host's order reaches
+       * them): the views always say which slot (`patternEdit`).
+       */
+      pattern?: number;
     }
   /** Set some fields of one part (effects, filter, steps, notes...). Only the part's own fields, each valid for it. */
   | {
@@ -28,6 +35,8 @@ export type Command =
       instrumentId: string;
       partName: string;
       fields: { [key: string]: Json };
+      /** For the input part (the notes): the pattern slot edited (absent: the live one). */
+      pattern?: number;
     }
   | {
       type: 'setInstrumentFields';
@@ -42,6 +51,11 @@ export type Command =
    * peer, so nothing to resolve first). Only parts its kind allows (`Instrument.addableParts`).
    */
   | { type: 'addPart'; instrumentId: string; partName: string }
+  /**
+   * Make a pattern slot the one the host plays for everyone (`lib/patterns.ts`). A slot never written
+   * starts empty. Absolute: making the live slot live again changes nothing.
+   */
+  | { type: 'setLivePattern'; instrumentId: string; pattern: number }
   | { type: 'setMasterVolume'; volume: number }
   /** The key the whole song plays in (it ends up in the code: only known keys and modes). */
   | { type: 'setScale'; scaleKey: string; scaleMode: string }
@@ -72,6 +86,7 @@ const SONG_COMMANDS = new Set<string>([
   'addInstrument',
   'removeInstrument',
   'addPart',
+  'setLivePattern',
   'setMasterVolume',
   'setScale'
 ]);
@@ -142,7 +157,7 @@ function cleanInstrument(i: any, env: Env): InstrumentData | null {
     if (part) parts.push(part);
   }
   if (!parts.some((p) => p.partName === input)) return null; // nothing to play: its code would not parse
-  return {
+  const clean: InstrumentData = {
     id: i.id,
     name: i.name,
     instrumentName: i.instrumentName,
@@ -150,6 +165,73 @@ function cleanInstrument(i: any, env: Env): InstrumentData | null {
     state: i.state,
     parts
   };
+  // the other patterns, leniently: a bad slot is dropped, never the instrument
+  if (Array.isArray(i.patterns) && i.patterns.length <= MAX_PATTERNS) {
+    const type = env.partType(input)!;
+    const live = isSlot(i.livePattern) ? i.livePattern : 0;
+    clean.patterns = i.patterns.map((p: unknown, slot: number) =>
+      slot !== live && (p as InstrumentPartData | null)?.partName === input
+        ? type.normalize(clone(p), false)
+        : null
+    );
+    clean.livePattern = live;
+  }
+  return clean;
+}
+
+/**
+ * The instrument with `slot`'s notes to edit (`withPattern`), or undefined for a bad slot. A slot never
+ * written gets empty notes, stored by `commit` once the edit has been applied.
+ */
+function patternTarget(
+  data: InstrumentData,
+  slot: unknown,
+  env: Env
+): { data: InstrumentData; commit: () => void } | undefined {
+  const none = { data, commit: () => {} };
+  if (slot === undefined || slot === liveSlot(data)) return none;
+  if (!isSlot(slot)) return undefined;
+  const input = env.instrumentInput(data.instrumentName);
+  const type = input ? env.partType(input) : undefined;
+  if (!input || !type || inputIndex(data, input) < 0) return undefined;
+  const stored = data.patterns?.[slot];
+  if (stored) return { data: withPattern(data, slot, input, () => stored), commit: () => {} };
+  const fresh = type.createData();
+  return {
+    data: withPattern(data, slot, input, () => fresh),
+    commit: () => {
+      if (!data.patterns) data.patterns = [];
+      const patterns = data.patterns; // read back: in a Svelte $state song, that is the reactive proxy
+      while (patterns.length <= slot) patterns.push(null);
+      patterns[slot] = fresh;
+      data.livePattern = liveSlot(data);
+    }
+  };
+}
+
+function applySetLivePattern(
+  song: Song,
+  cmd: Extract<Command, { type: 'setLivePattern' }>,
+  env: Env
+): boolean {
+  if (!isId(cmd.instrumentId) || !isSlot(cmd.pattern)) return false;
+  const data = song.instrumentsData.find((i) => i.id === cmd.instrumentId);
+  const input = data && env.instrumentInput(data.instrumentName);
+  const type = input ? env.partType(input) : undefined;
+  if (!data || !input || !type) return false;
+  const live = liveSlot(data);
+  if (cmd.pattern === live) return false; // already live: nothing to do (the host echoing it back)
+  const at = inputIndex(data, input);
+  if (at < 0) return false;
+  if (!data.patterns) data.patterns = [];
+  const patterns = data.patterns; // read back: in a Svelte $state song, that is the reactive proxy
+  while (patterns.length <= Math.max(live, cmd.pattern)) patterns.push(null);
+  const next = patterns[cmd.pattern] ?? type.createData();
+  patterns[live] = data.parts[at];
+  data.parts[at] = next;
+  patterns[cmd.pattern] = null;
+  data.livePattern = cmd.pattern;
+  return true;
 }
 
 function applySetCells(song: Song, cmd: Extract<Command, { type: 'setCells' }>, env: Env): boolean {
@@ -169,10 +251,13 @@ function applySetCells(song: Song, cmd: Extract<Command, { type: 'setCells' }>, 
     )
   )
     return false;
-  const data = song.instrumentsData.find((i) => i.id === cmd.instrumentId);
-  const seq = data && env.sequencerFor(data);
-  if (!data || !seq || cmd.track >= seq.tracks.length) return false;
-  for (const { step, on } of cmd.cells) seq.setCell(data, cmd.track, step, on);
+  const found = song.instrumentsData.find((i) => i.id === cmd.instrumentId);
+  const seq = found && env.sequencerFor(found);
+  if (!found || !seq || cmd.track >= seq.tracks.length) return false;
+  const target = patternTarget(found, cmd.pattern, env);
+  if (!target) return false;
+  for (const { step, on } of cmd.cells) seq.setCell(target.data, cmd.track, step, on);
+  target.commit();
   return true;
 }
 
@@ -186,19 +271,27 @@ function applySetPartFields(
     return false;
   if (!jsonLike(cmd.fields)) return false;
   const type = env.partType(cmd.partName);
-  const part = song.instrumentsData
-    .find((i) => i.id === cmd.instrumentId)
-    ?.parts.find((p) => p.partName === cmd.partName) as Record<string, unknown> | undefined;
-  if (!type || !part) return false;
+  const found = song.instrumentsData.find((i) => i.id === cmd.instrumentId);
+  if (!type || !found) return false;
+  // a slot only means something for the notes; the other parts are shared by every pattern
+  if (cmd.pattern !== undefined && !isSlot(cmd.pattern)) return false;
   const keys = Object.keys(cmd.fields);
   // Only the part's own fields, and the result must be valid for the part (it ends up in code). Strict: all or nothing.
   if (keys.some((key) => !type.hasField(key))) return false;
+  const target = type.isInput()
+    ? patternTarget(found, cmd.pattern, env)
+    : { data: found, commit() {} };
+  const part = target?.data.parts.find((p) => p.partName === cmd.partName) as
+    | Record<string, unknown>
+    | undefined;
+  if (!target || !part) return false;
   const next = type.normalize({ ...part, ...clone(cmd.fields) }, true) as Record<
     string,
     unknown
   > | null;
   if (!next) return false;
   for (const key of keys) part[key] = next[key];
+  target.commit();
   return true;
 }
 
@@ -279,6 +372,8 @@ export function applySongCommand(song: Song, cmd: SongCommand, env: Env): boolea
       return applyRemoveInstrument(song, cmd);
     case 'addPart':
       return applyAddPart(song, cmd, env);
+    case 'setLivePattern':
+      return applySetLivePattern(song, cmd, env);
     case 'setMasterVolume':
       if (!(typeof cmd.volume === 'number' && cmd.volume >= 0 && cmd.volume <= 1)) return false;
       song.volume = cmd.volume;

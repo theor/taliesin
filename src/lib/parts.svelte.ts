@@ -507,7 +507,7 @@ export class PartTrackNotes extends InstrumentPart<{ notes: DrumTracks }> {
         ([k, v]) => `<${Array.from({ length: total }, (_, i) => (v[i] == 1 ? k : '~')).join(' ')}>`
       )
       .join(',');
-    return `s("${joined}")`;
+    return `s("${joined || '~'}")`; // a kit without tracks (a new pattern) rests
   }
 }
 

@@ -260,6 +260,11 @@ export class Transport {
     if (Math.abs(drift) / this.last!.cps > thresholdS) this.player.shift(drift);
   }
 
+  /** Cycles per second: the host's. */
+  cps(): number {
+    return this.host ? this.player.cps : (this.last?.cps ?? this.player.cps);
+  }
+
   /** Current cycle position: exact on the host, extrapolated on clients. */
   position(): number {
     if (this.host) return this.player.now();
