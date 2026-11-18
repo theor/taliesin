@@ -4,8 +4,10 @@ import {
   ArpeggiatorType,
   ChordHold,
   DEFAULT_SCALE,
+  FilterType,
   PartArpeggiator,
   PartChords,
+  PartFilter,
   VoicingMode,
   getPartType,
   makePartData,
@@ -22,6 +24,33 @@ const ctx = (
   measures,
   ...DEFAULT_SCALE,
   degrees
+});
+
+describe('PartFilter', () => {
+  const filter = new PartFilter();
+  const gen = (data: Partial<PartFilter['dataType']>) =>
+    filter.generate(undefined!, filter.createData(data));
+
+  test('each type uses its own cutoff, resonance and envelope controls', () => {
+    expect(gen({ type: FilterType.lowpass, freq: 800, res: 4, env: 2 })).toBe(
+      '.lpf(800).lpq(4).lpenv(2)'
+    );
+    expect(gen({ type: FilterType.highpass, freq: 300, res: 1, env: 0 })).toBe('.hpf(300).hpq(1)');
+    expect(gen({ type: FilterType.bandpass, freq: 1200, res: 8, env: 3 })).toBe(
+      '.bpf(1200).bpq(8).bpenv(3)'
+    );
+  });
+
+  test('a filter saved before the type and envelope existed sounds as it did', () => {
+    const old = filter.normalize({ partName: PartFilter.id, freq: 400, res: 0.5 }, false)!;
+    expect(old).toMatchObject({ type: FilterType.lowpass, env: 4 });
+    expect(filter.generate(undefined!, old)).toBe('.lpf(400).lpq(0.5).lpenv(4)');
+  });
+
+  test('an unknown type or out-of-range values never reach the code', () => {
+    expect(filter.normalize({ partName: PartFilter.id, type: 'notch' })).toBeNull();
+    expect(gen({ type: '");evil(' as FilterType, res: 999, env: -1 })).toBe('.lpf(1000).lpq(50)');
+  });
 });
 
 describe('PartArpeggiator.generate', () => {

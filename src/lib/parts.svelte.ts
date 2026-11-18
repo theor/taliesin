@@ -566,22 +566,53 @@ export class PartEffects extends InstrumentPart<{
 export const MIN_FILTER_HZ = 20;
 export const MAX_FILTER_HZ = 20000;
 
-export class PartFilter extends InstrumentPart<{ freq: number; res: number }> {
+export const MAX_FILTER_RES = 50;
+export const MAX_FILTER_ENV = 8;
+
+/** Which side of the cutoff a filter keeps. Saved: never change the values. */
+export enum FilterType {
+  lowpass = 'low pass',
+  highpass = 'high pass',
+  bandpass = 'band pass'
+}
+/** Strudel's controls per filter type: cutoff, resonance (Q), envelope depth. */
+const FILTER_CONTROLS: Record<FilterType, [string, string, string]> = {
+  [FilterType.lowpass]: ['lpf', 'lpq', 'lpenv'],
+  [FilterType.highpass]: ['hpf', 'hpq', 'hpenv'],
+  [FilterType.bandpass]: ['bpf', 'bpq', 'bpenv']
+};
+
+/**
+ * A resonant filter. `res` is its resonance (Q: a peak at the cutoff, or how narrow a band pass is);
+ * `env` is how far the filter envelope sweeps the cutoff on each note, in octaves (0: it stays put).
+ */
+export class PartFilter extends InstrumentPart<{
+  type: FilterType;
+  freq: number;
+  res: number;
+  env: number;
+}> {
   static override readonly id = 'PartFilter';
   readonly stage = Stage.filter;
   readonly role = Role.soundFx;
   protected readonly fields = {
+    type: field.oneOf(Object.values(FilterType)),
     freq: field.num(MIN_FILTER_HZ, MAX_FILTER_HZ),
-    res: field.num(0, 50)
+    res: field.num(0, MAX_FILTER_RES),
+    env: field.num(0, MAX_FILTER_ENV)
   };
-  override defaultData(): { freq: number; res: number } {
-    return { freq: 1000, res: 0.5 };
+  override defaultData() {
+    // songs saved before the type and envelope existed were a low pass swept by 4 octaves
+    return { type: FilterType.lowpass, freq: 1000, res: 0.5, env: 4 };
   }
 
   override generate(_data: InstrumentData, selfData: PartFilter['dataType']): string {
+    const [cutoff, q, envelope] =
+      FILTER_CONTROLS[selfData.type] ?? FILTER_CONTROLS[FilterType.lowpass];
     const freq = num(selfData.freq, MIN_FILTER_HZ, MAX_FILTER_HZ, 1000);
-    const res = num(selfData.res, 0, 50, 0.5);
-    return `.lpf("${freq}:${res}").lpenv(4)`;
+    const res = num(selfData.res, 0, MAX_FILTER_RES, 0.5);
+    const env = num(selfData.env, 0, MAX_FILTER_ENV, 4);
+    return `.${cutoff}(${freq}).${q}(${res})${env > 0 ? `.${envelope}(${env})` : ''}`;
   }
 }
 
