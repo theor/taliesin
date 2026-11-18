@@ -1,5 +1,3 @@
-import type { Dispatch } from './commands';
-
 /** How a moment in time is snapped to the step grid. */
 export interface Quantize {
   /** Snap to every Nth step (1 = every step, 2 = every other step...). Whole numbers only. */
@@ -15,9 +13,27 @@ export interface LoopLength {
 }
 
 /**
- * The step a moment falls on. `cycle` is the song position in cycles, the same quantity the playhead
- * uses: one cycle is `stepsPerMeasure` steps and the whole loop repeats every `measures` cycles.
- * Undefined when there is no usable position (not a number, or an empty loop).
+ * The song step a moment falls on, counted from the start of the song (not wrapped round the loop).
+ * `cycle` is the song position in cycles, the same quantity the playhead uses: one cycle is one
+ * measure, `stepsPerMeasure` steps. Undefined when there is no usable position.
+ */
+export function quantizeAbsolute(
+  cycle: number,
+  stepsPerMeasure: number,
+  quantize: Quantize = DEFAULT_QUANTIZE
+): number | undefined {
+  if (!Number.isFinite(cycle) || !(stepsPerMeasure > 0)) return undefined;
+  const resolution = Math.max(1, Math.floor(quantize.resolution) || 1);
+  const snap = quantize.mode === 'floor' ? Math.floor : Math.round;
+  return snap((cycle * stepsPerMeasure) / resolution) * resolution;
+}
+
+/** A song step wrapped into the loop's `total` steps. */
+export const wrapStep = (step: number, total: number) => ((step % total) + total) % total;
+
+/**
+ * The loop step a moment falls on: the whole loop repeats every `measures` cycles. Undefined when
+ * there is no usable position (not a number, or an empty loop).
  */
 export function quantizeStep(
   cycle: number,
@@ -25,49 +41,41 @@ export function quantizeStep(
   quantize: Quantize = DEFAULT_QUANTIZE
 ): number | undefined {
   const total = length.stepsPerMeasure * length.measures;
-  if (!Number.isFinite(cycle) || !(total > 0)) return undefined;
-  const resolution = Math.max(1, Math.floor(quantize.resolution) || 1);
-  const raw = cycle * length.stepsPerMeasure;
-  const snap = quantize.mode === 'floor' ? Math.floor : Math.round;
-  const step = snap(raw / resolution) * resolution;
-  return ((step % total) + total) % total;
+  if (!(total > 0)) return undefined;
+  const step = quantizeAbsolute(cycle, length.stepsPerMeasure, quantize);
+  return step === undefined ? undefined : wrapStep(step, total);
 }
 
-export interface RecorderDeps {
-  instrumentId: string;
-  dispatch: Dispatch;
-  /** The song position, in cycles, of what the player is hearing right now (read live, not a stored prop). */
-  now: () => number;
-  /** Recording only makes sense while the song runs: there is no "current time" otherwise. */
-  playing: () => boolean;
-  length: () => LoopLength;
-  quantize?: () => Quantize;
+/** Where live input goes: the step a hit would land on now, and recording one. */
+export interface StepInput {
+  /** The loop step a hit made now would land on, or undefined when it would not be recorded. */
+  currentStep(): number | undefined;
+  /** Record `track` now. Returns the loop step it landed on, or undefined. */
+  hit(track: number): number | undefined;
 }
 
 /**
- * Turns live input into steps. Input views call `hit(track)` when the user plays something; the
- * recorder works out which step that is right now and dispatches an absolute `setCells`, like any
- * other edit. Views decide what "a hit" looks like (a pad, a key, a tap); this holds the timing.
+ * A continuous gesture (a finger held on a surface) fed to a `StepInput`. The view samples it as often
+ * as it likes (every pointer move and every frame, since a finger held still sends no events); a hit
+ * is only made when the step or the track changes, so a stroke costs one command per step, not one
+ * per sample. Changing track inside a step re-records that step: a melody holds one note per step,
+ * so the last pitch wins.
  */
-export class Recorder {
-  constructor(private deps: RecorderDeps) {}
+export class Stroke {
+  private last: { step: number; track: number } | undefined;
+  constructor(private input: StepInput) {}
 
-  /** The step a hit made right now would land on, or undefined when not playing. */
-  currentStep(): number | undefined {
-    if (!this.deps.playing()) return undefined;
-    return quantizeStep(this.deps.now(), this.deps.length(), this.deps.quantize?.());
-  }
-
-  /** Record one note on `track` at the current time. Returns the step it landed on. */
-  hit(track: number): number | undefined {
-    const step = this.currentStep();
+  /** The finger is on `track` now. Returns the step it is on (recorded or already recorded), or undefined. */
+  sample(track: number): number | undefined {
+    const step = this.input.currentStep();
     if (step === undefined) return undefined;
-    this.deps.dispatch({
-      type: 'setCells',
-      instrumentId: this.deps.instrumentId,
-      track,
-      cells: [{ step, on: true }]
-    });
-    return step;
+    if (this.last?.step === step && this.last.track === track) return step;
+    const recorded = this.input.hit(track);
+    if (recorded !== undefined) this.last = { step: recorded, track };
+    return recorded;
+  }
+  /** The finger lifted: the next sample starts a new stroke (and records even on the same cell). */
+  end() {
+    this.last = undefined;
   }
 }

@@ -12,7 +12,7 @@ import {
 import type { ISequencer } from './sequencer';
 
 /** How an instrument's cells can be edited: the step grid, one Euclidean circle per track, nested rings, or pads to play along on. */
-export type InputView = 'grid' | 'circle' | 'rings' | 'record';
+export type InputView = 'grid' | 'circle' | 'rings' | 'record' | 'draw';
 
 export interface Length {
   stepsPerMeasure: number;

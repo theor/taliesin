@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render } from '@testing-library/svelte';
 import RecordView from './RecordView.svelte';
@@ -6,13 +6,19 @@ import { createInstrument } from '$lib/Store.svelte';
 import { Drum } from '$lib/instruments/Drum';
 import { PianoScale } from '$lib/instruments/MonoSynth';
 import type { Command } from '$lib/commands';
+import { strudel } from '$lib/strudel';
 
-afterEach(cleanup);
+beforeEach(() => localStorage.clear()); // the take options and "hear notes" are saved per device
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 // Drum: 4 steps per cycle, 2 cycles = 8 steps.
-function mount(opts: { playing?: boolean; now?: () => number; piano?: boolean } = {}) {
+function mount(opts: { playing?: boolean; piano?: boolean } = {}) {
   const instrumentData = opts.piano ? createInstrument(PianoScale) : createInstrument(Drum);
   const dispatch = vi.fn<(cmd: Command) => void>();
+  const clock = { t: 0.1 };
   const view = render(RecordView, {
     props: {
       index: 0,
@@ -20,54 +26,77 @@ function mount(opts: { playing?: boolean; now?: () => number; piano?: boolean } 
       dispatch,
       playing: opts.playing ?? true,
       position: 0,
-      now: opts.now ?? (() => 0.5)
+      now: () => clock.t
     }
   });
-  return { instrumentData, dispatch, ...view };
+  /** Arm a take now (in measure 0): it runs from cycle 1 to cycle 3. Then move the clock into it. */
+  const recordFrom = async (cycle: number) => {
+    await fireEvent.click(view.getByLabelText('Record a take'));
+    clock.t = cycle;
+  };
+  /** The steps recorded (the take also clears the old pattern: those commands turn cells off). */
+  const steps = () =>
+    dispatch.mock.calls
+      .map(([c]) => (c as Extract<Command, { type: 'setCells' }>).cells)
+      .filter((cells) => cells[0].on)
+      .map((cells) => cells[0].step);
+  return { instrumentData, dispatch, clock, recordFrom, steps, ...view };
 }
 
 describe('RecordView', () => {
-  test('pads are disabled, with a hint, while the song is stopped', async () => {
+  test('pads and the record button are disabled, with a hint, while the song is stopped', async () => {
     const { dispatch, getByLabelText, getByTestId } = mount({ playing: false });
-    expect(getByLabelText('Record bd')).toBeDisabled();
+    expect(getByLabelText('Play bd')).toBeDisabled();
+    expect(getByLabelText('Record a take')).toBeDisabled();
     expect(getByTestId('record-hint')).toBeInTheDocument();
-    await fireEvent.pointerDown(getByLabelText('Record bd'));
+    await fireEvent.pointerDown(getByLabelText('Play bd'));
     expect(dispatch).not.toHaveBeenCalled();
   });
 
-  test('pressing a drum pad records that track at the current quantized step', async () => {
-    const { dispatch, instrumentData, getByLabelText } = mount();
-    await fireEvent.pointerDown(getByLabelText('Record sd'));
-    expect(dispatch).toHaveBeenCalledTimes(1);
+  test('outside a take the pads only play: nothing is recorded', async () => {
+    const play = vi.spyOn(strudel, 'playOnce');
+    const { dispatch, getByLabelText } = mount();
+    await fireEvent.pointerDown(getByLabelText('Play sd'));
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(play).toHaveBeenCalledTimes(1);
+  });
+
+  test('an armed take waits for the next measure', async () => {
+    const { dispatch, getByLabelText, clock } = mount();
+    await fireEvent.click(getByLabelText('Record a take'));
+    expect(getByLabelText('Cancel the take')).toHaveAttribute('data-phase', 'armed');
+    clock.t = 0.5; // still measure 0
+    await fireEvent.pointerDown(getByLabelText('Play bd'));
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  test('during a take a pad records its track at the current quantized step', async () => {
+    const { dispatch, instrumentData, getByLabelText, recordFrom } = mount();
+    await recordFrom(1.5);
+    await fireEvent.pointerDown(getByLabelText('Play sd'));
     expect(dispatch).toHaveBeenCalledWith({
       type: 'setCells',
       instrumentId: instrumentData.id,
       track: 1, // bd, sd, hh ...
-      cells: [{ step: 2, on: true }] // 0.5 cycles * 4 steps
+      cells: [{ step: 6, on: true }] // 1.5 cycles * 4 steps
     });
+    expect(getByLabelText('Play sd')).toHaveTextContent('step 7');
   });
 
   test('every press reads the clock again', async () => {
-    let t = 0;
-    const { dispatch, getByLabelText } = mount({ now: () => t });
-    t = 0.25;
-    await fireEvent.pointerDown(getByLabelText('Record bd'));
-    t = 0.75;
-    await fireEvent.pointerDown(getByLabelText('Record bd'));
-    expect(dispatch.mock.calls.map(([c]) => (c as any).cells[0].step)).toEqual([1, 3]);
-  });
-
-  test('pads show where they last recorded', async () => {
-    const { getByLabelText } = mount();
-    await fireEvent.pointerDown(getByLabelText('Record bd'));
-    expect(getByLabelText('Record bd')).toHaveTextContent('step 3');
+    const { getByLabelText, recordFrom, clock, steps } = mount();
+    await recordFrom(1.25);
+    await fireEvent.pointerDown(getByLabelText('Play bd'));
+    clock.t = 1.75;
+    await fireEvent.pointerDown(getByLabelText('Play bd'));
+    expect(steps()).toEqual([5, 7]);
   });
 
   test('a melodic instrument gets a pad per scale degree', async () => {
-    const { dispatch, instrumentData } = mount({ piano: true });
-    // the label is the note name; the pad's track is its scale degree
-    const pads = document.querySelectorAll('[aria-label^="Record "]');
+    const { dispatch, instrumentData, recordFrom } = mount({ piano: true });
+    const pads = document.querySelectorAll('[aria-label^="Play "]');
     expect(pads.length).toBe(8);
+    await recordFrom(1);
     await fireEvent.pointerDown(pads[3]);
     expect(dispatch).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'setCells', instrumentId: instrumentData.id, track: 3 })
@@ -75,19 +104,32 @@ describe('RecordView', () => {
   });
 
   test('a coarser quantize snaps to every 2nd step', async () => {
-    const { dispatch, getByLabelText, container } = mount({ now: () => 0.3 }); // 1.2 steps
-    await fireEvent.pointerDown(getByLabelText('Record bd'));
-    expect((dispatch.mock.calls[0][0] as any).cells[0].step).toBe(1);
-    const select = container.querySelector('select')!;
-    await fireEvent.change(select, { target: { value: 'Every 2 steps' } });
-    await fireEvent.pointerDown(getByLabelText('Record bd'));
-    expect((dispatch.mock.calls[1][0] as any).cells[0].step).toBe(2); // 0.6 -> 1 -> 2
+    const { getByLabelText, getByRole, recordFrom, steps } = mount();
+    await fireEvent.click(getByRole('button', { name: /^Take settings/ }));
+    await fireEvent.click(getByRole('button', { name: '2 steps' }));
+    await fireEvent.click(getByRole('button', { name: 'Done' }));
+    await recordFrom(1.3); // 5.2 steps
+    await fireEvent.pointerDown(getByLabelText('Play bd'));
+    expect(steps()).toEqual([6]); // 2.6 pairs of steps -> 3 -> step 6
+  });
+
+  test('a pad plays its sound here, unless hearing is off', async () => {
+    const play = vi.spyOn(strudel, 'playOnce');
+    const { getByLabelText, getByRole } = mount();
+    await fireEvent.pointerDown(getByLabelText('Play sd'));
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(play.mock.calls[0][0]).toContain('s("');
+    await fireEvent.click(getByRole('button', { name: /^Take settings/ }));
+    await fireEvent.click(getByRole('button', { name: /Hear notes as you play/ }));
+    await fireEvent.pointerDown(getByLabelText('Play sd'));
+    expect(play).toHaveBeenCalledTimes(1);
   });
 
   test('never mutates the instrument itself', async () => {
-    const { instrumentData, getByLabelText } = mount();
+    const { instrumentData, getByLabelText, recordFrom } = mount();
     const before = JSON.stringify(instrumentData);
-    await fireEvent.pointerDown(getByLabelText('Record bd'));
+    await recordFrom(1.5);
+    await fireEvent.pointerDown(getByLabelText('Play bd'));
     expect(JSON.stringify(instrumentData)).toBe(before);
   });
 });

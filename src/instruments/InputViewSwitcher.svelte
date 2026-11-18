@@ -2,8 +2,9 @@
   // Picks how the instrument's cells are edited (grid, circles, rings, record) and shows that view.
   import { Instrument, type InputView, type IDispatchingInstrumentViewProps } from '$lib';
   import { getInstrument } from '$lib/Store.svelte';
-  import { CircleDot, Grid3x3, Orbit, Target } from '@lucide/svelte';
+  import { CircleDot, Grid3x3, Orbit, Pencil, Target } from '@lucide/svelte';
   import CircleView from './CircleView.svelte';
+  import DrawView from './DrawView.svelte';
   import NestedCircleView from './NestedCircleView.svelte';
   import RecordView from './RecordView.svelte';
   import SequencerView from './SequencerView.svelte';
@@ -31,7 +32,8 @@
     grid: { label: 'Grid', aria: 'Grid view', icon: Grid3x3 },
     circle: { label: 'Circles', aria: 'Circle view', icon: Orbit },
     rings: { label: 'Rings', aria: 'Nested rings view', icon: Target },
-    record: { label: 'Record', aria: 'Record view', icon: CircleDot }
+    record: { label: 'Record', aria: 'Record view', icon: CircleDot },
+    draw: { label: 'Draw', aria: 'Draw view', icon: Pencil }
   } as const;
 
   // Which input the user prefers is a per-device choice (not part of the song, not synced).
@@ -39,8 +41,8 @@
   function loadView(id: string): InputView {
     try {
       const saved = localStorage.getItem(storageKey(id));
-      if (saved === 'grid' || saved === 'circle' || saved === 'rings' || saved === 'record') {
-        return views.includes(saved) ? saved : 'grid';
+      if (saved && Object.hasOwn(VIEW_META, saved)) {
+        return views.includes(saved as InputView) ? (saved as InputView) : 'grid';
       }
     } catch {
       // storage unavailable: fall back to the grid
@@ -87,6 +89,8 @@
         <CircleView {instrumentData} {index} {dispatch} {position} {playing} />
       {:else if view === 'record'}
         <RecordView {instrumentData} {index} {dispatch} {position} {playing} {now} />
+      {:else if view === 'draw'}
+        <DrawView {instrumentData} {index} {dispatch} {position} {playing} {now} />
       {:else if view === 'rings'}
         <NestedCircleView {instrumentData} {index} {dispatch} {position} {playing} />
       {:else}

@@ -1,4 +1,5 @@
-import { initStrudel, getAudioContext } from '@strudel/web';
+// everything from @strudel/web: it bundles its own core and superdough, and the sounds are registered there
+import { initStrudel, getAudioContext, superdough, transpiler } from '@strudel/web';
 // import { webaudioRepl,  initAudioOnFirstClick } from '@strudel/webaudio';
 import { get, writable, type Writable } from 'svelte/store';
 
@@ -63,6 +64,20 @@ const ASCHORDS_PRELUDE = `const asChords = register("asChords", function(triads,
 });
 Pattern.prototype.asChords = function(...args)  { return asChords(...args,this);  }`;
 
+/** The bits of a Strudel pattern (and its events) `playOnce` uses. */
+interface OneShotPattern {
+  queryArc(
+    begin: number,
+    end: number
+  ): {
+    hasOnset(): boolean;
+    ensureObjectValue(): void;
+    value: Record<string, unknown>;
+    whole: { begin: unknown };
+    duration: unknown;
+  }[];
+}
+
 class StrudelWrapper {
   repls: any;
   private initPromise: Promise<void>;
@@ -97,7 +112,9 @@ class StrudelWrapper {
       let done: unknown;
       try {
         done = await this.repls.evaluate(
-          this.preludeDone ? code : `${ASCHORDS_PRELUDE}
+          this.preludeDone
+            ? code
+            : `${ASCHORDS_PRELUDE}
 ${code}`,
           get(this.isPlaying)
         );
@@ -214,6 +231,44 @@ ${code}`,
     // return this.repls.scheduler.getTime();
   }
 
+  /** Compiled one-note patterns by code: drawing replays the same few notes, and compiling costs. */
+  private oneShots = new Map<string, Promise<OneShotPattern>>();
+  private static readonly MAX_ONE_SHOTS = 64;
+  /**
+   * Play the notes that start in the first `window` cycles of `code`, now, on this device only: the
+   * song's scheduler and pattern are untouched (monitoring what you record). Silent until audio is unlocked.
+   */
+  async playOnce(code: string, window: number): Promise<void> {
+    if (!this.repls) return; // not loaded yet: a missed monitor note is fine
+    const ctx = getAudioContext();
+    if (ctx.state !== 'running') return;
+    try {
+      let compiled = this.oneShots.get(code);
+      if (!compiled) {
+        // as the repl evaluates the song, but without handing the pattern to the scheduler
+        const { output } = transpiler(code, { emitMiniLocations: false, emitWidgets: false });
+        compiled = Function(
+          `"use strict";return (async () => {${output}})()`
+        )() as Promise<OneShotPattern>;
+        this.oneShots.set(code, compiled);
+        if (this.oneShots.size > StrudelWrapper.MAX_ONE_SHOTS) {
+          this.oneShots.delete(this.oneShots.keys().next().value!);
+        }
+      }
+      const pattern = await compiled;
+      const cps = this.cps;
+      for (const hap of pattern.queryArc(0, window)) {
+        if (!hap.hasOnset()) continue;
+        hap.ensureObjectValue();
+        const start = Number(hap.whole.begin) / cps;
+        superdough(hap.value, 0.005 + start, Number(hap.duration) / cps);
+      }
+    } catch (e) {
+      this.oneShots.delete(code);
+      console.warn('could not play the note', e);
+    }
+  }
+
   stop() {
     console.log('Strudel stopped!');
     this.repls?.stop();
@@ -250,6 +305,7 @@ export const strudel = VITEST
         throw new Error('no audio under test');
       },
       evaluate: async () => {},
+      playOnce: async () => {},
       stop() {
         (this as any).isPlaying.set(false);
       },

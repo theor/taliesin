@@ -1,6 +1,5 @@
-import { describe, expect, test, vi } from 'vitest';
-import { Recorder, quantizeStep, type RecorderDeps } from './recorder';
-import type { Command } from './commands';
+import { describe, expect, test } from 'vitest';
+import { Stroke, quantizeAbsolute, quantizeStep } from './recorder';
 
 const eight = { stepsPerMeasure: 4, measures: 2 }; // 8 steps, 4 per cycle
 
@@ -35,46 +34,71 @@ describe('quantizeStep', () => {
   });
 });
 
-describe('Recorder', () => {
-  function make(over: Partial<RecorderDeps> = {}) {
-    const dispatch = vi.fn<(c: Command) => void>();
-    const recorder = new Recorder({
-      instrumentId: 'i1',
-      dispatch,
-      now: () => 0.5,
-      playing: () => true,
-      length: () => eight,
-      ...over
+describe('quantizeAbsolute', () => {
+  test('counts steps from the start of the song, never wrapping', () => {
+    expect(quantizeAbsolute(3.3, 4)).toBe(13);
+    expect(quantizeAbsolute(3.3, 4, { resolution: 1, mode: 'floor' })).toBe(13);
+    expect(quantizeAbsolute(3.24, 4, { resolution: 1, mode: 'floor' })).toBe(12);
+    expect(quantizeAbsolute(NaN, 4)).toBeUndefined();
+  });
+});
+
+describe('Stroke', () => {
+  /** A fake input: the step is whatever the test says; hits are recorded. */
+  function make() {
+    let step: number | undefined = 0;
+    const hits: [number, number][] = [];
+    const stroke = new Stroke({
+      currentStep: () => step,
+      hit: (track) => {
+        if (step !== undefined) hits.push([track, step]);
+        return step;
+      }
     });
-    return { recorder, dispatch };
+    return { stroke, hits, at: (s: number | undefined) => (step = s) };
   }
 
-  test('a hit sets one cell on at the quantized current step', () => {
-    const { recorder, dispatch } = make();
-    expect(recorder.hit(3)).toBe(2);
-    expect(dispatch).toHaveBeenCalledWith({
-      type: 'setCells',
-      instrumentId: 'i1',
-      track: 3,
-      cells: [{ step: 2, on: true }]
-    });
+  test('samples on the same step and track hit once', () => {
+    const { stroke, hits } = make();
+    stroke.sample(3);
+    stroke.sample(3);
+    expect(hits).toEqual([[3, 0]]);
   });
-  test('reads the clock at the moment of the hit, not before', () => {
-    let t = 0;
-    const { recorder, dispatch } = make({ now: () => t });
-    t = 0.25;
-    recorder.hit(0);
-    t = 0.75;
-    recorder.hit(0);
-    expect(dispatch.mock.calls.map(([c]) => (c as any).cells[0].step)).toEqual([1, 3]);
+  test('a new track inside the step hits again', () => {
+    const { stroke, hits } = make();
+    stroke.sample(3);
+    stroke.sample(5);
+    expect(hits).toEqual([
+      [3, 0],
+      [5, 0]
+    ]);
   });
-  test('does nothing while the song is stopped', () => {
-    const { recorder, dispatch } = make({ playing: () => false });
-    expect(recorder.hit(0)).toBeUndefined();
-    expect(dispatch).not.toHaveBeenCalled();
+  test('holding a track across steps hits each step', () => {
+    const { stroke, hits, at } = make();
+    for (const s of [0, 0, 1, 1, 2]) {
+      at(s);
+      stroke.sample(2);
+    }
+    expect(hits).toEqual([
+      [2, 0],
+      [2, 1],
+      [2, 2]
+    ]);
   });
-  test('uses the quantization it is given', () => {
-    const { recorder } = make({ now: () => 0.3, quantize: () => ({ resolution: 4, mode: 'floor' }) });
-    expect(recorder.currentStep()).toBe(0); // 1.2 steps -> floor to a multiple of 4
+  test('after end, the same cell hits again', () => {
+    const { stroke, hits } = make();
+    stroke.sample(2);
+    stroke.end();
+    stroke.sample(2);
+    expect(hits).toEqual([
+      [2, 0],
+      [2, 0]
+    ]);
+  });
+  test('nothing while there is no step', () => {
+    const { stroke, hits, at } = make();
+    at(undefined);
+    expect(stroke.sample(2)).toBeUndefined();
+    expect(hits).toEqual([]);
   });
 });
