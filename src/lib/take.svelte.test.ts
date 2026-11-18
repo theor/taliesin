@@ -85,6 +85,18 @@ describe('Take', () => {
     expect(on()).toEqual(['1:1', '1:5']);
   });
 
+  test('a hit on a known step (the tombola) is recorded if the take covers that step', () => {
+    const { take, at, on } = make();
+    at(1);
+    take.arm(); // song steps 4 to 11
+    at(4);
+    expect(take.hitAt(0, 3)).toBeUndefined(); // before the take
+    expect(take.hitAt(0, 4)).toBe(4);
+    expect(take.hitAt(1, 10)).toBe(2); // ahead of the playhead, wrapped round the loop
+    expect(take.hitAt(1, 12)).toBeUndefined(); // after it
+    expect(on()).toEqual(['0:4', '1:2']);
+  });
+
   test('an early hit that rounds into the first step counts', () => {
     const { take, at } = make({}, { resolution: 1, mode: 'nearest' });
     at(1);

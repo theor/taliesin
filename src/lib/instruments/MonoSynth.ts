@@ -33,8 +33,8 @@ export class PianoScale extends Instrument {
     PartFilter,
     PartEffects
   ];
-  /** One pad per scale degree to play the melody in. */
-  override views: InputView[] = ['grid', 'record', 'draw'];
+  /** One pad per scale degree to play the melody in; or a tombola of degrees. */
+  override views: InputView[] = ['grid', 'record', 'draw', 'tombola'];
   constructor() {
     super();
     this.sequencer = new Sequencer(new MonoSequenceSequencer(), MonoSequence);

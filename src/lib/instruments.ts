@@ -11,8 +11,11 @@ import {
 } from './parts.svelte';
 import type { ISequencer } from './sequencer';
 
-/** How an instrument's cells can be edited: the step grid, one Euclidean circle per track, nested rings, or pads to play along on. */
-export type InputView = 'grid' | 'circle' | 'rings' | 'record' | 'draw';
+/**
+ * How an instrument's notes are edited: the step grid, one Euclidean circle per track, nested rings, pads
+ * to play along on, drawing, or a tombola that draws random loops (`lib/tombola.ts`).
+ */
+export type InputView = 'grid' | 'circle' | 'rings' | 'record' | 'draw' | 'tombola';
 
 export interface Length {
   stepsPerMeasure: number;

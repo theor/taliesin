@@ -64,6 +64,13 @@ const ASCHORDS_PRELUDE = `const asChords = register("asChords", function(triads,
 });
 Pattern.prototype.asChords = function(...args)  { return asChords(...args,this);  }`;
 
+/** A clock running at `cps` cycles per second that reaches cycle `cycle` at time `seconds`. */
+export interface LinearClock {
+  cycle: number;
+  seconds: number;
+  cps: number;
+}
+
 /** The bits of a Strudel pattern (and its events) `playOnce` uses. */
 interface OneShotPattern {
   queryArc(
@@ -245,39 +252,76 @@ ${code}`,
   /** Compiled one-note patterns by code: drawing replays the same few notes, and compiling costs. */
   private oneShots = new Map<string, Promise<OneShotPattern>>();
   private static readonly MAX_ONE_SHOTS = 64;
+  private compile(code: string): Promise<OneShotPattern> {
+    let compiled = this.oneShots.get(code);
+    if (!compiled) {
+      // as the repl evaluates the song, but without handing the pattern to the scheduler
+      const { output } = transpiler(code, { emitMiniLocations: false, emitWidgets: false });
+      compiled = Function(
+        `"use strict";return (async () => {${output}})()`
+      )() as Promise<OneShotPattern>;
+      compiled.catch(() => this.oneShots.delete(code));
+      this.oneShots.set(code, compiled);
+      if (this.oneShots.size > StrudelWrapper.MAX_ONE_SHOTS) {
+        this.oneShots.delete(this.oneShots.keys().next().value!);
+      }
+    }
+    return compiled;
+  }
   /**
-   * Play the notes that start in the first `window` cycles of `code`, now, on this device only: the
-   * song's scheduler and pattern are untouched (monitoring what you record). Silent until audio is unlocked.
+   * Compile `code` for `playOnce` now, so that the first time it plays costs no more than the others
+   * (compiling takes tens of milliseconds on a phone: too long for a note scheduled 0.1 s ahead).
    */
-  async playOnce(code: string, window: number): Promise<void> {
+  prepare(code: string) {
+    if (!this.repls) return; // the first play compiles it instead
+    try {
+      this.compile(code).catch((e) => console.warn('could not prepare the note', e));
+    } catch (e) {
+      console.warn('could not prepare the note', e); // the transpiler throws at once
+    }
+  }
+  /**
+   * Play the notes that start in the first `window` cycles of `code` on this device only: the song's
+   * scheduler and pattern are untouched (monitoring what you record). Now, or at the AudioContext time
+   * `at` (a note whose time has passed by the time it is ready is dropped). Silent until audio is unlocked.
+   */
+  async playOnce(code: string, window: number, at?: number): Promise<void> {
     if (!this.repls) return; // not loaded yet: a missed monitor note is fine
     const ctx = getAudioContext();
     if (ctx.state !== 'running') return;
     try {
-      let compiled = this.oneShots.get(code);
-      if (!compiled) {
-        // as the repl evaluates the song, but without handing the pattern to the scheduler
-        const { output } = transpiler(code, { emitMiniLocations: false, emitWidgets: false });
-        compiled = Function(
-          `"use strict";return (async () => {${output}})()`
-        )() as Promise<OneShotPattern>;
-        this.oneShots.set(code, compiled);
-        if (this.oneShots.size > StrudelWrapper.MAX_ONE_SHOTS) {
-          this.oneShots.delete(this.oneShots.keys().next().value!);
-        }
-      }
-      const pattern = await compiled;
+      const pattern = await this.compile(code);
       const cps = this.cps;
+      const begin = at ?? ctx.currentTime + 0.005;
       for (const hap of pattern.queryArc(0, window)) {
         if (!hap.hasOnset()) continue;
         hap.ensureObjectValue();
-        const start = Number(hap.whole.begin) / cps;
-        superdough(hap.value, 0.005 + start, Number(hap.duration) / cps);
+        const start = begin + Number(hap.whole.begin) / cps;
+        if (start < ctx.currentTime) continue;
+        superdough(hap.value, `=${start}`, Number(hap.duration) / cps);
       }
     } catch (e) {
-      this.oneShots.delete(code);
       console.warn('could not play the note', e);
     }
+  }
+
+  /** The AudioContext's time (0 before Strudel has loaded). */
+  audioNow(): number {
+    return this.repls ? getAudioContext().currentTime : 0;
+  }
+  /**
+   * How the running song maps cycles to AudioContext time: cycle `cycle` is played at `seconds`, at
+   * `cps` (the scheduler's own sum, its latency included, so a note scheduled from it lands with the
+   * song's). Undefined while stopped. Changes with the tempo and resyncs: read it again each frame.
+   */
+  songClock(): LinearClock | undefined {
+    const s = this.repls?.scheduler;
+    if (!s?.started || !(s.cps > 0)) return undefined;
+    return {
+      cycle: s.num_cycles_at_cps_change,
+      seconds: s.seconds_at_cps_change + s.latency,
+      cps: s.cps
+    };
   }
 
   stop() {
@@ -320,6 +364,9 @@ export const strudel = VITEST
       },
       evaluate: async () => {},
       playOnce: async () => {},
+      prepare: () => {},
+      audioNow: () => 0,
+      songClock: () => undefined,
       stop() {
         (this as any).isPlaying.set(false);
       },

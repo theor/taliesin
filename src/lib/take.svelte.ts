@@ -212,6 +212,18 @@ export class Take implements StepInput {
   hit(track: number): number | undefined {
     const step = this.currentStep();
     if (step === undefined) return undefined;
+    return this.record(track, step);
+  }
+  /**
+   * A hit on a known song step (absolute, not wrapped), for an input that times its notes itself (the
+   * tombola): recorded if the take covers that step. Returns the loop step, like `hit`.
+   */
+  hitAt(track: number, songStep: number): number | undefined {
+    if (this.tick() === 'idle' || !Number.isInteger(songStep)) return undefined;
+    if (songStep < this.startStep || songStep >= this.endStep) return undefined;
+    return this.record(track, wrapStep(songStep, this.loopSteps));
+  }
+  private record(track: number, step: number): number {
     this.snapshot();
     this.recorded.add(key(track, step));
     this.send(track, [{ step, on: true }]);

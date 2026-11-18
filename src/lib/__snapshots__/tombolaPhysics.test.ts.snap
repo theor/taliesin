@@ -1,0 +1,3 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the drum > a fixed seed gives a fixed outcome (catches a change of physics or of engine maths) 1`] = `"024.04242.0.2..0224402040.42.20.2.2.0242020...224..20.00........"`;

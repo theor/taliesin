@@ -16,7 +16,7 @@ export class Drum extends Instrument {
   /** Parts that work on samples. Not a voice (it would replace the drum sounds), nor parts that need melody notes. */
   override readonly addableParts = [PartSteps, PartFilter, PartEffects];
   /** Drum tracks are independent rows of hits, which suits Euclidean circles. */
-  override views: InputView[] = ['grid', 'circle', 'rings', 'record'];
+  override views: InputView[] = ['grid', 'circle', 'rings', 'record', 'tombola'];
   constructor() {
     super();
     this.sequencer = new Sequencer(new TrackSequencer(), PartTrackNotes);

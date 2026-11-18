@@ -12,6 +12,8 @@ import {
 /** An instrument's input as a grid of on/off cells: one row per track, one column per step. */
 export interface ISequencer {
   tracks: string[];
+  /** One note per step (a melody): turning a cell on moves the step's note, turning one off clears the step. */
+  readonly mono: boolean;
 
   getCell(data: InstrumentData, track: number, step: number): boolean;
   setCell(data: InstrumentData, track: number, step: number, value: boolean): boolean;
@@ -19,11 +21,13 @@ export interface ISequencer {
 /** Adapts a part's grid logic (`PartSequencer`) to an instrument's data. */
 export class Sequencer<TTrack, T extends InstrumentPart<any>> implements ISequencer {
   tracks: string[];
+  readonly mono: boolean;
   constructor(
     private partSequencer: PartSequencer<TTrack, T>,
     private partType: PartClass<T>
   ) {
     this.tracks = this.partSequencer.tracks.map((x) => `${x}`);
+    this.mono = !!this.partSequencer.mono;
   }
   getCell(data: InstrumentData, track: number, step: number): boolean {
     const part = getPart(this.partType, data);
@@ -38,6 +42,7 @@ export class Sequencer<TTrack, T extends InstrumentPart<any>> implements ISequen
 }
 export interface PartSequencer<TTrack, T extends InstrumentPart<any>> {
   tracks: TTrack[];
+  readonly mono?: boolean;
   getCell(part: PartType<T>, track: TTrack, step: number): boolean;
   setCell(part: PartType<T>, track: TTrack, step: number, value: boolean): boolean;
 }
@@ -47,6 +52,7 @@ export class MonoSequenceSequencer implements PartSequencer<number, MonoSequence
   /** The grid's rows: scale degrees 0-6, and 7 for the octave above. */
   static readonly degrees: readonly number[] = [0, 1, 2, 3, 4, 5, 6, 7];
   tracks: number[] = [...MonoSequenceSequencer.degrees];
+  readonly mono = true;
   getCell(part: PartType<MonoSequence>, track: number, step: number): boolean {
     if (step < 0 || step >= part.notes.length) return false;
     return part.notes[step] == track;
