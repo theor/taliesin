@@ -76,8 +76,7 @@ async function pair() {
   return { room, host, client };
 }
 
-// The page's own controls, driven like a user would. (The fine-tuning panes sit under "More controls".)
-const showEffects = (p: Page) => p.locator('[data-testid="more-controls"] summary').click();
+// The page's own controls, driven like a user would.
 const instrumentVolume = (p: Page, index: number) =>
   p.evaluate(
     (i) => (window as any).__store.instrumentsData.instrumentsData[i].volume as number,
@@ -143,7 +142,7 @@ describe('instrument sync (real transport, real controls)', () => {
     await client.locator('[title="Add"]:visible').click();
     // the modal's slide-in transition never settles under headless Chromium, so coordinate-based clicks
     // miss it; dispatching the click event still runs the real handler
-    await client.getByRole('button', { name: 'Drum' }).dispatchEvent('click');
+    await client.getByRole('dialog').getByRole('button', { name: /^Drum/ }).dispatchEvent('click');
 
     await expect.poll(async () => (await instruments(host)).length).toBe(before + 1);
     const last = (await instruments(host)).at(-1);
@@ -155,8 +154,7 @@ describe('instrument sync (real transport, real controls)', () => {
     const { host, client } = await pair();
     expect(await partField(host, 'PartEffects', 'reverb')).toBe(0.2); // precondition
 
-    await showEffects(client);
-    await setControl(client, 'Reverb', '0.7');
+    await setControl(client, 'Reverb', '0.7'); // the quick slider, above the rack's knob
 
     // the slider snaps to its step (0.05), which leaves float noise like 0.7000000000000001
     await expect
@@ -228,7 +226,8 @@ describe('instrument sync (real transport, real controls)', () => {
 
     await client.locator('[title="Mixer"]:visible').click();
     await setControl(client, 'Master Volume', '0.3');
-    await setControl(client, 'Volume', '0.4'); // the first instrument's
+    const first = (await instruments(client))[0].name;
+    await setControl(client, `${first} volume`, '0.4'); // its channel strip
 
     // the slider rounds to its step, so compare with a tolerance
     await expect.poll(() => masterVolume(host), { timeout: 20_000 }).toBeCloseTo(0.3, 5);

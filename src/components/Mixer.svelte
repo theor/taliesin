@@ -1,72 +1,174 @@
 <script lang="ts">
-  import { getInstrumentIcon } from '$lib/Store.svelte';
+  import { TrackState } from '$lib';
   import type { Dispatch, Song } from '$lib/commands';
-  import { Volume } from '@lucide/svelte';
-  import ParamSlider from './ParamSlider.svelte';
-  import ParamSelect from './ParamSelect.svelte';
+  import { setTrackStateCommand } from '$lib/commandBuilders';
   import { KEYS, MODE_NAMES } from '$lib/scale';
+  import { trackColor, trackInitials } from '$lib/trackColors';
+
+  /** The mixer, phone and desktop: the song's key, then one channel strip per instrument and the master. Pure view. */
+  let { song, dispatch }: { song: Song; dispatch: Dispatch } = $props();
 
   const setScale = (scaleKey: string, scaleMode: string) =>
     dispatch({ type: 'setScale', scaleKey, scaleMode });
-
-  // Pure view: the song comes in as a prop, changes go out as commands.
-  let { song, dispatch }: { song: Song; dispatch: Dispatch } = $props();
+  const db = (v: number) => (v <= 0.001 ? '-∞' : (20 * Math.log10(v)).toFixed(1));
+  const select =
+    'bg-surface-800 border-surface-700 text-surface-100 h-11 w-full rounded-lg border px-2.5 font-mono text-[15px] font-semibold tracking-normal normal-case';
 </script>
 
-<div class="grid w-full grid-flow-row auto-rows-min gap-2 md:auto-cols-min md:grid-flow-col">
-  <div
-    class="card preset-filled-surface-100-900 border-surface-200-800 card-hover divide-surface-200-800 block w-sm divide-y overflow-hidden border-[1px]"
-  >
-    <header class="flex flex-row gap-2 p-4">
-      <Volume size="36" />
-      <h3 class="h3">Main</h3>
-    </header>
-    <article class="h-64 space-y-4 overflow-y-auto p-4">
-      <ParamSlider
-        label="Master Volume"
-        bind:value={() => song.volume, (volume) => dispatch({ type: 'setMasterVolume', volume })}
-        min={0}
-        max={1}
-        step={0.01}
-      />
-      <ParamSelect
-        label="Key"
-        options={[...KEYS]}
-        bind:value={() => song.scale.scaleKey, (k) => setScale(k, song.scale.scaleMode)}
-      />
-      <ParamSelect
-        label="Mode"
-        options={[...MODE_NAMES]}
-        bind:value={() => song.scale.scaleMode, (m) => setScale(song.scale.scaleKey, m)}
-      />
-    </article>
-  </div>
-  {#each song.instrumentsData as instrumentData (instrumentData.id)}
-    {@const Icon = getInstrumentIcon(instrumentData.instrumentName)}
-    <div
-      class="card preset-filled-surface-100-900 border-surface-200-800 card-hover divide-surface-200-800 block w-sm divide-y overflow-hidden border-[1px]"
+<section
+  aria-label="Song"
+  class="bg-surface-900 border-surface-700 grid max-w-md grid-cols-2 gap-2 rounded-2xl border p-3"
+>
+  <label class="label-caps flex flex-col gap-1"
+    >Key
+    <select
+      class={select}
+      aria-label="Key"
+      value={song.scale.scaleKey}
+      onchange={(e) => setScale(e.currentTarget.value, song.scale.scaleMode)}
     >
-      <header class="flex flex-row gap-2 p-4">
-        <Icon size="36" />
-        <h3 class="h3">{instrumentData.name}</h3>
-      </header>
-      <article class="h-64 space-y-4 overflow-y-auto p-4">
-        <ParamSlider
-          label="Volume"
-          bind:value={
-            () => instrumentData.volume,
-            (volume) =>
-              dispatch({
-                type: 'setInstrumentFields',
-                instrumentId: instrumentData.id,
-                fields: { volume }
-              })
-          }
-          min={0}
-          max={1}
-          step={0.01}
-        />
-      </article>
-    </div>
+      {#each KEYS as k (k)}<option value={k}>{k}</option>{/each}
+    </select>
+  </label>
+  <label class="label-caps flex flex-col gap-1"
+    >Mode
+    <select
+      class={select}
+      aria-label="Mode"
+      value={song.scale.scaleMode}
+      onchange={(e) => setScale(song.scale.scaleKey, e.currentTarget.value)}
+    >
+      {#each MODE_NAMES as m (m)}<option value={m}>{m}</option>{/each}
+    </select>
+  </label>
+</section>
+
+<div class="flex gap-1.5 overflow-x-auto pt-4 pb-1" aria-label="Channels" role="group">
+  {#each song.instrumentsData as data, index (data.id)}
+    {@const muted = data.state === TrackState.Muted}
+    {@const soloed = data.state === TrackState.Solo}
+    {@render strip({
+      name: data.name,
+      label: `${data.name} volume`,
+      color: trackColor(index),
+      value: data.volume,
+      onchange: (volume) =>
+        dispatch({ type: 'setInstrumentFields', instrumentId: data.id, fields: { volume } }),
+      mute: { on: muted, toggle: () => dispatch(setTrackStateCommand(data, TrackState.Muted)) },
+      solo: { on: soloed, toggle: () => dispatch(setTrackStateCommand(data, TrackState.Solo)) }
+    })}
   {/each}
+  {@render strip({
+    name: 'Master',
+    label: 'Master Volume',
+    color: 'var(--color-surface-100)',
+    value: song.volume,
+    onchange: (volume) => dispatch({ type: 'setMasterVolume', volume }),
+    master: true
+  })}
 </div>
+
+{#snippet strip(s: {
+  name: string;
+  label: string;
+  color: string;
+  value: number;
+  onchange: (v: number) => void;
+  master?: boolean;
+  mute?: { on: boolean; toggle: () => void };
+  solo?: { on: boolean; toggle: () => void };
+})}
+  <div
+    class="flex max-w-28 min-w-16 flex-1 flex-col items-center gap-1.5 rounded-2xl border px-1.5 py-2 {s.master
+      ? 'bg-surface-800 border-surface-600'
+      : 'bg-surface-900 border-surface-700'}"
+  >
+    <span
+      class="flex size-8 items-center justify-center rounded-lg text-[11px] font-bold text-[#0B0C0F]"
+      style:background={s.color}>{s.master ? 'MA' : trackInitials(s.name)}</span
+    >
+    <span class="w-full truncate text-center text-[11px] font-semibold">{s.name}</span>
+    <input
+      type="range"
+      class="fader"
+      style:--fader={s.color}
+      min="0"
+      max="1"
+      step="0.01"
+      value={s.value}
+      aria-label={s.label}
+      oninput={(e) => s.onchange(Number(e.currentTarget.value))}
+    />
+    <span class="font-mono text-[11px] font-semibold tabular-nums">{db(s.value)}</span>
+    {#if s.mute && s.solo}
+      <button
+        class="h-11 w-full rounded-lg border text-sm font-bold {s.mute.on
+          ? 'bg-warning-500 border-warning-500 text-warning-contrast-500'
+          : 'bg-surface-800 border-surface-700'}"
+        aria-label="Mute {s.name}"
+        aria-pressed={s.mute.on}
+        onclick={s.mute.toggle}>M</button
+      >
+      <button
+        class="h-11 w-full rounded-lg border text-sm font-bold {s.solo.on
+          ? 'bg-primary-500 border-primary-500 text-primary-contrast-500'
+          : 'bg-surface-800 border-surface-700'}"
+        aria-label="Solo {s.name}"
+        aria-pressed={s.solo.on}
+        onclick={s.solo.toggle}>S</button
+      >
+    {:else}
+      <span class="h-[94px]"></span>
+    {/if}
+  </div>
+{/snippet}
+
+<style>
+  .label-caps {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-surface-300);
+  }
+  /* a vertical fader: low at the bottom, a wide thumb in the strip's colour */
+  .fader {
+    writing-mode: vertical-lr;
+    direction: rtl;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 44px;
+    height: 260px;
+    background: transparent;
+    touch-action: none;
+    cursor: pointer;
+  }
+  .fader::-webkit-slider-runnable-track {
+    width: 6px;
+    border-radius: 3px;
+    background: var(--color-surface-700);
+  }
+  .fader::-moz-range-track {
+    width: 6px;
+    border-radius: 3px;
+    background: var(--color-surface-700);
+  }
+  .fader::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 36px;
+    height: 20px;
+    margin-left: -15px;
+    border-radius: 6px;
+    border: none;
+    background: var(--color-surface-100);
+    box-shadow: inset 0 -3px 0 var(--fader);
+  }
+  .fader::-moz-range-thumb {
+    width: 36px;
+    height: 20px;
+    border-radius: 6px;
+    border: none;
+    background: var(--color-surface-100);
+    box-shadow: inset 0 -3px 0 var(--fader);
+  }
+</style>

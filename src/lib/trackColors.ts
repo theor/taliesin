@@ -16,6 +16,14 @@ export function trackColor(index: number): string {
   return TRACK_COLORS[((index % n) + n) % n];
 }
 
+/** What kind of instrument it is, for people: "Drum" -> "Drums", "PianoScale" -> "Synth". */
+export function trackKind(instrumentName: string): string {
+  return (
+    ({ Drum: 'Drums', PianoScale: 'Synth' } as Record<string, string>)[instrumentName] ??
+    instrumentName
+  );
+}
+
 /** Two letters for the instrument's tile: "Drums" -> "DR", "Lead synth" -> "LS". */
 export function trackInitials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);

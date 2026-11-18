@@ -17,9 +17,26 @@ describe('Transport', () => {
     ]);
   });
 
-  test('shows the playing state and the position it is given', () => {
-    render(Transport, { props: { playing: true, position: 1.5, dispatch: vi.fn() } });
-    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
-    expect(screen.getByText('1.50')).toBeInTheDocument();
+  test('shows the playing state, the position as bar.beat, and the key', () => {
+    for (const size of ['lg', 'md'] as const) {
+      render(Transport, {
+        props: {
+          playing: true,
+          position: 1.5, // half way through the second bar: its third beat
+          dispatch: vi.fn(),
+          scale: { scaleKey: 'D', scaleMode: 'dorian' },
+          size
+        }
+      });
+      expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+      expect(screen.getByTestId('position')).toHaveTextContent('2.3');
+      expect(document.body).toHaveTextContent(/D\s*dorian/);
+      cleanup();
+    }
+  });
+
+  test('stopped, there is no position', () => {
+    render(Transport, { props: { playing: false, position: 1.5, dispatch: vi.fn() } });
+    expect(screen.getByTestId('position')).toHaveTextContent('–');
   });
 });

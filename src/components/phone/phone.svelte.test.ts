@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import SessionView from './SessionView.svelte';
-import PhoneMixer from './PhoneMixer.svelte';
+import Mixer from '../Mixer.svelte';
 import { createInstrument } from '$lib/Store.svelte';
 import { Drum } from '$lib/instruments/Drum';
 import { PianoScale } from '$lib/instruments/MonoSynth';
@@ -103,11 +103,11 @@ describe('SessionView (phone)', () => {
   });
 });
 
-describe('PhoneMixer', () => {
+describe('Mixer', () => {
   test('each strip’s fader sets that instrument’s volume; the master sets the song’s', async () => {
     const song = makeSong();
     const dispatch = vi.fn<(cmd: Command) => void>();
-    render(PhoneMixer, { props: { song, dispatch } });
+    render(Mixer, { props: { song, dispatch } });
     await fireEvent.input(screen.getByRole('slider', { name: 'Lead volume' }), {
       target: { value: '0.25' }
     });
@@ -125,7 +125,7 @@ describe('PhoneMixer', () => {
   test('the key is changed by command', async () => {
     const song = makeSong();
     const dispatch = vi.fn<(cmd: Command) => void>();
-    render(PhoneMixer, { props: { song, dispatch } });
+    render(Mixer, { props: { song, dispatch } });
     await fireEvent.change(screen.getByLabelText('Key'), { target: { value: 'E' } });
     expect(dispatch).toHaveBeenLastCalledWith({
       type: 'setScale',

@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/svelte';
 import InstrumentView from './InstrumentView.svelte';
 import { createInstrument } from '$lib/Store.svelte';
 import { Drum } from '$lib/instruments/Drum';
 import { PianoScale } from '$lib/instruments/MonoSynth';
 import { TrackState, type Constructor, type Instrument as InstrumentBase } from '$lib/instruments';
 import type { Command } from '$lib/commands';
+import { ROLE_ORDER } from '$lib/parts.svelte';
 
 // The view in isolation, like SequencerView: it gets state and a spy `dispatch`, and the tests check
 // which commands the controls produce.
@@ -16,6 +17,10 @@ function mount(Instrument: Constructor<InstrumentBase> = PianoScale, extra: obje
   render(InstrumentView, { props: { index: 0, instrumentData, dispatch, ...extra } });
   return { instrumentData, dispatch };
 }
+
+const ORDER: string[] = [...ROLE_ORDER];
+/** The quick sliders (the rack below has knobs with some of the same names). */
+const quick = () => within(screen.getByRole('region', { name: 'Quick controls' }));
 
 beforeEach(() => vi.spyOn(console, 'log').mockImplementation(() => {}));
 afterEach(() => {
@@ -27,20 +32,20 @@ describe('InstrumentView', () => {
   test('the grid and the quick controls are on screen together, without switching views', () => {
     mount();
     expect(document.querySelector('[data-x="0"][data-y="0"]')).toBeInTheDocument();
-    expect(screen.getByRole('slider', { name: 'Volume' })).toBeInTheDocument();
-    expect(screen.getByRole('slider', { name: 'Reverb' })).toBeInTheDocument();
-    expect(screen.getByRole('slider', { name: 'Octave' })).toBeInTheDocument();
+    expect(quick().getByRole('slider', { name: 'Volume' })).toBeInTheDocument();
+    expect(quick().getByRole('slider', { name: 'Reverb' })).toBeInTheDocument();
+    expect(quick().getByRole('slider', { name: 'Octave' })).toBeInTheDocument();
   });
 
   test('a drum kit only offers the controls it has', () => {
     mount(Drum);
-    expect(screen.getByRole('slider', { name: 'Volume' })).toBeInTheDocument();
-    expect(screen.queryByRole('slider', { name: 'Reverb' })).toBeNull();
+    expect(quick().getByRole('slider', { name: 'Volume' })).toBeInTheDocument();
+    expect(quick().queryByRole('slider', { name: 'Reverb' })).toBeNull();
   });
 
   test('a macro slider dispatches an absolute value for the right part', async () => {
     const { dispatch, instrumentData } = mount();
-    await fireEvent.input(screen.getByRole('slider', { name: 'Reverb' }), {
+    await fireEvent.input(quick().getByRole('slider', { name: 'Reverb' }), {
       target: { value: '0.7' }
     });
     expect(dispatch).toHaveBeenCalledWith({
@@ -49,7 +54,7 @@ describe('InstrumentView', () => {
       partName: 'PartEffects',
       fields: { reverb: 0.7 }
     });
-    await fireEvent.input(screen.getByRole('slider', { name: 'Volume' }), {
+    await fireEvent.input(quick().getByRole('slider', { name: 'Volume' }), {
       target: { value: '0.4' }
     });
     expect(dispatch).toHaveBeenLastCalledWith({
@@ -122,6 +127,21 @@ describe('InstrumentView', () => {
       partName: 'PartSteps',
       fields: { measures: 1 }
     });
+  });
+
+  test('the rack shows the parts as modules under their roles, with a way to add more', () => {
+    mount();
+    const rack = within(screen.getByRole('region', { name: 'Rack' }));
+    // one grid in signal order, each module captioned with its role
+    const roles = [...document.querySelectorAll('[data-role]')].map((m) =>
+      m.getAttribute('data-role')
+    );
+    expect(roles).toEqual([...roles].sort((a, b) => ORDER.indexOf(a!) - ORDER.indexOf(b!)));
+    expect(
+      within(rack.getByRole('region', { name: 'Envelope' })).getByText('Sound')
+    ).toBeInTheDocument();
+    expect(rack.getByRole('slider', { name: 'Attack' })).toBeInTheDocument(); // a knob
+    expect(rack.getByRole('button', { name: 'Add module' })).toBeInTheDocument();
   });
 
   test('the whole loop is shown, with the playhead on the right step', () => {

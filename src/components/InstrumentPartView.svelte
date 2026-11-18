@@ -13,8 +13,10 @@
     instrumentId: string;
     PartComponent: Component<IPartViewProps<InstrumentPart<any>>>;
     dispatch: Dispatch;
+    /** A small caption in the rack module's header (the part's role, where no group header says it). */
+    kicker?: string;
   }
-  let { partData, instrumentId, PartComponent, dispatch }: Props = $props();
+  let { partData, instrumentId, PartComponent, dispatch, kicker }: Props = $props();
 
   const copy = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
 
@@ -110,6 +112,10 @@
         <span class="flex-1 text-xs font-bold tracking-[0.08em] uppercase">{title}</span>
         {#if collapsed}
           <span class="text-surface-300 max-w-[55%] truncate font-mono text-xs">{summary}</span>
+        {:else if kicker}
+          <span class="text-surface-400 text-[10px] font-semibold tracking-[0.08em] uppercase"
+            >{kicker}</span
+          >
         {/if}
         <ChevronDown
           size={16}

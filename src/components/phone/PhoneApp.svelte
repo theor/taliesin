@@ -2,7 +2,7 @@
   import { store, TrackState } from '$lib';
   import type { Dispatch } from '$lib/commands';
   import { randomizeCommands, setTrackStateCommand } from '$lib/commandBuilders';
-  import { trackColor, trackInitials } from '$lib/trackColors';
+  import { trackColor, trackInitials, trackKind } from '$lib/trackColors';
   import {
     ChevronLeft,
     Dices,
@@ -17,14 +17,15 @@
     Waves
   } from '@lucide/svelte';
   import { untrack, type Snippet } from 'svelte';
+  import type { Screen } from '$lib/nav.svelte';
   import InputViewSwitcher from '../../instruments/InputViewSwitcher.svelte';
   import AddInstrumentModal from '../AddInstrumentModal.svelte';
   import InstrumentMenu from '../InstrumentMenu.svelte';
   import SettingsPanel from '../SettingsPanel.svelte';
   import ShareButton from '../ShareButton.svelte';
-  import PhoneMixer from './PhoneMixer.svelte';
+  import Mixer from '../Mixer.svelte';
   import QuickRack from './QuickRack.svelte';
-  import RackModules from './RackModules.svelte';
+  import RackModules from '../RackModules.svelte';
   import SessionView from './SessionView.svelte';
 
   /**
@@ -33,6 +34,7 @@
    */
   let {
     selectedIndex = $bindable(),
+    screen = $bindable('session'),
     dispatch,
     position,
     playing,
@@ -45,6 +47,8 @@
     debug
   }: {
     selectedIndex: number;
+    /** Which screen shows. Bindable, so +page can keep it in the browser's history. */
+    screen?: Screen;
     dispatch: Dispatch;
     position: number;
     playing: boolean;
@@ -59,8 +63,6 @@
     debug?: Snippet;
   } = $props();
 
-  type Screen = 'session' | 'edit' | 'rack' | 'mixer';
-  let screen = $state<Screen>('session');
   let addOpen = $state(false);
 
   const song = store.instrumentsData;
@@ -90,7 +92,6 @@
     if (!hasInstrument && (screen === 'edit' || screen === 'rack')) screen = 'session';
   });
 
-  const KIND: Record<string, string> = { Drum: 'Drums', PianoScale: 'Synth' };
   const tabs = [
     { id: 'session', label: 'Session', icon: ListMusic },
     { id: 'edit', label: 'Edit', icon: LayoutGrid },
@@ -154,7 +155,7 @@
         <h1 class="flex-1 text-[22px] font-bold">Mixer</h1>
         {@render playButton()}
       </header>
-      <PhoneMixer song={store.instrumentsData} {dispatch} />
+      <div class="px-4"><Mixer song={store.instrumentsData} {dispatch} /></div>
       <section
         class="bg-surface-900 border-surface-700 mx-4 mt-4 space-y-2 rounded-2xl border p-3"
         aria-label="Sound settings"
@@ -163,10 +164,7 @@
       </section>
     {:else if current}
       <!-- the instrument's colour becomes the primary colour, so its steps, knobs and buttons wear it -->
-      <div
-        class="flex flex-col"
-        style:--color-primary-500={color}
-      >
+      <div class="flex flex-col" style:--color-primary-500={color}>
         <header class="flex items-center gap-2.5 px-4 pt-3.5 pb-2">
           <button
             class={iconButton}
@@ -183,7 +181,7 @@
           <div class="flex min-w-0 flex-1 flex-col">
             <h1 class="truncate text-lg leading-tight font-bold">{current.name}</h1>
             <span class="text-surface-300 truncate text-xs"
-              >{KIND[current.instrumentName] ?? current.instrumentName} · {store.scale.scaleKey}
+              >{trackKind(current.instrumentName)} · {store.scale.scaleKey}
               {store.scale.scaleMode}{current.state === TrackState.Muted
                 ? ' · muted'
                 : current.state === TrackState.Solo

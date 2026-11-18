@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
-import RackModules from './RackModules.svelte';
+import RackModules from '../RackModules.svelte';
 import QuickRack from './QuickRack.svelte';
 import { createInstrument } from '$lib/Store.svelte';
 import { PianoScale } from '$lib/instruments/MonoSynth';

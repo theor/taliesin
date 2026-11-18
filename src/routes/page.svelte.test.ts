@@ -6,7 +6,12 @@ import { render, screen } from '@testing-library/svelte';
 vi.mock('$app/state', () => ({
   page: { url: new URL('http://localhost/?host=true&room=test') }
 }));
-vi.mock('$app/navigation', () => ({ goto: vi.fn() }));
+vi.mock('$app/navigation', () => ({
+  goto: vi.fn(),
+  beforeNavigate: vi.fn(),
+  pushState: vi.fn(),
+  replaceState: vi.fn()
+}));
 vi.mock('trystero', async () => {
   const { createFakeNetwork } = await import('$lib/testing/fakeRoom');
   const net = createFakeNetwork();

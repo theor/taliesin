@@ -4,9 +4,10 @@
   import { presetCommands, setTrackStateCommand } from '$lib/commandBuilders';
   import { playheadStep } from '$lib/gesture';
   import { getInstrument } from '$lib/Store.svelte';
-  import { trackColor, trackInitials } from '$lib/trackColors';
-  import { Pause, Play, Plus, Square } from '@lucide/svelte';
+  import { trackColor, trackInitials, trackKind } from '$lib/trackColors';
+  import { Plus } from '@lucide/svelte';
   import type { Snippet } from 'svelte';
+  import Transport from '../Transport.svelte';
 
   /**
    * The phone's home screen: the transport, then one card per instrument with a glance at its pattern.
@@ -38,7 +39,6 @@
 
   /** The most steps a card shows; longer loops show their start. */
   const MAX_CELLS = 32;
-  const KIND: Record<string, string> = { Drum: 'Drums', PianoScale: 'Synth' };
 
   function overview(data: InstrumentData) {
     const instr = getInstrument(data);
@@ -51,47 +51,13 @@
     );
     return { cells, total, now: playheadStep(position, playing, length) };
   }
-
-  const bar = $derived(
-    playing && Number.isFinite(position) && position >= 0
-      ? `${Math.floor(position) + 1}.${Math.floor((position % 1) * 4) + 1}`
-      : '–'
-  );
 </script>
 
 <section
   aria-label="Transport"
   class="bg-surface-900 border-surface-700 mx-4 flex items-center gap-3 rounded-2xl border p-3"
 >
-  <button
-    class="bg-primary-500 text-primary-contrast-500 flex size-14 items-center justify-center rounded-xl"
-    aria-label={playing ? 'Pause' : 'Play'}
-    onclick={() => dispatch({ type: 'transport', action: 'toggle' })}
-  >
-    {#if playing}<Pause size={24} fill="currentColor" />{:else}<Play
-        size={24}
-        fill="currentColor"
-      />{/if}
-  </button>
-  <button
-    class="bg-surface-800 border-surface-700 flex size-14 items-center justify-center rounded-xl border"
-    aria-label="Stop"
-    onclick={() => dispatch({ type: 'transport', action: 'stop' })}
-    ><Square size={18} fill="currentColor" /></button
-  >
-  <dl class="grid flex-1 grid-cols-2 gap-2">
-    <div class="flex flex-col gap-0.5">
-      <dt class="label-caps">Pos</dt>
-      <dd class="font-mono text-lg font-semibold tabular-nums" data-testid="position">{bar}</dd>
-    </div>
-    <div class="flex flex-col gap-0.5">
-      <dt class="label-caps">Key</dt>
-      <dd class="font-mono text-lg font-semibold">
-        {song.scale.scaleKey}
-        <span class="text-sm">{song.scale.scaleMode}</span>
-      </dd>
-    </div>
-  </dl>
+  <Transport {playing} {position} {dispatch} scale={song.scale} />
 </section>
 
 {#if status}
@@ -140,9 +106,7 @@
           <span class="flex min-w-0 flex-col">
             <span class="truncate text-[15px] font-semibold">{data.name}</span>
             <span class="text-surface-300 truncate text-xs"
-              >{KIND[data.instrumentName] ?? data.instrumentName}{o.total
-                ? ` · ${o.total} steps`
-                : ''}</span
+              >{trackKind(data.instrumentName)}{o.total ? ` · ${o.total} steps` : ''}</span
             >
           </span>
         </button>
@@ -202,13 +166,6 @@
 </div>
 
 <style>
-  .label-caps {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--color-surface-300);
-  }
   .edit-flash {
     animation: edit-flash 1.6s ease-out forwards;
   }

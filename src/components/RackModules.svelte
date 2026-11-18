@@ -5,15 +5,23 @@
   import { setControlStyle } from '$lib/controlStyle';
   import { getInstrument } from '$lib/Store.svelte';
   import { Plus, X } from '@lucide/svelte';
-  import InstrumentPartView from '../InstrumentPartView.svelte';
-  import { addablePartGroups, partViewGroups } from '../partViews';
+  import InstrumentPartView from './InstrumentPartView.svelte';
+  import { addablePartGroups, partViewGroups } from './partViews';
 
   /**
-   * The phone's rack: every part of the instrument as a module of knobs and chips, in signal order,
+   * The rack (phone and desktop): every part of the instrument as a module of knobs and chips, in signal order,
    * under a header per role (notes, note FX, sound, sound FX). "Add module" gives it a part it lacks.
    */
-  let { instrumentData, dispatch }: { instrumentData: InstrumentData; dispatch: Dispatch } =
-    $props();
+  let {
+    instrumentData,
+    dispatch,
+    layout = 'stack'
+  }: {
+    instrumentData: InstrumentData;
+    dispatch: Dispatch;
+    /** `stack`: one module per row (phone). `grid`: modules side by side, as many columns as fit (desktop). */
+    layout?: 'stack' | 'grid';
+  } = $props();
   setControlStyle('rack');
 
   const groups = $derived(partViewGroups(instrumentData.parts));
@@ -35,30 +43,53 @@
 </script>
 
 <div class="flex flex-col gap-4" bind:this={root}>
-  {#each groups as group (group.role)}
-    <section aria-label={group.label} data-role={group.role} class="flex flex-col gap-2">
-      <h3 class="rack-label flex items-center gap-2 px-1">
-        {group.label}
-        <span class="bg-surface-800 h-px flex-1" aria-hidden="true"></span>
-      </h3>
-      {#each group.modules as { part, component } (part.partName)}
-        <InstrumentPartView
-          instrumentId={instrumentData.id}
-          {dispatch}
-          PartComponent={component}
-          partData={part}
-        />
+  {#if layout === 'grid'}
+    <!-- side by side, the modules flow in signal order; each says its role, as there is no group header -->
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(17rem,1fr))] items-start gap-3">
+      {#each groups as group (group.role)}
+        {#each group.modules as { part, component } (part.partName)}
+          <div data-role={group.role}>
+            <InstrumentPartView
+              instrumentId={instrumentData.id}
+              {dispatch}
+              PartComponent={component}
+              partData={part}
+              kicker={group.label}
+            />
+          </div>
+        {/each}
       {/each}
-    </section>
+    </div>
   {:else}
+    {#each groups as group (group.role)}
+      <section aria-label={group.label} data-role={group.role} class="flex flex-col gap-2">
+        <h3 class="rack-label flex items-center gap-2 px-1">
+          {group.label}
+          <span class="bg-surface-800 h-px flex-1" aria-hidden="true"></span>
+        </h3>
+        {#each group.modules as { part, component } (part.partName)}
+          <InstrumentPartView
+            instrumentId={instrumentData.id}
+            {dispatch}
+            PartComponent={component}
+            partData={part}
+          />
+        {/each}
+      </section>
+    {/each}
+  {/if}
+  {#if groups.length === 0}
     <p class="text-surface-300 p-4 text-sm">This instrument has no settings yet.</p>
-  {/each}
+  {/if}
 
   {#if addable.length > 0}
     {#if picking}
       <section
         aria-label="Add module"
-        class="bg-surface-900 border-surface-700 flex flex-col gap-3 rounded-2xl border p-3"
+        class="bg-surface-900 border-surface-700 flex flex-col gap-3 rounded-2xl border p-3 {layout ===
+        'grid'
+          ? 'max-w-2xl'
+          : ''}"
       >
         <header class="flex items-center justify-between">
           <span class="text-xs font-bold tracking-[0.08em] uppercase">Add module</span>
@@ -90,7 +121,10 @@
     {:else}
       <button
         type="button"
-        class="border-surface-700 text-surface-300 hover:text-surface-100 flex h-12 items-center justify-center gap-2 rounded-2xl border border-dashed text-sm font-semibold"
+        class="border-surface-700 text-surface-300 hover:text-surface-100 flex h-12 items-center {layout ===
+        'grid'
+          ? 'sm:w-72'
+          : ''} justify-center gap-2 rounded-2xl border border-dashed text-sm font-semibold"
         onclick={() => (picking = true)}
       >
         <Plus size={18} aria-hidden="true" /> Add module

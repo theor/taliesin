@@ -1,11 +1,7 @@
 <script lang="ts">
-  import { AppBar } from '@skeletonlabs/skeleton-svelte';
-  import { SettingsIcon } from '@lucide/svelte';
   import { page } from '$app/state';
   import { strudel, store } from '$lib';
   import '../main.scss';
-  import Network from '../components/Network.svelte';
-  import Transport from '../components/Transport.svelte';
   import { setGlobalContext } from '$lib/context';
   import { base } from '$app/paths';
   import type { IceServer } from '$lib/turn';
@@ -63,8 +59,13 @@
   });
 
   function onKeyDown(event: KeyboardEvent) {
-    // keys typed into a slider or text field belong to that control, not to the song
-    if ((event.target as HTMLElement | null)?.closest?.('input, textarea, select')) return;
+    // keys typed into a control belong to it, not to the song (Space on a focused button clicks it)
+    if (
+      (event.target as HTMLElement | null)?.closest?.(
+        'input, textarea, select, button, [role="slider"]'
+      )
+    )
+      return;
 
     switch (event.code) {
       case 'Space':
@@ -80,49 +81,66 @@
         break;
     }
   }
-  let title = 'Taliesin';
 
   const instrumentsData = store.instrumentsData;
   // console.log($instrumentsData.instrumentsData);
   let code = $state(store.code());
   // let group = $state('0');
-  let selectedIndex = $state(0);
-  let currentInstrument = $derived(instrumentsData.instrumentsData[selectedIndex]);
   $effect(() => {
-    // console.log('store changed', $state.snapshot(instrumentsData.instrumentsData), instrumentsData.instrumentsData[0]);
     code = store.code();
     // every peer plays the song itself, following the host's clock (unless only the host makes sound)
     if (isHost || !store.transport.hostOnly) strudel.evaluate(code);
-    if (selectedIndex >= instrumentsData.instrumentsData.length) {
-      selectedIndex = Math.max(0, instrumentsData.instrumentsData.length - 1);
-    }
   });
 
-  import AppMenu from '../components/AppMenu.svelte';
+  // The page shown (screen, instrument) lives in the browser's history: switching pages pushes an
+  // entry (shallow routing: the URL stays), and Back / Forward bring one back.
+  const nav = new NavHistory(
+    (state) => pushState('', { nav: $state.snapshot(state) }),
+    (state) => replaceState('', { nav: $state.snapshot(state) })
+  );
+  $effect(() => nav.restore(page.state?.nav));
+
+  // Leaving while the music plays or others are here asks first. Leaving the site (closing, reloading,
+  // Back past the first page) can only get the browser's own "Leave site?" dialog, and only once the
+  // page has been interacted with (never on iOS Safari); links within the app get a confirm.
+  // Back/Forward between this page's own entries is not leaving: same URL, so it is let through.
+  beforeNavigate((navigation) => {
+    if (!shouldConfirmLeave({ playing, peers: store.peers.length })) return;
+    if (navigation.willUnload) {
+      navigation.cancel(); // makes the browser ask
+      return;
+    }
+    const to = navigation.to?.url;
+    if (to && to.pathname === page.url.pathname && to.search === page.url.search) return;
+    if (!confirm(playing ? 'Leave the jam? The music will stop.' : 'Leave the jam?'))
+      navigation.cancel();
+  });
+  const ids = $derived(instrumentsData.instrumentsData.map((i) => i.id));
+
   import PhoneApp from '../components/phone/PhoneApp.svelte';
-  import SettingsPanel from '../components/SettingsPanel.svelte';
+  import DesktopApp from '../components/desktop/DesktopApp.svelte';
+  import {
+    NavHistory,
+    desktopIndex,
+    desktopSelect,
+    navIndex,
+    phoneScreen,
+    shouldConfirmLeave
+  } from '$lib/nav.svelte';
   import { Media, PHONE_QUERY } from '$lib/utils/media.svelte';
-  import InstrumentView from '../components/InstrumentView.svelte';
-  import { initStore, mixerIndex } from '$lib/Store.svelte';
-  import Mixer from '../components/Mixer.svelte';
+  import { initStore } from '$lib/Store.svelte';
   import { presetCommands } from '$lib/commandBuilders';
-  import { goto } from '$app/navigation';
+  import { beforeNavigate, goto, pushState, replaceState } from '$app/navigation';
   import { onMount } from 'svelte';
   import { getRelaySockets as getNostrSockets } from 'trystero';
   import { getRelaySockets as getMqttSockets } from '@trystero-p2p/mqtt';
   import { installRtcDebug, refreshRtcStats, relaySummary, rtcSummary } from '$lib/rtcDebug';
   import { WebAcoustics } from '$lib/calibration/webAcoustics';
   import { findChirp, makeChirp } from '$lib/calibration/dsp';
-  const calibration = store.calibration;
   const phone = new Media(PHONE_QUERY);
-  let settingsOpen = $state(false);
   let playing = $derived(store.transport.playing);
   /** A guest's browser keeps audio locked until their first tap. */
   let needsTap = $derived(!isHost && playing && !store.transport.hostOnly && !$audioRunning);
-  function startBeat() {
-    presetCommands().forEach(store.dispatch);
-    selectedIndex = 0;
-  }
 
   // `?debug` on a phone: are the signalling relays reachable?
   let relays = $state('');
@@ -191,11 +209,23 @@
   >
   {#each relayLines as line}<p class="text-xs" data-testid="relay-debug">{line}</p>{/each}
   {#each rtcLines as line}<p class="text-xs" data-testid="rtc-debug">{line}</p>{/each}
+  <details class="bg-surface-900 border-surface-700 rounded-2xl border p-3">
+    <summary class="cursor-pointer text-sm">Code</summary>
+    <div class="flex gap-2 py-2">
+      <button class="btn btn-sm preset-outlined" onclick={() => store.cycle()}>Cycle</button>
+      <button
+        class="btn btn-sm preset-outlined"
+        onclick={() => navigator.clipboard.writeText(store.exportLog())}>Copy log</button
+      >
+    </div>
+    <pre class="text-xs whitespace-pre-wrap">{code}</pre>
+  </details>
 {/snippet}
 
 {#if phone.matches}
   <PhoneApp
-    bind:selectedIndex
+    bind:selectedIndex={() => navIndex(nav.current, ids), (i) => nav.go({ instrumentId: ids[i] })}
+    bind:screen={() => phoneScreen(nav.current, ids), (screen) => nav.go({ screen })}
     dispatch={store.dispatch}
     {position}
     {playing}
@@ -208,121 +238,18 @@
     debug={isDebug ? debugPanel : undefined}
   />
 {:else}
-  <AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block" toolbarClasses="">
-    {#snippet lead()}
-      <!-- <ArrowLeft size={24} /> -->
-      <Network />
-    {/snippet}
-    {#snippet trail()}
-      <div class="flex items-center space-x-4">
-        <div class="flex items-center space-x-4">
-          <Transport playing={store.transport.playing} {position} dispatch={store.dispatch} />
-          {#if needsTap}
-            <button class="btn preset-filled" onclick={() => strudel.unlockAudio()}
-              >Tap to hear</button
-            >
-          {/if}
-        </div>
-        {#if isHost || calibration.applied !== undefined}
-          <div class="relative">
-            <button
-              class="btn-icon preset-tonal"
-              aria-label="Settings"
-              aria-expanded={settingsOpen}
-              onclick={() => (settingsOpen = !settingsOpen)}><SettingsIcon size={20} /></button
-            >
-            {#if settingsOpen}
-              <div
-                class="card bg-surface-100-900 border-surface-300-700 absolute top-full right-0 z-50 mt-2 w-72 space-y-2 border p-3 shadow-xl"
-                data-testid="settings-panel"
-              >
-                <SettingsPanel {isHost} />
-              </div>
-            {/if}
-          </div>
-        {/if}
-      </div>
-    {/snippet}
-    <span>{title}</span>
-    <span class="text-surface-600-400 ml-2 hidden text-xs sm:inline" data-testid="room-code"
-      >{room}</span
-    >
-    {#if !isHost && store.transport.hostOnly}
-      <span class="chip preset-tonal ml-2 text-xs" data-testid="host-only-note"
-        >Sound from host</span
-      >
-    {/if}
-  </AppBar>
-
-  <div class="flex flex-1 flex-row">
-    <div class="card border-surface-100-900 flex flex-col border-[1px]">
-      <AppMenu bind:selectedIndex dispatch={store.dispatch} />
-    </div>
-
-    <div class="flex min-w-0 flex-1 flex-col gap-4 p-4">
-      {#if isDebug}
-        {@render debugPanel()}
-        <div
-          class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden flex-col space-y-5 p-5 lg:flex"
-        >
-          Code
-          <div class="flex flex-row">
-            <button class="btn preset-outlined ml-4" onclick={() => store.cycle()}>Cycle</button>
-            <button
-              class="btn preset-outlined ml-4"
-              onclick={() => navigator.clipboard.writeText(store.exportLog())}>Copy log</button
-            >
-          </div>
-          <pre class="whitespace-pre-wrap">
-{code}
-            </pre>
-          <!-- <pre>{store.serialized()}</pre> -->
-        </div>
-      {/if}
-
-      {#if selectedIndex === mixerIndex}
-        <Mixer song={store.instrumentsData} dispatch={store.dispatch} />
-      {:else if currentInstrument}
-        <InstrumentView
-          bind:instrumentData={currentInstrument}
-          index={selectedIndex}
-          dispatch={store.dispatch}
-          {position}
-          {playing}
-          now={() => store.transport.heardPosition()}
-          editedByOther={store.activity[currentInstrument.id]}
-        />
-      {:else}
-        <div class="card preset-outlined-surface-200-800 space-y-4 p-8 text-center">
-          <p class="text-lg">Nothing playing yet.</p>
-          <button class="btn preset-filled-primary-500" onclick={startBeat}
-            >Start with a beat</button
-          >
-          <p class="text-sm opacity-70">
-            Adds piano, bass and drums. Use Add for a single instrument.
-          </p>
-        </div>
-      {/if}
-
-      <!-- {#each instrumentsData.instrumentsData as instrumentData, index}
-			{@render instrumentCard(instrumentData, index)}
-		{/each} -->
-      <!-- <Tabs value={group} onValueChange={(e) => (group = e.value)}>
-			{#snippet list()}
-				{#each instrumentsData.instrumentsData as instrumentData, index}
-					<Tabs.Control value={index.toString()}>{instrumentData.instrumentName}</Tabs.Control>
-				{/each}
-			{/snippet}
-			{#snippet content()}
-				{#each instrumentsData.instrumentsData as instrumentData, index}
-					<Tabs.Panel value={index.toString()}>
-						{@render instrumentCard(instrumentData, index)}
-					</Tabs.Panel>
-				{/each}
-			{/snippet}
-		</Tabs> -->
-    </div>
-  </div>
-{/if}
+  <DesktopApp
+    bind:selectedIndex={() => desktopIndex(nav.current, ids), (i) => nav.go(desktopSelect(i, ids))}
+    dispatch={store.dispatch}
+    {position}
+    {playing}
+    now={() => store.transport.heardPosition()}
+    {isHost}
+    roomId={room!}
+    {needsTap}
+    hostOnly={!isHost && store.transport.hostOnly}
+    onTap={() => strudel.unlockAudio()}
+    debug={isDebug ? debugPanel : undefined}
+  />{/if}
 
 <svelte:window on:keydown={onKeyDown} />

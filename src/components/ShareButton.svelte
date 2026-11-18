@@ -30,7 +30,7 @@
   onclick={share}
   triggerBase={iconOnly
     ? 'bg-surface-900 border-surface-700 flex size-11 items-center justify-center rounded-xl border'
-    : 'btn btn-sm preset-filled-primary-500'}
+    : 'bg-surface-100 text-surface-950 flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-bold'}
   triggerAriaLabel={iconOnly ? 'Share jam link' : ''}
   contentBase="card bg-surface-100-900 text-surface-contrast-100-900 p-4 space-y-4 shadow-xl max-w-screen-sm"
   backdropClasses="backdrop-blur-sm"
