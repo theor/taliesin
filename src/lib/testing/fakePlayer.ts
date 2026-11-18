@@ -63,6 +63,15 @@ export function fakePlayer(
     shift(delta: number) {
       calls.push(`shift`);
       base += delta;
+    },
+    /** as Strudel's scheduler: the position carries on, then advances at the new rate */
+    setCps(cps: number) {
+      calls.push(`cps:${cps}`);
+      if (opts.clocked && get(isPlaying)) {
+        base = player.now();
+        since = performance.now();
+      }
+      player.cps = cps;
     }
   };
   return player;

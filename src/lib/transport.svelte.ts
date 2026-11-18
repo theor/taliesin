@@ -19,7 +19,13 @@ export interface PlayerLike {
   start(target: () => number | undefined): Promise<void>;
   /** Jump the running scheduler by `delta` cycles. */
   shift(delta: number): void;
+  /** Change the tempo; the cycle position carries on from where it is (no jump). */
+  setCps(cps: number): void;
 }
+
+/** The fastest and slowest tempo a client accepts from the network (cycles per second). */
+const MIN_CPS = 0.05;
+const MAX_CPS = 4;
 
 // `type`, not `interface`: Trystero's payload constraint needs an implicit index signature
 export type TransportState = {
@@ -122,10 +128,14 @@ export class Transport {
     } else {
       onState((state, peerId) => {
         if (typeof state?.playing !== 'boolean' || typeof state.seq !== 'number') return;
+        if (!(typeof state.cps === 'number' && state.cps >= MIN_CPS && state.cps <= MAX_CPS))
+          return;
         if (state.seq <= this.appliedSeq) return; // stale or duplicate
         this.appliedSeq = state.seq;
         this.hostId = peerId;
         this.hostOnly = state.hostOnly === true;
+        // the host's scheduler sets the tempo: run ours at the same rate (the position is reconciled below)
+        if (state.cps !== this.player.cps) this.player.setCps(state.cps);
         this.watchStalls(state.playing);
         // A message handled just after the main thread was stalled (a slow device evaluating the song)
         // may have waited behind it for a long time: its arrival time is unknown, so its position would
@@ -258,6 +268,16 @@ export class Transport {
     if (target === undefined || !get(this.player.isPlaying)) return;
     const drift = target - this.player.now();
     if (Math.abs(drift) / this.last!.cps > thresholdS) this.player.shift(drift);
+  }
+
+  /**
+   * Host: play at this tempo (cycles per second), and tell everybody at once so clients change their
+   * rate and position together. Clients take the tempo from the host's transport messages instead.
+   */
+  setTempo(cps: number) {
+    if (!this.host || this.player.cps === cps) return;
+    this.player.setCps(cps);
+    this.broadcast();
   }
 
   /** Cycles per second: the host's. */

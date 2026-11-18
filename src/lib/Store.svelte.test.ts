@@ -394,6 +394,50 @@ describe('playhead sync', () => {
     expect(a.transport.position()).toBeCloseTo(3);
   });
 
+  test('a tempo change: everyone shows it, the host plays it, clients follow without a jump', async () => {
+    vi.useFakeTimers();
+    const { host, a, b, players } = setup({ clocked: true });
+    await host.transport.toggle();
+    await vi.advanceTimersByTimeAsync(2000); // 1 cycle at 120 BPM
+    a.dispatch({ type: 'setTempo', bpm: 180 }); // anyone may change it; the host's scheduler plays it
+    await vi.advanceTimersByTimeAsync(0);
+    expect([host.tempo, a.tempo, b.tempo]).toEqual([180, 180, 180]);
+    expect(players.host.cps).toBeCloseTo(0.75);
+    expect(players.a.cps).toBeCloseTo(0.75);
+    expect(players.b.cps).toBeCloseTo(0.75);
+    const at = players.host.now();
+    expect(at).toBeCloseTo(1, 1); // the position carries on: no jump
+    await vi.advanceTimersByTimeAsync(2000); // 1.5 cycles at 180 BPM
+    expect(players.host.now()).toBeCloseTo(at + 1.5, 1);
+    expect(a.transport.position()).toBeCloseTo(players.host.now(), 1);
+    expect(players.a.now()).toBeCloseTo(players.host.now(), 1);
+  });
+
+  test('a client joining later plays at the song tempo', async () => {
+    vi.useFakeTimers();
+    const net = createFakeNetwork();
+    const players = { host: fakePlayer({ clocked: true }), late: fakePlayer({ clocked: true }) };
+    const host = new AppStore(true, 'r', net.join('host'), players.host);
+    host.dispatch({ type: 'setTempo', bpm: 90 });
+    const late = new AppStore(false, 'r', net.join('late'), players.late);
+    net.settle();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(late.tempo).toBe(90);
+    expect(players.late.cps).toBeCloseTo(90 / 240);
+  });
+
+  test('a client ignores a transport message with an absurd tempo', async () => {
+    const net = createFakeNetwork();
+    const player = fakePlayer();
+    new AppStore(false, 'r', net.join('a'), player);
+    const rogue = net.join('rogue');
+    net.settle();
+    const [sendState] = rogue.makeAction<any>('transport');
+    await sendState({ playing: false, cycle: 0, cps: 1e9, out: 0, seq: Date.now() }, 'a');
+    await Promise.resolve();
+    expect(player.cps).toBe(0.5);
+  });
+
   test('position is frozen while stopped (a stop rewinds to the start)', async () => {
     vi.useFakeTimers();
     const { host, a } = setup({ clocked: true });
@@ -793,6 +837,18 @@ describe('saving the song', () => {
     s.dispatch(rename(s, 0, 'x'));
     s.saveNow();
     expect(JSON.parse(storage.data['taliesin:song:r']).instruments[0].name).toBe('x');
+  });
+
+  test('the tempo is saved and a reloaded host plays at it', () => {
+    vi.useFakeTimers();
+    const storage = memory();
+    const first = hostWith(storage);
+    first.dispatch({ type: 'setTempo', bpm: 96 });
+    vi.advanceTimersByTime(600);
+    const player = fakePlayer();
+    const second = new AppStore(true, 'r', createFakeNetwork().join('host'), player, storage);
+    expect(second.tempo).toBe(96);
+    expect(player.cps).toBeCloseTo(96 / 240);
   });
 
   test('a client never saves: the host owns the song', () => {

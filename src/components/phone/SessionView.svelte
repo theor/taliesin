@@ -1,6 +1,6 @@
 <script lang="ts">
   import { TrackState, type InstrumentData } from '$lib';
-  import type { Dispatch, Song } from '$lib/commands';
+  import { DEFAULT_BPM, type Dispatch, type Song } from '$lib/commands';
   import { presetCommands, setTrackStateCommand } from '$lib/commandBuilders';
   import { playheadStep } from '$lib/gesture';
   import { getInstrument } from '$lib/Store.svelte';
@@ -78,7 +78,7 @@
   aria-label="Transport"
   class="bg-surface-900 border-surface-700 mx-4 flex items-center gap-3 rounded-2xl border p-3"
 >
-  <Transport {playing} {position} {dispatch} scale={song.scale} />
+  <Transport {playing} {position} {dispatch} scale={song.scale} tempo={song.tempo ?? DEFAULT_BPM} />
 </section>
 
 {#if status}

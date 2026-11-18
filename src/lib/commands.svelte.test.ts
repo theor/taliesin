@@ -406,6 +406,17 @@ describe('the whole song over the network', () => {
   });
 });
 
+describe('the tempo', () => {
+  test('is song state: whole BPM in range only (it is network input)', () => {
+    const { host, a, b } = trio();
+    expect(a.tempo).toBe(120);
+    a.dispatch({ type: 'setTempo', bpm: 133 });
+    for (const bad of [39, 241, 120.5, NaN, '120', null] as unknown[])
+      a.dispatch({ type: 'setTempo', bpm: bad as number });
+    expect([host.tempo, a.tempo, b.tempo]).toEqual([133, 133, 133]);
+  });
+});
+
 describe('the scale', () => {
   test('is song state: set by command, synced, and only known keys and modes', () => {
     const { host, a, b } = trio();

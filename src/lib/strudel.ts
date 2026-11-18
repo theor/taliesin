@@ -149,6 +149,7 @@ ${code}`,
           await Promise.all([samples('github:tidalcycles/dirt-samples'), registerSoundfonts()]);
         }
       });
+      this.repls.scheduler.setCps(this.wantedCps); // a tempo set while loading
       const ctx = getAudioContext();
       const update = () => this.audioRunning.set(ctx.state === 'running');
       ctx.addEventListener('statechange', update);
@@ -218,9 +219,19 @@ ${code}`,
     s.lastBegin += delta;
   }
   time = writable(0);
+  /** The tempo asked for, kept for a scheduler that does not exist yet (Strudel still loading). */
+  private wantedCps = 0.5;
   /** Cycles per second of the running scheduler (Strudel's default is 0.5). */
   get cps(): number {
-    return this.repls?.scheduler?.cps ?? 0.5;
+    return this.repls?.scheduler?.cps ?? this.wantedCps;
+  }
+  /**
+   * Change the tempo. Strudel's scheduler picks it up at its next tick and carries the cycle position on
+   * from there (evaluating the song never resets it).
+   */
+  setCps(cps: number) {
+    this.wantedCps = cps;
+    this.repls?.scheduler?.setCps(cps);
   }
   updateTime() {
     // return ctx.currentTime;
@@ -300,6 +311,9 @@ export const strudel = VITEST
       now: () => 0,
       start: async () => {},
       shift: () => {},
+      setCps(cps: number) {
+        (this as any).cps = cps;
+      },
       unlockAudio: async () => {},
       audioContext: () => {
         throw new Error('no audio under test');

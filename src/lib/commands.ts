@@ -59,14 +59,29 @@ export type Command =
   | { type: 'setMasterVolume'; volume: number }
   /** The key the whole song plays in (it ends up in the code: only known keys and modes). */
   | { type: 'setScale'; scaleKey: string; scaleMode: string }
+  /** The song's tempo, in whole beats per minute (`MIN_BPM`..`MAX_BPM`; a cycle is one 4-beat bar). */
+  | { type: 'setTempo'; bpm: number }
   | { type: 'transport'; action: 'toggle' | 'stop' };
 
 /** Commands that change song data (as opposed to driving the transport). */
 export type SongCommand = Exclude<Command, { type: 'transport' }>;
 export type Dispatch = (cmd: Command) => void;
 
-/** The part of the app state commands operate on. */
-export type Song = { instrumentsData: InstrumentData[]; volume: number; scale: Scale };
+/** The part of the app state commands operate on. `tempo` in BPM (absent: `DEFAULT_BPM`). */
+export type Song = {
+  instrumentsData: InstrumentData[];
+  volume: number;
+  scale: Scale;
+  tempo?: number;
+};
+
+export const MIN_BPM = 40;
+export const MAX_BPM = 240;
+export const DEFAULT_BPM = 120;
+/** A cycle is one bar of 4 beats: cycles per second for a tempo. */
+export const bpmToCps = (bpm: number) => bpm / 60 / 4;
+export const isBpm = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isInteger(v) && v >= MIN_BPM && v <= MAX_BPM;
 
 /** What applying a command needs to know about the app. */
 export type Env = {
@@ -88,7 +103,8 @@ const SONG_COMMANDS = new Set<string>([
   'addPart',
   'setLivePattern',
   'setMasterVolume',
-  'setScale'
+  'setScale',
+  'setTempo'
 ]);
 export const isSongCommand = (cmd: unknown): cmd is SongCommand =>
   typeof cmd === 'object' && cmd !== null && SONG_COMMANDS.has((cmd as Command).type);
@@ -381,6 +397,10 @@ export function applySongCommand(song: Song, cmd: SongCommand, env: Env): boolea
     case 'setScale':
       if (!KEYS.includes(cmd.scaleKey) || !MODE_NAMES.includes(cmd.scaleMode)) return false;
       song.scale = { scaleKey: cmd.scaleKey, scaleMode: cmd.scaleMode };
+      return true;
+    case 'setTempo':
+      if (!isBpm(cmd.bpm)) return false;
+      song.tempo = cmd.bpm;
       return true;
   }
 }

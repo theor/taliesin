@@ -40,6 +40,8 @@ import { WebAcoustics } from './calibration/webAcoustics';
 import {
   applySongCommand,
   isSongCommand,
+  bpmToCps,
+  DEFAULT_BPM,
   type Command,
   type Dispatch,
   type SongCommand
@@ -85,7 +87,13 @@ const config: JoinRoomConfig = { appId: 'taliesin', turnConfig };
 /** `from`: the peer that made the edit, stamped by the host when it rebroadcasts (only used to show who is editing). */
 type WireCommand = { cmd: Command; ordered: boolean; from?: string };
 /** The `'state'` message: the whole song (each part of it still goes through the reducer). */
-type SongState = { instruments: InstrumentDataJsonValue[]; volume: number; scale: Scale };
+type SongState = {
+  instruments: InstrumentDataJsonValue[];
+  volume: number;
+  scale: Scale;
+  /** BPM (absent from older hosts: the default). */
+  tempo?: number;
+};
 
 type Preset = {
   name: string;
@@ -228,7 +236,8 @@ export class AppStore {
   instrumentsData = $state({
     instrumentsData: [] as InstrumentData[],
     volume: 0.8,
-    scale: { ...DEFAULT_SCALE } as Scale
+    scale: { ...DEFAULT_SCALE } as Scale,
+    tempo: DEFAULT_BPM
   });
   serialized(): string {
     return JSON.stringify(
@@ -241,6 +250,10 @@ export class AppStore {
   /** The key the song plays in (song state: changed with `setScale`, synced like everything else). */
   get scale(): Scale {
     return this.instrumentsData.scale;
+  }
+  /** The song's tempo in BPM (song state: changed with `setTempo`; the host's scheduler plays it). */
+  get tempo(): number {
+    return this.instrumentsData.tempo ?? DEFAULT_BPM;
   }
   /**
    * The song as Strudel code: every audible instrument's live pattern, or, with `heard`, the pattern
@@ -313,7 +326,12 @@ export class AppStore {
   /** The whole song, as the `'state'` message carries it. */
   private snapshotSong(): SongState {
     const { volume, scale } = this.instrumentsData;
-    return { instruments: this.snapshotInstruments(), volume, scale: { ...scale } };
+    return {
+      instruments: this.snapshotInstruments(),
+      volume,
+      scale: { ...scale },
+      tempo: this.tempo
+    };
   }
   /**
    * Send the full instrument list to everyone. Used for structural changes (add / remove / reorder),
@@ -338,6 +356,7 @@ export class AppStore {
         start: this.logStart,
         volume: this.instrumentsData.volume,
         scale: this.instrumentsData.scale,
+        tempo: this.tempo,
         log: this.commandLog
       },
       null,
@@ -380,7 +399,8 @@ export class AppStore {
         JSON.stringify({
           instruments: this.snapshotInstruments(),
           volume: this.instrumentsData.volume,
-          scale: this.instrumentsData.scale
+          scale: this.instrumentsData.scale,
+          tempo: this.tempo
         })
       );
     } catch (e) {
@@ -397,6 +417,7 @@ export class AppStore {
       if (typeof saved.volume === 'number')
         this.applyCommand({ type: 'setMasterVolume', volume: saved.volume });
       if (saved.scale) this.applyCommand({ type: 'setScale', ...saved.scale });
+      if (saved.tempo !== undefined) this.applyCommand({ type: 'setTempo', bpm: saved.tempo });
       return this.instrumentsData.instrumentsData.length > 0;
     } catch {
       return false; // corrupt: start from the presets
@@ -422,6 +443,8 @@ export class AppStore {
         return `i:${cmd.instrumentId}`;
       case 'setMasterVolume':
         return 'm';
+      case 'setTempo':
+        return 't';
     }
   }
 
@@ -458,6 +481,8 @@ export class AppStore {
     // a slot open here that has just gone live (whoever launched it): follow the live one from now on
     if (applied && cmd.type === 'setLivePattern')
       this.cues?.followed(cmd.instrumentId, cmd.pattern);
+    // the host's scheduler plays the tempo (clients follow its transport messages)
+    if (applied && cmd.type === 'setTempo') this.transport?.setTempo(bpmToCps(this.tempo));
     return applied;
   }
   private applySong(cmd: SongCommand): boolean {
@@ -489,6 +514,7 @@ export class AppStore {
     const { room: r } = this.init(host, roomId, room);
     this.room = r;
     this.transport = new Transport(this.room, host, player);
+    this.transport.setTempo(bpmToCps(this.tempo)); // a restored song's
     const transport = this.transport;
     this.cues = new PatternCues(
       this.room,
@@ -558,6 +584,7 @@ export class AppStore {
       }
       if ('volume' in song) this.applyCommand({ type: 'setMasterVolume', volume: song.volume });
       if ('scale' in song) this.applyCommand({ type: 'setScale', ...song.scale });
+      if ('tempo' in song) this.applyCommand({ type: 'setTempo', bpm: song.tempo as number });
       this.commandLog = [];
       this.logStart = this.snapshotInstruments();
     });

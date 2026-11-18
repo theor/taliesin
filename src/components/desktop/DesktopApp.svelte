@@ -67,7 +67,14 @@
     >
     <div class="flex-1"></div>
     <div class="flex items-center gap-2">
-      <Transport {playing} {position} {dispatch} scale={store.scale} size="md" />
+      <Transport
+        {playing}
+        {position}
+        {dispatch}
+        scale={store.scale}
+        tempo={store.tempo}
+        size="md"
+      />
     </div>
     {#if needsTap}
       <button
