@@ -7,7 +7,7 @@
   import type { Dispatch } from '$lib/commands';
   import AddInstrumentModal from './AddInstrumentModal.svelte';
 
-  /** The desktop sidebar: one tile per instrument, the mixer, and "Add". (Phones use `MobileNav`.) */
+  /** The desktop sidebar: one tile per instrument, the mixer, and "Add". (Phones use `phone/PhoneApp`.) */
   let {
     selectedIndex = $bindable(),
     dispatch

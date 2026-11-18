@@ -1,55 +1,75 @@
-import { makePartData, getPartTypeAndData } from "$lib/Store.svelte";
-import { Instrument,getPart,type Constructor,type InputView, type InstrumentData } from "$lib/instruments";
-import { InstrumentPart, MonoSequence, PartEffects, PartFilter, PartOctave, PartSteps, PartVoice, PartFm, PartEnvelope, InstrumentPartTyped, type InstrumentPartData } from "$lib/parts.svelte";
-import { Sequencer, MonoSequenceSequencer } from "$lib/sequencer";
-import { degreeName } from "$lib/scale";
+import { Instrument, type InputView, type InstrumentData } from '$lib/instruments';
+import {
+  getPart,
+  makePartData,
+  MonoSequence,
+  PartArpeggiator,
+  PartChords,
+  PartEffects,
+  PartEnvelope,
+  PartFilter,
+  PartFm,
+  PartOctave,
+  PartSteps,
+  PartVoice,
+  type InstrumentPartData,
+  type Scale
+} from '$lib/parts.svelte';
+import { Sequencer, MonoSequenceSequencer } from '$lib/sequencer';
+import { DEGREES_PER_OCTAVE, degreeName } from '$lib/scale';
 
-
+/** A melodic instrument: one scale degree per step, with optional chords, arpeggio and sound design parts. */
 export class PianoScale extends Instrument {
-    public randomize(data: InstrumentData): InstrumentData {
-      const part = getPart(MonoSequence, data)!;
-      const length = this.getLength(data);
-
-      part.notes = Array.from({length: length.stepsPerMeasure * length.measures}, (_, i) => {
-        return Math.floor(Math.random() * 7);
-      });
-      // const notes = part.data.notes.map(() => {
-      //   return Math.floor(Math.random() * 7);
-      // });
-      // part.data.notes = notes;
-      return data;
-    }
-    protected generate_(data: InstrumentData): string {
-      // an instrument saved before voices existed has no PartVoice: it keeps the sawtooth
-      const length = this.getLength(data);
-      const gen = (x: Constructor<InstrumentPartTyped<any>>) => {
-        const p = getPartTypeAndData(x, data);
-        return p.data ? p.part.generate(data, { ...p.data, partName: x.name }, length) : '';
-      };
-      return `${gen(PartVoice) || '.sound("sawtooth")'}${gen(PartFm)}${gen(PartEnvelope)}`;
-    }
-    override name: string = 'PianoScale';
-    /** One pad per scale degree to play the melody in. */
-    override views: InputView[] = ['grid', 'record'];
-    override trackLabel(track: string, scale: { scaleKey: string; scaleMode: string }): string {
-      return degreeName(scale.scaleKey, scale.scaleMode, Number(track));
-    }
-    // notes = [1,2,3,4,5,6,7].map(x => x.toString());
-    override createData_(): InstrumentPartData[] {
-      return [
-        makePartData(PartVoice),
-        makePartData(PartEnvelope),
-        makePartData(PartOctave, {octave:4}),
-        makePartData(MonoSequence, {notes:[1, 2, 3, undefined, 4, 5, 3, undefined]}),
-        makePartData(PartSteps, {stepsPerMeasure: 8, measures: 2, oddSignature: false}),
-        makePartData(PartEffects, { reverb: .2,  })
-      ];
-    }
-     
-    constructor() {
-      super();
-      this.sequencer = new Sequencer(this,new MonoSequenceSequencer(), MonoSequence);
-
-    }
+  readonly name = 'PianoScale';
+  readonly input = MonoSequence;
+  override readonly addableParts = [
+    PartSteps,
+    PartOctave,
+    PartChords,
+    PartArpeggiator,
+    PartVoice,
+    PartFm,
+    PartEnvelope,
+    PartFilter,
+    PartEffects
+  ];
+  /** One pad per scale degree to play the melody in. */
+  override views: InputView[] = ['grid', 'record'];
+  constructor() {
+    super();
+    this.sequencer = new Sequencer(new MonoSequenceSequencer(), MonoSequence);
   }
-  
+
+  /**
+   * A random melody on the grid's rows inside one octave: the top row (the octave above) is left out,
+   * so a random tune stays around the key's root.
+   */
+  randomize(data: InstrumentData): InstrumentData {
+    const part = getPart(MonoSequence, data);
+    if (!part) return data;
+    const rows = MonoSequenceSequencer.degrees.filter((d) => d < DEGREES_PER_OCTAVE);
+    const length = this.getLength(data);
+    part.notes = Array.from(
+      { length: length.stepsPerMeasure * length.measures },
+      () => rows[Math.floor(Math.random() * rows.length)]
+    );
+    return data;
+  }
+  /** An instrument saved before voices existed has no PartVoice: it keeps the sawtooth. */
+  protected override generateExtra(data: InstrumentData): string {
+    return getPart(PartVoice, data) ? '' : '.sound("sawtooth")';
+  }
+  override trackLabel(track: string, scale: Scale): string {
+    return degreeName(scale.scaleKey, scale.scaleMode, Number(track));
+  }
+  protected createParts(): InstrumentPartData[] {
+    return [
+      makePartData(PartVoice),
+      makePartData(PartEnvelope),
+      makePartData(PartOctave, { octave: 4 }),
+      makePartData(MonoSequence, { notes: [1, 2, 3, undefined, 4, 5, 3, undefined] }),
+      makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2, oddSignature: false }),
+      makePartData(PartEffects, { reverb: 0.2 })
+    ];
+  }
+}

@@ -216,11 +216,13 @@ ${code}`,
 
   stop() {
     console.log('Strudel stopped!');
-    this.repls.stop();
+    this.repls?.stop();
     this.isPlaying.set(false);
   }
   // get isPlaying(): boolean { return repls.state.started}
   async toggle() {
+    // a tap on Play can come before Strudel has loaded (a fresh page): wait instead of throwing
+    await this.initPromise;
     console.log('Strudel toggled!', this.repls);
     if (this.repls.state.started) {
       this.repls.stop();

@@ -98,7 +98,7 @@ describe('SequencerView', () => {
   test('a drag that starts on a lit cell erases everything it covers', async () => {
     const { dispatch, cell, gesture } = mount();
     await gesture([[4, 0], [5, 0], [6, 0]], false); // the kick is on at step 4
-    expect(cell(5, 0).firstElementChild).toHaveClass('preset-gradient'); // erase preview
+    expect(cell(5, 0).firstElementChild).toHaveClass('cell-erasing'); // erase preview
     await gesture([], true);
     expect(dispatch.mock.calls[0][0]).toMatchObject({
       track: 0,
@@ -116,7 +116,7 @@ describe('SequencerView', () => {
     const { dispatch, cell, gesture } = mount();
     await gesture([[1, 1], [2, 1], [3, 1]], false);
     expect(dispatch).not.toHaveBeenCalled();
-    expect(cell(2, 1).firstElementChild).toHaveClass('preset-filled-secondary-500'); // preview colour
+    expect(cell(2, 1).firstElementChild).toHaveClass('cell-preview'); // preview colour
   });
 
   test('the view never mutates the instrument itself', async () => {
@@ -134,8 +134,8 @@ describe('SequencerView', () => {
 
   test('renders the cells that are on', () => {
     const { cell } = mount();
-    expect(cell(0, 0).firstElementChild).toHaveClass('preset-filled-primary-500'); // kick on step 0
-    expect(cell(1, 0).firstElementChild).toHaveClass('preset-outlined-primary-500'); // off
+    expect(cell(0, 0).firstElementChild).toHaveClass('cell-on'); // kick on step 0
+    expect(cell(1, 0).firstElementChild).toHaveClass('cell-off'); // off
   });
 
   describe('with a finger (hold to paint, otherwise the page scrolls)', () => {

@@ -1,0 +1,321 @@
+<script lang="ts">
+  import { store, TrackState } from '$lib';
+  import type { Dispatch } from '$lib/commands';
+  import { randomizeCommands, setTrackStateCommand } from '$lib/commandBuilders';
+  import { trackColor, trackInitials } from '$lib/trackColors';
+  import {
+    ChevronLeft,
+    Dices,
+    Headphones,
+    LayoutGrid,
+    ListMusic,
+    Pause,
+    Play,
+    SlidersVertical,
+    Volume2,
+    VolumeX,
+    Waves
+  } from '@lucide/svelte';
+  import { untrack, type Snippet } from 'svelte';
+  import InputViewSwitcher from '../../instruments/InputViewSwitcher.svelte';
+  import AddInstrumentModal from '../AddInstrumentModal.svelte';
+  import InstrumentMenu from '../InstrumentMenu.svelte';
+  import SettingsPanel from '../SettingsPanel.svelte';
+  import ShareButton from '../ShareButton.svelte';
+  import PhoneMixer from './PhoneMixer.svelte';
+  import QuickRack from './QuickRack.svelte';
+  import RackModules from './RackModules.svelte';
+  import SessionView from './SessionView.svelte';
+
+  /**
+   * The phone layout: four screens (session, edit, rack, mixer) behind a bottom tab bar within thumb's
+   * reach. Desktop keeps its own layout; `+page` picks one.
+   */
+  let {
+    selectedIndex = $bindable(),
+    dispatch,
+    position,
+    playing,
+    now,
+    isHost,
+    roomId,
+    needsTap,
+    onTap,
+    hostOnly = false,
+    debug
+  }: {
+    selectedIndex: number;
+    dispatch: Dispatch;
+    position: number;
+    playing: boolean;
+    now: () => number;
+    isHost: boolean;
+    roomId: string;
+    /** A guest whose audio is still locked. */
+    needsTap: boolean;
+    onTap: () => void;
+    /** A guest in a jam where only the host makes sound. */
+    hostOnly?: boolean;
+    debug?: Snippet;
+  } = $props();
+
+  type Screen = 'session' | 'edit' | 'rack' | 'mixer';
+  let screen = $state<Screen>('session');
+  let addOpen = $state(false);
+
+  const song = store.instrumentsData;
+  const current = $derived(
+    selectedIndex >= 0 ? song.instrumentsData[selectedIndex] : song.instrumentsData[0]
+  );
+  const currentIndex = $derived(current ? song.instrumentsData.indexOf(current) : -1);
+  const color = $derived(trackColor(currentIndex));
+  const hasInstrument = $derived(!!current);
+
+  function open(index: number, to: Screen = 'edit') {
+    selectedIndex = index;
+    screen = to;
+  }
+  // an instrument added from the dialog opens straight away (not ones added by others)
+  let countAtOpen: number | undefined;
+  $effect(() => {
+    if (addOpen) {
+      countAtOpen = untrack(() => song.instrumentsData.length);
+    } else if (countAtOpen !== undefined) {
+      if (untrack(() => song.instrumentsData.length) > countAtOpen) screen = 'edit';
+      countAtOpen = undefined;
+    }
+  });
+  // the selected instrument was removed (here or by someone else): back to the list
+  $effect(() => {
+    if (!hasInstrument && (screen === 'edit' || screen === 'rack')) screen = 'session';
+  });
+
+  const KIND: Record<string, string> = { Drum: 'Drums', PianoScale: 'Synth' };
+  const tabs = [
+    { id: 'session', label: 'Session', icon: ListMusic },
+    { id: 'edit', label: 'Edit', icon: LayoutGrid },
+    { id: 'rack', label: 'Rack', icon: Waves },
+    { id: 'mixer', label: 'Mixer', icon: SlidersVertical }
+  ] as const;
+  const iconButton =
+    'bg-surface-900 border-surface-700 flex size-11 flex-none items-center justify-center rounded-xl border';
+</script>
+
+<AddInstrumentModal bind:open={addOpen} bind:selectedIndex {dispatch} />
+
+<div class="flex min-h-dvh flex-col pt-[env(safe-area-inset-top)]" data-testid="phone-app">
+  <main class="flex flex-1 flex-col pb-40">
+    {#if screen === 'session'}
+      <header class="flex items-center gap-3 px-4 pt-3.5 pb-2.5">
+        <div class="flex flex-1 flex-col">
+          <span class="label-caps">{isHost ? 'Hosting jam' : 'Jam'}</span>
+          <span class="font-mono text-lg font-semibold tracking-wider" data-testid="room-code"
+            >{roomId}</span
+          >
+        </div>
+        <span
+          class="bg-surface-900 border-surface-700 flex h-11 items-center gap-2 rounded-xl border px-3 text-sm"
+          title={store.status()}
+          aria-label="{store.peers.length + 1} here"
+        >
+          <span
+            class="size-2 rounded-full {store.peers.length ? 'bg-primary-500' : 'bg-surface-500'}"
+          ></span>
+          {store.peers.length + 1}
+        </span>
+        <ShareButton iconOnly />
+      </header>
+      <SessionView
+        song={store.instrumentsData}
+        {dispatch}
+        {position}
+        {playing}
+        {selectedIndex}
+        activity={store.activity}
+        onSelect={(i) => open(i)}
+        onAdd={() => (addOpen = true)}
+      >
+        {#snippet status()}
+          <span
+            class="size-2 rounded-full {store.peers.length ? 'bg-primary-500' : 'bg-surface-500'}"
+          ></span>
+          {#if hostOnly}
+            <span data-testid="host-only-note">Sound from host · following the playhead</span>
+          {:else}
+            {isHost ? "You're hosting" : 'Joined'} · {store.peers.length === 0
+              ? 'waiting for others'
+              : `${store.peers.length} other${store.peers.length > 1 ? 's' : ''} here`}
+          {/if}
+        {/snippet}
+      </SessionView>
+      {#if debug}<div class="space-y-2 px-4 pt-6">{@render debug()}</div>{/if}
+    {:else if screen === 'mixer'}
+      <header class="flex items-center gap-3 px-5 pt-4 pb-3">
+        <h1 class="flex-1 text-[22px] font-bold">Mixer</h1>
+        {@render playButton()}
+      </header>
+      <PhoneMixer song={store.instrumentsData} {dispatch} />
+      <section
+        class="bg-surface-900 border-surface-700 mx-4 mt-4 space-y-2 rounded-2xl border p-3"
+        aria-label="Sound settings"
+      >
+        <SettingsPanel {isHost} />
+      </section>
+    {:else if current}
+      <!-- the instrument's colour becomes the primary colour, so its steps, knobs and buttons wear it -->
+      <div
+        class="flex flex-col"
+        style:--color-primary-500={color}
+      >
+        <header class="flex items-center gap-2.5 px-4 pt-3.5 pb-2">
+          <button
+            class={iconButton}
+            aria-label="Back to tracks"
+            onclick={() => (screen = 'session')}><ChevronLeft size={20} /></button
+          >
+          <span
+            class="flex size-9 flex-none items-center justify-center rounded-lg text-xs font-bold text-[#0B0C0F] {current.state ===
+            TrackState.Muted
+              ? 'opacity-40'
+              : ''}"
+            style:background={color}>{trackInitials(current.name)}</span
+          >
+          <div class="flex min-w-0 flex-1 flex-col">
+            <h1 class="truncate text-lg leading-tight font-bold">{current.name}</h1>
+            <span class="text-surface-300 truncate text-xs"
+              >{KIND[current.instrumentName] ?? current.instrumentName} · {store.scale.scaleKey}
+              {store.scale.scaleMode}{current.state === TrackState.Muted
+                ? ' · muted'
+                : current.state === TrackState.Solo
+                  ? ' · solo'
+                  : ''}</span
+            >
+          </div>
+          {@render playButton()}
+          <InstrumentMenu instrumentData={current} {dispatch} buttonClass={iconButton}>
+            {#snippet extra(close)}
+              <button
+                class="btn preset-tonal justify-start"
+                onclick={() => {
+                  randomizeCommands(current).forEach((c) => dispatch(c));
+                  close();
+                }}><Dices size={16} /> Randomize</button
+              >
+              <button
+                class="btn preset-tonal justify-start"
+                aria-pressed={current.state === TrackState.Muted}
+                onclick={() => {
+                  dispatch(setTrackStateCommand(current, TrackState.Muted));
+                  close();
+                }}
+                ><VolumeX size={16} />
+                {current.state === TrackState.Muted ? 'Unmute' : 'Mute'}</button
+              >
+              <button
+                class="btn preset-tonal justify-start"
+                aria-pressed={current.state === TrackState.Solo}
+                onclick={() => {
+                  dispatch(setTrackStateCommand(current, TrackState.Solo));
+                  close();
+                }}
+                ><Headphones size={16} />
+                {current.state === TrackState.Solo ? 'Unsolo' : 'Solo'}</button
+              >
+            {/snippet}
+          </InstrumentMenu>
+        </header>
+
+        <div class="flex gap-1.5 overflow-x-auto px-4 pb-3" role="group" aria-label="Instruments">
+          {#each store.instrumentsData.instrumentsData as data, index (data.id)}
+            <button
+              class="flex h-11 flex-none items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold {index ===
+              currentIndex
+                ? 'bg-surface-800 border-surface-500'
+                : 'border-surface-700'}"
+              aria-current={index === currentIndex}
+              title={data.name}
+              onclick={() => (selectedIndex = index)}
+            >
+              <span class="size-2.5 rounded-sm" style:background={trackColor(index)}></span>
+              {data.name}
+            </button>
+          {/each}
+        </div>
+
+        {#if screen === 'edit'}
+          <div class="space-y-4 px-4">
+            <InputViewSwitcher
+              instrumentData={current}
+              index={currentIndex}
+              {dispatch}
+              {position}
+              {playing}
+              {now}
+              maxVisibleSteps={16}
+            />
+            <QuickRack instrumentData={current} {dispatch} onOpenRack={() => (screen = 'rack')} />
+          </div>
+        {:else}
+          <div class="flex items-center justify-between px-5 pb-2">
+            <h2 class="text-[15px] font-bold">Rack</h2>
+            <span class="text-surface-300 text-xs">tap a module's name to fold it</span>
+          </div>
+          <div class="px-4">
+            <RackModules instrumentData={current} {dispatch} />
+          </div>
+        {/if}
+      </div>
+    {/if}
+  </main>
+
+  <nav
+    class="bg-surface-950/95 border-surface-700 fixed inset-x-0 bottom-0 z-40 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur"
+    aria-label="Screens"
+  >
+    {#if needsTap}
+      <button class="btn preset-filled-primary-500 w-full rounded-none py-3" onclick={onTap}>
+        <Volume2 size={20} /> Tap to hear
+      </button>
+    {/if}
+    <div class="grid grid-cols-4 px-2 pt-1.5 pb-3">
+      {#each tabs as tab (tab.id)}
+        {@const Icon = tab.icon}
+        {@const disabled = (tab.id === 'edit' || tab.id === 'rack') && !hasInstrument}
+        <button
+          class="flex h-13 flex-col items-center justify-center gap-0.5 text-[11px] font-semibold disabled:opacity-30 {screen ===
+          tab.id
+            ? 'text-primary-500'
+            : 'text-surface-300'}"
+          aria-current={screen === tab.id ? 'page' : undefined}
+          {disabled}
+          onclick={() => (screen = tab.id)}><Icon size={22} />{tab.label}</button
+        >
+      {/each}
+    </div>
+  </nav>
+</div>
+
+{#snippet playButton()}
+  <button
+    class="flex size-11 flex-none items-center justify-center rounded-xl {playing
+      ? 'bg-surface-100 text-surface-950'
+      : 'bg-primary-500 text-primary-contrast-500'}"
+    aria-label={playing ? 'Pause' : 'Play'}
+    onclick={() => dispatch({ type: 'transport', action: 'toggle' })}
+  >
+    {#if playing}<Pause size={20} fill="currentColor" />{:else}<Play
+        size={20}
+        fill="currentColor"
+      />{/if}
+  </button>
+{/snippet}
+
+<style>
+  .label-caps {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-surface-300);
+  }
+</style>

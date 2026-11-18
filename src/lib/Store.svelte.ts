@@ -4,7 +4,6 @@ import { joinRoom as joinRoomMqtt } from '@trystero-p2p/mqtt';
 import { adaptRoom, type ActionSender, type Room } from './netRoom';
 import type { JsonValue } from 'trystero';
 import {
-  getPart,
   newId,
   type Constructor,
   type Instrument,
@@ -17,21 +16,21 @@ import { Drum } from './instruments/Drum';
 import type { Component } from 'svelte';
 import { DrumIcon, KeyboardMusic, Music, Piano } from '@lucide/svelte';
 import {
-  PartEffects,
-  type InstrumentPart,
+  DEFAULT_SCALE,
+  getPartType,
+  makePartData,
   MonoSequence,
-  PartSteps,
-  PartFilter,
-  PartOctave,
-  PartVoice,
-  PartFm,
-  PartEnvelope,
-  PartChords,
   PartArpeggiator,
-  PartTrackNotes,
+  PartChords,
+  PartEffects,
+  PartEnvelope,
+  PartFilter,
+  PartFm,
+  PartOctave,
+  PartSteps,
+  PartVoice,
   type InstrumentPartData,
-  InstrumentPartTyped,
-  type PartType
+  type Scale
 } from './parts.svelte';
 import { VITEST, strudel } from './strudel';
 import { Transport, type PlayerLike } from './transport.svelte';
@@ -41,6 +40,8 @@ import { WebAcoustics } from './calibration/webAcoustics';
 import { applySongCommand, isSongCommand, type Command, type SongCommand } from './commands';
 
 export const mixerIndex = -1;
+/** Most instruments a song received from the network can have. */
+const MAX_INSTRUMENTS = 64;
 
 /** Which instruments make sound: any soloed ones alone, otherwise everything that is not muted. */
 export function audibleInstruments(all: InstrumentData[]): InstrumentData[] {
@@ -73,75 +74,14 @@ const config: JoinRoomConfig = { appId: 'taliesin', turnConfig };
 /** `ordered`: sent by the host, which is the single sequencer of instrument commands. */
 /** `from`: the peer that made the edit, stamped by the host when it rebroadcasts (only used to show who is editing). */
 type WireCommand = { cmd: Command; ordered: boolean; from?: string };
+/** The `'state'` message: the whole song (each part of it still goes through the reducer). */
+type SongState = { instruments: InstrumentDataJsonValue[]; volume: number; scale: Scale };
 
 type Preset = {
   name: string;
   instrument: Constructor<Instrument>;
   parts: InstrumentPartData[];
 };
-
-export const parts: { part: Constructor<InstrumentPart>; partName: string }[] = [
-  { partName: PartEffects.name, part: PartEffects },
-  { partName: PartFilter.name, part: PartFilter },
-  { partName: PartSteps.name, part: PartSteps },
-  { partName: PartChords.name, part: PartChords },
-  { partName: PartArpeggiator.name, part: PartArpeggiator },
-  { partName: MonoSequence.name, part: MonoSequence },
-  { partName: PartOctave.name, part: PartOctave },
-  { partName: PartVoice.name, part: PartVoice },
-  { partName: PartFm.name, part: PartFm },
-  { partName: PartEnvelope.name, part: PartEnvelope },
-  { partName: PartTrackNotes.name, part: PartTrackNotes }
-];
-export const partMap: { [key: string]: InstrumentPart } = parts.reduce(
-  (acc, p) => {
-    acc[p.partName] = new p.part();
-    return acc;
-  },
-  {} as { [key: string]: InstrumentPart }
-);
-
-export type PartTypeAndData<T extends InstrumentPartTyped<any>> = { part: T; data: PartType<T> };
-export function findPartTypeAndData<T extends InstrumentPartTyped<any>>(
-  data: InstrumentData,
-  f: (x: InstrumentPart) => boolean
-): PartTypeAndData<T> | undefined {
-  // Constructor<InstrumentPart> | undefined {
-  for (const p of data.parts) {
-    const partInst = partMap[p.partName] as T;
-    if (partInst && f(partInst)) {
-      return { part: partInst, data: p as PartType<T> };
-    }
-  }
-  return undefined;
-}
-
-export function getPartTypeAndData<T extends InstrumentPartTyped<any>>(
-  partType: Constructor<T>,
-  data: InstrumentData
-): PartTypeAndData<T> {
-  // Constructor<InstrumentPart> | undefined {
-  const part = partMap[partType.name] as T;
-  if (!part) {
-    console.error('Part type not found:', partType.name);
-    return { part: undefined!, data: undefined! };
-  }
-  const partData = getPart(partType, data);
-  return { part, data: partData! };
-}
-export function getPartType(name: string): InstrumentPart {
-  // Constructor<InstrumentPart> | undefined {
-  // return part.find((p) => p.part.name === name)?.part;
-  return partMap[name];
-}
-export function makePartData<T extends InstrumentPartTyped<any>>(
-  part: Constructor<T>,
-  data?: Partial<Omit<PartType<T>, 'partName'>>
-): InstrumentPartData {
-  const partName = part.name;
-  const partInstance = getPartType(partName);
-  return { ...partInstance.createData(data), partName };
-}
 
 export const presets: Preset[] = [
   {
@@ -174,7 +114,9 @@ export const presets: Preset[] = [
       makePartData(PartEnvelope, { attack: 0.4, decay: 0.3, sustain: 0.8, release: 1 }),
       makePartData(PartChords, { enabled: true }),
       makePartData(PartEffects, { reverb: 0.6 }),
-      makePartData(MonoSequence, { notes: [1, undefined, undefined, undefined, 4, undefined, undefined, undefined] }),
+      makePartData(MonoSequence, {
+        notes: [1, undefined, undefined, undefined, 4, undefined, undefined, undefined]
+      }),
       makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
       makePartData(PartOctave, { octave: 3 })
     ]
@@ -211,7 +153,9 @@ export const presets: Preset[] = [
       makePartData(PartFm, { index: 6, ratio: 3.5, decay: 0.8 }),
       makePartData(PartEnvelope, { attack: 0.005, decay: 1.2, sustain: 0, release: 0.8 }),
       makePartData(PartEffects, { reverb: 0.5 }),
-      makePartData(MonoSequence, { notes: [1, undefined, 5, undefined, 3, undefined, 6, undefined] }),
+      makePartData(MonoSequence, {
+        notes: [1, undefined, 5, undefined, 3, undefined, 6, undefined]
+      }),
       makePartData(PartSteps, { stepsPerMeasure: 8, measures: 2 }),
       makePartData(PartOctave, { octave: 5 })
     ]
@@ -271,7 +215,11 @@ export class AppStore {
     this.instrumentsData.instrumentsData = JSON.parse(json) as InstrumentDataJsonValue[];
     this.broadcastState();
   }
-  instrumentsData = $state({ instrumentsData: [] as InstrumentData[], volume: 0.8 });
+  instrumentsData = $state({
+    instrumentsData: [] as InstrumentData[],
+    volume: 0.8,
+    scale: { ...DEFAULT_SCALE } as Scale
+  });
   serialized(): string {
     return JSON.stringify(
       this.instrumentsData.instrumentsData,
@@ -280,11 +228,15 @@ export class AppStore {
       2
     );
   }
+  /** The key the song plays in (song state: changed with `setScale`, synced like everything else). */
+  get scale(): Scale {
+    return this.instrumentsData.scale;
+  }
   code = () => {
     const code = audibleInstruments(this.instrumentsData.instrumentsData)
       .map((i) => {
-        const instr = getInstrument(i);
-        return instr ? `$: ${instr.generate(i)}` : '';
+        const code = getInstrument(i)?.generate(i, this.scale);
+        return code ? `$: ${code}` : ''; // an instrument with nothing to play is left out
       })
       .join('\n')
       .replace(/[\r\n]{2,}/g, '\n\n');
@@ -321,15 +273,25 @@ export class AppStore {
     if (!this.peers.includes(peerId)) this.peers.push(peerId);
     this.transport.peerJoined(peerId);
     // Both sides get onPeerJoin for each other, so the host always syncs a (re)connecting peer.
-    if (this.host) this.sendState(this.snapshotInstruments(), peerId);
+    if (this.host) {
+      this.sendState(this.snapshotSong(), peerId);
+    }
   }
+  /** Client: the peer we take the song and the command order from (the first to send us the song). */
+  private hostPeerId = '';
   peerLeft(peerId: string) {
     console.log('peer left', peerId);
+    if (peerId === this.hostPeerId) this.hostPeerId = ''; // a host that comes back has a new id
     this.peers = this.peers.filter((p) => p !== peerId);
   }
 
   private snapshotInstruments(): InstrumentDataJsonValue[] {
     return $state.snapshot(this.instrumentsData.instrumentsData) as InstrumentDataJsonValue[];
+  }
+  /** The whole song, as the `'state'` message carries it. */
+  private snapshotSong(): SongState {
+    const { volume, scale } = this.instrumentsData;
+    return { instruments: this.snapshotInstruments(), volume, scale: { ...scale } };
   }
   /**
    * Send the full instrument list to everyone. Used for structural changes (add / remove / reorder),
@@ -337,9 +299,9 @@ export class AppStore {
    */
   private broadcastState() {
     // not wired yet while the constructor seeds the initial presets
-    this.sendState?.(this.snapshotInstruments());
+    this.sendState?.(this.snapshotSong());
   }
-  sendState: ActionSender<InstrumentDataJsonValue[]>;
+  sendState: ActionSender<SongState>;
   sendCommand: ActionSender<WireCommand>;
 
   /** Every command applied here, in order: a recording that can be replayed through `dispatch`. */
@@ -350,7 +312,12 @@ export class AppStore {
   /** A bug report: the starting song and every command since, as JSON. Replay through `dispatch`. */
   exportLog(): string {
     return JSON.stringify(
-      { start: this.logStart, volume: this.instrumentsData.volume, log: this.commandLog },
+      {
+        start: this.logStart,
+        volume: this.instrumentsData.volume,
+        scale: this.instrumentsData.scale,
+        log: this.commandLog
+      },
       null,
       1
     );
@@ -390,7 +357,8 @@ export class AppStore {
         this.storageKey,
         JSON.stringify({
           instruments: this.snapshotInstruments(),
-          volume: this.instrumentsData.volume
+          volume: this.instrumentsData.volume,
+          scale: this.instrumentsData.scale
         })
       );
     } catch (e) {
@@ -403,9 +371,10 @@ export class AppStore {
       const saved = JSON.parse(this.storage?.getItem(this.storageKey) ?? 'null');
       if (!Array.isArray(saved?.instruments)) return false;
       for (const instrument of saved.instruments)
-        this.applyCommand({ type: 'addInstrument', instrument: withPartDefaults(instrument) });
+        this.applyCommand({ type: 'addInstrument', instrument });
       if (typeof saved.volume === 'number')
         this.applyCommand({ type: 'setMasterVolume', volume: saved.volume });
+      if (saved.scale) this.applyCommand({ type: 'setScale', ...saved.scale });
       return this.instrumentsData.instrumentsData.length > 0;
     } catch {
       return false; // corrupt: start from the presets
@@ -465,34 +434,15 @@ export class AppStore {
   private applyCommand(cmd: SongCommand): boolean {
     return applySongCommand(this.instrumentsData, cmd, {
       sequencerFor: (data) => getInstrument(data)?.sequencer,
-      isKnownInstrument: (name) => name in instrumentMap
+      instrumentInput: (name) =>
+        Object.hasOwn(instrumentMap, name) ? instrumentMap[name].input.id : undefined,
+      partType: getPartType,
+      canAddPart: (name, partName) =>
+        Object.hasOwn(instrumentMap, name) &&
+        instrumentMap[name].addableParts.some((p) => p.id === partName)
     });
   }
 
-  // deserializeInstrumentData(data: InstrumentDataJsonValue): InstrumentData {
-  //   let res: InstrumentData = {...data, parts: data.parts.map(part => {
-  //       const type = getPartType(part.name);
-  //       if (!type) {
-  //         console.error('Unknown instrument part type', data.parts);
-  //         return undefined!; // Fallback to original data
-  //       }
-  //       let newPart = new type(data);
-  //       console.log('deserializeInstrumentData', part, newPart);
-  //       // newPart.assign(part as InstrumentPart);
-  //       return newPart;
-  //   }).filter(x => x)};
-  //   // console.log('deserializeInstrumentData', data, res);
-  //   return res;
-
-  // }
-  // serializeInstrumentData(dataOrReactive: InstrumentData): InstrumentDataJsonValue {
-  //   const data = $state.snapshot(dataOrReactive) as InstrumentData;
-  //   console.log('serializeInstrumentData', data);
-  //   return {
-  //     ...data,
-  //     parts: data.parts.map((part, index) => {return {...dataOrReactive.parts[index].serialize(), name: dataOrReactive.parts[index].constructor.name}})
-  //   };
-  // }
   /**
    * @param room optional pre-built room (tests inject a fake one); defaults to a real Trystero room.
    * @param player optional audio player (tests inject a fake one); defaults to the Strudel singleton.
@@ -518,7 +468,7 @@ export class AppStore {
       this.transport
     );
 
-    const [sendState, onReceiveState] = this.room.makeAction<InstrumentDataJsonValue[]>('state');
+    const [sendState, onReceiveState] = this.room.makeAction<SongState>('state');
     // Command is JSON, but its union type is wider than Trystero's payload constraint allows
     const [sendCommand, onReceiveCommand] = this.room.makeAction<any>('cmd') as unknown as [
       ActionSender<WireCommand>,
@@ -533,6 +483,7 @@ export class AppStore {
     onReceiveCommand((msg, peerId) => {
       if (!isSongCommand(msg?.cmd)) return;
       if (this.host ? msg.ordered : !msg.ordered) return;
+      if (!this.host && peerId !== this.hostPeerId) return; // "ordered" by someone who is not our host
       if (!this.applyCommand(msg.cmd)) return;
       this.commandLog.push({ cmd: msg.cmd, origin: 'remote' });
       // the host knows who sent it; a client is told by the host (and ignores its own edits coming back)
@@ -548,10 +499,23 @@ export class AppStore {
     this.room.onPeerLeave((peerId) => this.peerLeft(peerId));
 
     // Full state: sent by the host when a peer connects (and by cycle()). Everything after that is commands.
-    onReceiveState((data, peerId) => {
-      console.log('receiveState', data, peerId);
-      if (!Array.isArray(data)) return;
-      this.instrumentsData.instrumentsData = data.map((i) => ({ ...i, id: i.id ?? newId() }));
+    // Only clients take it, only from their host, and only what the reducer accepts.
+    onReceiveState((data: SongState | InstrumentDataJsonValue[], peerId) => {
+      // older hosts send just the instrument list
+      const song = Array.isArray(data) ? { instruments: data } : data;
+      if (this.host || !Array.isArray(song?.instruments)) return;
+      // the host sends the song first thing when we meet, so the first peer to send one is the host
+      // (until it leaves); anyone else sending a whole song is ignored
+      if (this.hostPeerId && peerId !== this.hostPeerId) return;
+      this.hostPeerId = peerId;
+      this.instrumentsData.instrumentsData = [];
+      for (const instrument of song.instruments.slice(0, MAX_INSTRUMENTS)) {
+        // instruments from older peers have no id yet
+        const id = typeof instrument?.id === 'string' && instrument.id ? instrument.id : newId();
+        this.applyCommand({ type: 'addInstrument', instrument: { ...instrument, id } as never });
+      }
+      if ('volume' in song) this.applyCommand({ type: 'setMasterVolume', volume: song.volume });
+      if ('scale' in song) this.applyCommand({ type: 'setScale', ...song.scale });
       this.commandLog = [];
       this.logStart = this.snapshotInstruments();
     });
@@ -583,18 +547,6 @@ function safeLocalStorage(): Pick<Storage, 'getItem' | 'setItem'> | undefined {
   } catch {
     return undefined;
   }
-}
-/**
- * Fill in the fields a saved part is missing (it was saved before they existed) from the part's defaults.
- * `setPartFields` only changes fields a part already has, so without this the new controls could not touch them.
- */
-export function withPartDefaults<T extends InstrumentData>(instrument: T): T {
-  if (!Array.isArray(instrument?.parts)) return instrument;
-  const parts = instrument.parts.map((p) => {
-    const part = p && typeof p === 'object' ? partMap[p.partName] : undefined;
-    return part ? { ...part.createData(), ...p } : p;
-  });
-  return { ...instrument, parts };
 }
 export let store: AppStore = undefined!;
 /**
@@ -653,31 +605,24 @@ export function getInstrument(data: InstrumentData): Instrument | undefined {
     // throw new Error(`Instrument ${name} not found`);
   }
 }
+/** The instrument object of a kind (its class). */
+export function instrumentOf(kind: Constructor<Instrument>): Instrument {
+  const instr = Object.values(instrumentMap).find((i) => i instanceof kind);
+  if (!instr) throw new Error(`Unknown instrument ${kind.name}`);
+  return instr;
+}
+/** A new instrument of the given kind, with `parts` replacing (or added to) its default parts. */
 export function createInstrument<TInstr extends Instrument>(
-  n: Constructor<TInstr>,
-  d?: InstrumentPartData[],
+  kind: Constructor<TInstr>,
+  parts?: InstrumentPartData[],
   name?: string
 ): InstrumentData {
-  console.log('createInstrument', n, d);
-  var instr = instrumentMap[n.name];
-  var baseData = instr.createData(name);
-  if (d) {
-    d.forEach((t, index) => {
-      let existingPart = baseData.parts.find((p) => p.partName === t.partName);
-      if (existingPart) {
-        // Update existing part
-        Object.assign(existingPart, t);
-      } else {
-        // Add new part
-        baseData.parts.push(t);
-      }
-    });
-    // baseData.parts
-    // var data = { ...baseData, ...d };
-    // return data;
+  const data = instrumentOf(kind).createData(name);
+  for (const part of parts ?? []) {
+    const copy = structuredClone(part); // never share arrays with a preset (and keep rests `undefined`)
+    const at = data.parts.findIndex((p) => p.partName === part.partName);
+    if (at >= 0) data.parts[at] = { ...data.parts[at], ...copy };
+    else data.parts.push(copy);
   }
-  // else
-  // console.warn($state.snapshot(baseData));
-
-  return baseData;
+  return data;
 }

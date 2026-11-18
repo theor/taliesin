@@ -1,4 +1,6 @@
 const CHROMATIC = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+/** The keys a song can be in. */
+export const KEYS: readonly string[] = CHROMATIC;
 const MODES: Record<string, number[]> = {
   major: [0, 2, 4, 5, 7, 9, 11],
   minor: [0, 2, 3, 5, 7, 8, 10],
@@ -7,6 +9,10 @@ const MODES: Record<string, number[]> = {
   lydian: [0, 2, 4, 6, 7, 9, 11],
   phrygian: [0, 1, 3, 5, 7, 8, 10]
 };
+/** Scale degrees in an octave (degree 7 is the root an octave up). */
+export const DEGREES_PER_OCTAVE = 7;
+/** The modes a song can be in (each also a Strudel scale name). */
+export const MODE_NAMES: readonly string[] = Object.keys(MODES);
 
 /** The note name of a scale degree (0 = the root; 7 = the root an octave up, marked with ↑). */
 export function degreeName(key: string, mode: string, degree: number): string {

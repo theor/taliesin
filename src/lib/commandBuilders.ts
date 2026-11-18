@@ -1,7 +1,7 @@
 import type { Command } from './commands';
 import { diffFields } from './partFields';
-import { getPart, TrackState, type InstrumentData } from './instruments';
-import { PartSteps } from './parts.svelte';
+import { TrackState, type InstrumentData } from './instruments';
+import { getPart, PartSteps } from './parts.svelte';
 import { createInstrument, getInstrument, presets } from './Store.svelte';
 
 /**
@@ -84,7 +84,7 @@ export function resizeLoopCommands(data: InstrumentData, direction: 'double' | '
   const setMeasures = (measures: number): Command => ({
     type: 'setPartFields',
     instrumentId: data.id,
-    partName: PartSteps.name,
+    partName: PartSteps.id,
     fields: { measures }
   });
   if (direction === 'halve') return canHalveLoop(data) ? [setMeasures(steps.measures / 2)] : [];

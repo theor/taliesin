@@ -53,8 +53,13 @@
     host: isHost,
     debug: isDebug,
     roomId: room!,
-    scaleKey: 'A',
-    scaleMode: 'minor'
+    // the views name notes in the song's key (getters: it can change); code generation reads the store
+    get scaleKey() {
+      return store.scale.scaleKey;
+    },
+    get scaleMode() {
+      return store.scale.scaleMode;
+    }
   });
 
   function onKeyDown(event: KeyboardEvent) {
@@ -94,7 +99,9 @@
   });
 
   import AppMenu from '../components/AppMenu.svelte';
-  import MobileNav from '../components/MobileNav.svelte';
+  import PhoneApp from '../components/phone/PhoneApp.svelte';
+  import SettingsPanel from '../components/SettingsPanel.svelte';
+  import { Media, PHONE_QUERY } from '$lib/utils/media.svelte';
   import InstrumentView from '../components/InstrumentView.svelte';
   import { initStore, mixerIndex } from '$lib/Store.svelte';
   import Mixer from '../components/Mixer.svelte';
@@ -107,14 +114,7 @@
   import { WebAcoustics } from '$lib/calibration/webAcoustics';
   import { findChirp, makeChirp } from '$lib/calibration/dsp';
   const calibration = store.calibration;
-  const calibrationNote = $derived.by(() => {
-    if (calibration.running) return 'Listening… keep the room quiet';
-    return Object.values(calibration.results)
-      .map((r) =>
-        r.status === 'ok' ? `calibrated (${Math.round(r.delay * 1000)} ms)` : r.reason
-      )
-      .join(' · ');
-  });
+  const phone = new Media(PHONE_QUERY);
   let settingsOpen = $state(false);
   let playing = $derived(store.transport.playing);
   /** A guest's browser keeps audio locked until their first tap. */
@@ -181,161 +181,133 @@
   });
 </script>
 
-<AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block" toolbarClasses="">
-  {#snippet lead()}
-    <!-- <ArrowLeft size={24} /> -->
-    <Network />
-  {/snippet}
-  {#snippet trail()}
-    <div class="flex items-center space-x-4">
-      <!-- on a phone the transport lives in the bottom bar, within thumb's reach -->
-      <div class="hidden items-center space-x-4 md:flex">
-        <Transport playing={store.transport.playing} {position} dispatch={store.dispatch} />
-        {#if needsTap}
-          <button class="btn preset-filled" onclick={() => strudel.unlockAudio()}>Tap to hear</button>
-        {/if}
-      </div>
-      {#if isHost || calibration.applied !== undefined}
-        <div class="relative">
-          <button
-            class="btn-icon preset-tonal"
-            aria-label="Settings"
-            aria-expanded={settingsOpen}
-            onclick={() => (settingsOpen = !settingsOpen)}><SettingsIcon size={20} /></button
-          >
-          {#if settingsOpen}
-            <div
-              class="card bg-surface-100-900 border-surface-300-700 absolute top-full right-0 z-50 mt-2 w-72 space-y-2 border p-3 shadow-xl"
-              data-testid="settings-panel"
+{#snippet debugPanel()}
+  <p class="text-sm" data-testid="net-debug">
+    {relays} · peers {store.peers.length} · secure context {String(window.isSecureContext)} · turn servers
+    {data.iceServers.length} · {skew}
+  </p>
+  <button class="btn preset-outlined w-fit" data-testid="copy-debug" onclick={copyDebug}
+    >{copied ? 'Copied' : 'Copy debug text'}</button
+  >
+  {#each relayLines as line}<p class="text-xs" data-testid="relay-debug">{line}</p>{/each}
+  {#each rtcLines as line}<p class="text-xs" data-testid="rtc-debug">{line}</p>{/each}
+{/snippet}
+
+{#if phone.matches}
+  <PhoneApp
+    bind:selectedIndex
+    dispatch={store.dispatch}
+    {position}
+    {playing}
+    now={() => store.transport.heardPosition()}
+    {isHost}
+    roomId={room!}
+    {needsTap}
+    hostOnly={!isHost && store.transport.hostOnly}
+    onTap={() => strudel.unlockAudio()}
+    debug={isDebug ? debugPanel : undefined}
+  />
+{:else}
+  <AppBar headlineClasses="sm:hidden" centerClasses="hidden sm:block" toolbarClasses="">
+    {#snippet lead()}
+      <!-- <ArrowLeft size={24} /> -->
+      <Network />
+    {/snippet}
+    {#snippet trail()}
+      <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-4">
+          <Transport playing={store.transport.playing} {position} dispatch={store.dispatch} />
+          {#if needsTap}
+            <button class="btn preset-filled" onclick={() => strudel.unlockAudio()}
+              >Tap to hear</button
             >
-              {#if isHost}
-                <h3 class="h6">Who plays the sound</h3>
-                <label class="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    class="checkbox mt-1"
-                    checked={store.transport.hostOnly}
-                    onchange={(e) => store.transport.setHostOnly(e.currentTarget.checked)}
-                  />
-                  <span>
-                    Only this device plays
-                    <span class="block text-xs opacity-70"
-                      >Everyone else follows the playhead but stays silent. Off: every device plays the
-                      song itself.</span
-                    >
-                  </span>
-                </label>
-              {/if}
-              <h3 class="h6">Sound sync</h3>
-              {#if isHost}
-                {#if store.peers.length > 0}
-                  <button
-                    class="btn preset-tonal w-full"
-                    disabled={calibration.running || store.transport.playing}
-                    title="The host's microphone listens while each device plays a test sound, so every device can be lined up with this one. Stop the song and keep the room quiet."
-                    onclick={() => calibration.run(store.peers)}>Calibrate</button
-                  >
-                  {#if calibrationNote}<p class="text-sm" data-testid="calibration-note">
-                      {calibrationNote}
-                    </p>{/if}
-                  <p class="text-xs opacity-70">
-                    Lines every device up with this one when they sit in the same room. Stop the song
-                    first and keep the room quiet.
-                  </p>
-                {:else}
-                  <p class="text-sm opacity-70">
-                    Calibration is offered once someone has joined the jam.
-                  </p>
-                {/if}
-              {:else if calibration.applied !== undefined}
-                <button
-                  class="btn preset-outlined w-full"
-                  title="Calibrated by the host. Click to go back to the browser's own estimate."
-                  onclick={() => calibration.reset()}
-                  >Synced {Math.round(calibration.applied * 1000)} ms ✕</button
-                >
-              {/if}
-            </div>
           {/if}
         </div>
-      {/if}
+        {#if isHost || calibration.applied !== undefined}
+          <div class="relative">
+            <button
+              class="btn-icon preset-tonal"
+              aria-label="Settings"
+              aria-expanded={settingsOpen}
+              onclick={() => (settingsOpen = !settingsOpen)}><SettingsIcon size={20} /></button
+            >
+            {#if settingsOpen}
+              <div
+                class="card bg-surface-100-900 border-surface-300-700 absolute top-full right-0 z-50 mt-2 w-72 space-y-2 border p-3 shadow-xl"
+                data-testid="settings-panel"
+              >
+                <SettingsPanel {isHost} />
+              </div>
+            {/if}
+          </div>
+        {/if}
+      </div>
+    {/snippet}
+    <span>{title}</span>
+    <span class="text-surface-600-400 ml-2 hidden text-xs sm:inline" data-testid="room-code"
+      >{room}</span
+    >
+    {#if !isHost && store.transport.hostOnly}
+      <span class="chip preset-tonal ml-2 text-xs" data-testid="host-only-note"
+        >Sound from host</span
+      >
+    {/if}
+  </AppBar>
+
+  <div class="flex flex-1 flex-row">
+    <div class="card border-surface-100-900 flex flex-col border-[1px]">
+      <AppMenu bind:selectedIndex dispatch={store.dispatch} />
     </div>
-  {/snippet}
-  <span>{title}</span>
-  <span class="text-surface-600-400 ml-2 hidden text-xs sm:inline" data-testid="room-code">{room}</span>
-  {#if !isHost && store.transport.hostOnly}
-    <span class="chip preset-tonal ml-2 text-xs" data-testid="host-only-note">Sound from host</span>
-  {/if}
-</AppBar>
 
-<MobileNav
-  bind:selectedIndex
-  dispatch={store.dispatch}
-  {playing}
-  {needsTap}
-  hostOnly={!isHost && store.transport.hostOnly}
-  onTap={() => strudel.unlockAudio()}
-/>
-
-<div class="flex h-full flex-row">
-  <div class="card border-surface-100-900 hidden flex-col border-[1px] md:flex">
-    <AppMenu bind:selectedIndex dispatch={store.dispatch} />
-  </div>
-
-  <div class="flex min-w-0 flex-1 flex-col gap-4 p-4 pb-44 md:pb-4">
-    {#if isDebug}
-      <p class="text-sm" data-testid="net-debug">
-        {relays} · peers {store.peers.length} · secure context {String(window.isSecureContext)} · turn servers {data.iceServers.length} · {skew}
-      </p>
-      <button
-        class="btn preset-outlined w-fit"
-        data-testid="copy-debug"
-        onclick={copyDebug}>{copied ? 'Copied' : 'Copy debug text'}</button
-      >
-      {#each relayLines as line}<p class="text-xs" data-testid="relay-debug">{line}</p>{/each}
-      {#each rtcLines as line}<p class="text-xs" data-testid="rtc-debug">{line}</p>{/each}
-      <div
-        class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden flex-col space-y-5 p-5 lg:flex"
-      >
-        Code
-        <div class="flex flex-row">
-          <button class="btn preset-outlined ml-4" onclick={() => store.cycle()}>Cycle</button>
-          <button
-            class="btn preset-outlined ml-4"
-            onclick={() => navigator.clipboard.writeText(store.exportLog())}>Copy log</button
-          >
-        </div>
-        <pre class="whitespace-pre-wrap">
+    <div class="flex min-w-0 flex-1 flex-col gap-4 p-4">
+      {#if isDebug}
+        {@render debugPanel()}
+        <div
+          class="card preset-outlined-surface-200-800 bg-surface-50-950 hidden flex-col space-y-5 p-5 lg:flex"
+        >
+          Code
+          <div class="flex flex-row">
+            <button class="btn preset-outlined ml-4" onclick={() => store.cycle()}>Cycle</button>
+            <button
+              class="btn preset-outlined ml-4"
+              onclick={() => navigator.clipboard.writeText(store.exportLog())}>Copy log</button
+            >
+          </div>
+          <pre class="whitespace-pre-wrap">
 {code}
             </pre>
-        <!-- <pre>{store.serialized()}</pre> -->
-      </div>
-    {/if}
+          <!-- <pre>{store.serialized()}</pre> -->
+        </div>
+      {/if}
 
-    {#if selectedIndex === mixerIndex}
-      <Mixer song={store.instrumentsData} dispatch={store.dispatch} />
-    {:else if currentInstrument}
-      <InstrumentView
-        bind:instrumentData={currentInstrument}
-        index={selectedIndex}
-        dispatch={store.dispatch}
-        {position}
-        {playing}
-        now={() => store.transport.heardPosition()}
-        editedByOther={store.activity[currentInstrument.id]}
-      />
-    {:else}
-      <div class="card preset-outlined-surface-200-800 space-y-4 p-8 text-center">
-        <p class="text-lg">Nothing playing yet.</p>
-        <button class="btn preset-filled-primary-500" onclick={startBeat}>Start with a beat</button>
-        <p class="text-sm opacity-70">Adds piano, bass and drums. Use Add for a single instrument.</p>
-      </div>
-    {/if}
+      {#if selectedIndex === mixerIndex}
+        <Mixer song={store.instrumentsData} dispatch={store.dispatch} />
+      {:else if currentInstrument}
+        <InstrumentView
+          bind:instrumentData={currentInstrument}
+          index={selectedIndex}
+          dispatch={store.dispatch}
+          {position}
+          {playing}
+          now={() => store.transport.heardPosition()}
+          editedByOther={store.activity[currentInstrument.id]}
+        />
+      {:else}
+        <div class="card preset-outlined-surface-200-800 space-y-4 p-8 text-center">
+          <p class="text-lg">Nothing playing yet.</p>
+          <button class="btn preset-filled-primary-500" onclick={startBeat}
+            >Start with a beat</button
+          >
+          <p class="text-sm opacity-70">
+            Adds piano, bass and drums. Use Add for a single instrument.
+          </p>
+        </div>
+      {/if}
 
-    <!-- {#each instrumentsData.instrumentsData as instrumentData, index}
+      <!-- {#each instrumentsData.instrumentsData as instrumentData, index}
 			{@render instrumentCard(instrumentData, index)}
 		{/each} -->
-    <!-- <Tabs value={group} onValueChange={(e) => (group = e.value)}>
+      <!-- <Tabs value={group} onValueChange={(e) => (group = e.value)}>
 			{#snippet list()}
 				{#each instrumentsData.instrumentsData as instrumentData, index}
 					<Tabs.Control value={index.toString()}>{instrumentData.instrumentName}</Tabs.Control>
@@ -349,7 +321,8 @@
 				{/each}
 			{/snippet}
 		</Tabs> -->
+    </div>
   </div>
-</div>
+{/if}
 
 <svelte:window on:keydown={onKeyDown} />

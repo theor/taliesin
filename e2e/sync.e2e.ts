@@ -518,7 +518,7 @@ describe('TURN credentials', () => {
 });
 
 describe('on a phone (touch input)', () => {
-  test('the transport and the instrument tabs are in the bottom bar, no menu to open first', async () => {
+  test('the session screen plays the song, and a track card opens that instrument', async () => {
     const context = await browser.newContext({
       viewport: { width: 390, height: 844 },
       hasTouch: true,
@@ -528,7 +528,9 @@ describe('on a phone (touch input)', () => {
     const page = await context.newPage();
     await page.goto(`${APP_URL}/?host&room=${newRoom()}&relay=${encodeURIComponent(RELAY_URL)}&debug`);
     await page.waitForFunction(() => (window as any).__store);
-    // the desktop header's transport is hidden at this width; the bottom bar's is the visible one
+    await expect.poll(() => page.getByTestId('phone-app').isVisible()).toBe(true);
+    // the session screen's transport is the only one on screen; tapping it at once works (Strudel may
+    // still be loading)
     const play = page.getByRole('button', { name: 'Play' });
     await expect.poll(() => play.isVisible()).toBe(true);
     await play.tap();
@@ -536,10 +538,21 @@ describe('on a phone (touch input)', () => {
       .poll(() => page.evaluate(() => (window as any).__store.transport.playing as boolean))
       .toBe(true);
     await page.getByRole('button', { name: 'Stop' }).tap();
-    // tapping a tab switches instruments
-    const tabs = page.locator('nav[aria-label="Instruments and transport"] button[title]');
-    await tabs.nth(1).tap();
-    await expect.poll(() => tabs.nth(1).getAttribute('aria-current')).toBe('true');
+    await expect
+      .poll(() => page.evaluate(() => (window as any).__store.transport.playing as boolean))
+      .toBe(false);
+
+    // an empty jam starts from a beat; tapping a card opens that instrument's grid
+    const startBeat = page.getByRole('button', { name: 'Start with a beat' });
+    if (await startBeat.isVisible()) await startBeat.tap();
+    const cards = page.getByRole('button', { name: /^Edit / });
+    await expect.poll(() => cards.count()).toBeGreaterThan(1);
+    await cards.nth(1).tap();
+    await expect.poll(() => page.locator('[data-x="0"][data-y="0"]').isVisible()).toBe(true);
+    // the picker under the header switches instruments without going back
+    const picker = page.locator('[aria-label="Instruments"] button');
+    await picker.nth(0).tap();
+    await expect.poll(() => picker.nth(0).getAttribute('aria-current')).toBe('true');
   });
 });
 
@@ -565,7 +578,7 @@ describe('sequencer gestures (real pointer, real network)', () => {
     const { host, client } = await pair();
     // precondition, so the test cannot pass vacuously: step 2 holds note 3, and track 6 is off there
     expect((await pianoNotes(host))[2]).toBe(3);
-    expect(await cellClass(host, 2, 6)).toContain('preset-outlined');
+    expect(await cellClass(host, 2, 6)).toContain('cell-off');
 
     const at = await cellBox(client, 2, 6);
     await client.mouse.move(at.x, at.y);
@@ -575,8 +588,8 @@ describe('sequencer gestures (real pointer, real network)', () => {
     await expect.poll(async () => (await pianoNotes(host))[2], { timeout: 20_000 }).toBe(6);
     expect((await pianoNotes(client))[2]).toBe(6);
     // the cell lit up on both screens, not just in the data
-    await expect.poll(() => cellClass(host, 2, 6)).toContain('preset-filled');
-    expect(await cellClass(client, 2, 6)).toContain('preset-filled');
+    await expect.poll(() => cellClass(host, 2, 6)).toContain('cell-on');
+    expect(await cellClass(client, 2, 6)).toContain('cell-on');
   });
 
   test('dragging along a row on the host reaches the client as one stroke', async () => {

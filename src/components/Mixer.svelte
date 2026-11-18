@@ -3,6 +3,11 @@
   import type { Dispatch, Song } from '$lib/commands';
   import { Volume } from '@lucide/svelte';
   import ParamSlider from './ParamSlider.svelte';
+  import ParamSelect from './ParamSelect.svelte';
+  import { KEYS, MODE_NAMES } from '$lib/scale';
+
+  const setScale = (scaleKey: string, scaleMode: string) =>
+    dispatch({ type: 'setScale', scaleKey, scaleMode });
 
   // Pure view: the song comes in as a prop, changes go out as commands.
   let { song, dispatch }: { song: Song; dispatch: Dispatch } = $props();
@@ -23,6 +28,16 @@
         min={0}
         max={1}
         step={0.01}
+      />
+      <ParamSelect
+        label="Key"
+        options={[...KEYS]}
+        bind:value={() => song.scale.scaleKey, (k) => setScale(k, song.scale.scaleMode)}
+      />
+      <ParamSelect
+        label="Mode"
+        options={[...MODE_NAMES]}
+        bind:value={() => song.scale.scaleMode, (m) => setScale(song.scale.scaleKey, m)}
       />
     </article>
   </div>

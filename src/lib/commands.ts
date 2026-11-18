@@ -1,4 +1,6 @@
 import type { InstrumentData } from './instruments';
+import type { InstrumentPart, InstrumentPartData, Scale } from './parts.svelte';
+import { KEYS, MODE_NAMES } from './scale';
 import type { ISequencer } from './sequencer';
 
 /**
@@ -20,13 +22,29 @@ export type Command =
       track: number;
       cells: { step: number; on: boolean }[];
     }
-  /** Set some fields of one part (effects, filter, steps, notes...). Only fields the part already has. */
-  | { type: 'setPartFields'; instrumentId: string; partName: string; fields: { [key: string]: Json } }
-  | { type: 'setInstrumentFields'; instrumentId: string; fields: { name?: string; volume?: number; state?: number } }
+  /** Set some fields of one part (effects, filter, steps, notes...). Only the part's own fields, each valid for it. */
+  | {
+      type: 'setPartFields';
+      instrumentId: string;
+      partName: string;
+      fields: { [key: string]: Json };
+    }
+  | {
+      type: 'setInstrumentFields';
+      instrumentId: string;
+      fields: { name?: string; volume?: number; state?: number };
+    }
   /** Appends the instrument (or moves it to the end if it is already there): the host's order wins. */
   | { type: 'addInstrument'; instrument: InstrumentData & { [key: string]: Json } }
   | { type: 'removeInstrument'; instrumentId: string }
+  /**
+   * Gives an instrument a part it does not have yet, with the part's default data (the same on every
+   * peer, so nothing to resolve first). Only parts its kind allows (`Instrument.addableParts`).
+   */
+  | { type: 'addPart'; instrumentId: string; partName: string }
   | { type: 'setMasterVolume'; volume: number }
+  /** The key the whole song plays in (it ends up in the code: only known keys and modes). */
+  | { type: 'setScale'; scaleKey: string; scaleMode: string }
   | { type: 'transport'; action: 'toggle' | 'stop' };
 
 /** Commands that change song data (as opposed to driving the transport). */
@@ -34,12 +52,17 @@ export type SongCommand = Exclude<Command, { type: 'transport' }>;
 export type Dispatch = (cmd: Command) => void;
 
 /** The part of the app state commands operate on. */
-export type Song = { instrumentsData: InstrumentData[]; volume: number };
+export type Song = { instrumentsData: InstrumentData[]; volume: number; scale: Scale };
 
 /** What applying a command needs to know about the app. */
 export type Env = {
   sequencerFor: (data: InstrumentData) => ISequencer | undefined;
-  isKnownInstrument: (instrumentName: string) => boolean;
+  /** The id of the input part an instrument kind plays from; undefined for a kind this version does not know. */
+  instrumentInput: (instrumentName: string) => string | undefined;
+  /** The part type stored under a `partName`, which validates its data. */
+  partType: (partName: string) => InstrumentPart | undefined;
+  /** Whether an instrument kind may be given that part (`Instrument.addableParts`). */
+  canAddPart: (instrumentName: string, partName: string) => boolean;
 };
 
 const SONG_COMMANDS = new Set<string>([
@@ -48,7 +71,9 @@ const SONG_COMMANDS = new Set<string>([
   'setInstrumentFields',
   'addInstrument',
   'removeInstrument',
-  'setMasterVolume'
+  'addPart',
+  'setMasterVolume',
+  'setScale'
 ]);
 export const isSongCommand = (cmd: unknown): cmd is SongCommand =>
   typeof cmd === 'object' && cmd !== null && SONG_COMMANDS.has((cmd as Command).type);
@@ -59,7 +84,8 @@ const MAX_PARTS = 32;
 const MAX_STRING = 128;
 const MAX_JSON_NODES = 20_000;
 
-const isId = (v: unknown): v is string => typeof v === 'string' && v.length > 0 && v.length <= MAX_STRING;
+const isId = (v: unknown): v is string =>
+  typeof v === 'string' && v.length > 0 && v.length <= MAX_STRING;
 
 /** JSON-shaped and bounded: commands come from the network. `undefined` (a rest) is tolerated. */
 function jsonLike(value: unknown, budget = { n: MAX_JSON_NODES }, depth = 0): boolean {
@@ -84,23 +110,46 @@ function jsonLike(value: unknown, budget = { n: MAX_JSON_NODES }, depth = 0): bo
 /** Detach from the caller: state must never share references with a logged command. */
 const clone = <T>(v: T): T => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
 
-const kind = (v: unknown) => (Array.isArray(v) ? 'array' : v === null ? 'null' : typeof v);
-
-function validInstrument(i: any): boolean {
-  return (
+/**
+ * A clean copy of an instrument from untrusted input, or null. Its parts go through their own
+ * validation, leniently (a field saved by an older version falls back to its default); parts this
+ * version does not know are dropped, as they would generate nothing anyway.
+ */
+function cleanInstrument(i: any, env: Env): InstrumentData | null {
+  const valid =
     !!i &&
     isId(i.id) &&
     typeof i.name === 'string' &&
     i.name.length <= MAX_STRING &&
     isId(i.instrumentName) &&
     typeof i.volume === 'number' &&
-    Number.isFinite(i.volume) &&
+    i.volume >= 0 &&
+    i.volume <= 1 &&
     Number.isInteger(i.state) &&
+    i.state >= 0 &&
+    i.state <= 2 &&
     Array.isArray(i.parts) &&
     i.parts.length <= MAX_PARTS &&
-    i.parts.every((p: any) => !!p && isId(p.partName)) &&
-    jsonLike(i)
-  );
+    jsonLike(i);
+  const input = valid ? env.instrumentInput(i.instrumentName) : undefined;
+  if (!input) return null;
+  const parts: InstrumentPartData[] = [];
+  for (const p of i.parts) {
+    const type = env.partType(p?.partName);
+    if (!type || parts.some((q) => q.partName === type.id)) continue;
+    if (type.isInput() && type.id !== input) continue; // an instrument plays from its own input only
+    const part = type.normalize(clone(p), false);
+    if (part) parts.push(part);
+  }
+  if (!parts.some((p) => p.partName === input)) return null; // nothing to play: its code would not parse
+  return {
+    id: i.id,
+    name: i.name,
+    instrumentName: i.instrumentName,
+    volume: i.volume,
+    state: i.state,
+    parts
+  };
 }
 
 function applySetCells(song: Song, cmd: Extract<Command, { type: 'setCells' }>, env: Env): boolean {
@@ -129,25 +178,27 @@ function applySetCells(song: Song, cmd: Extract<Command, { type: 'setCells' }>, 
 
 function applySetPartFields(
   song: Song,
-  cmd: Extract<Command, { type: 'setPartFields' }>
+  cmd: Extract<Command, { type: 'setPartFields' }>,
+  env: Env
 ): boolean {
   if (!isId(cmd.instrumentId) || !isId(cmd.partName)) return false;
-  if (typeof cmd.fields !== 'object' || cmd.fields === null || Array.isArray(cmd.fields)) return false;
+  if (typeof cmd.fields !== 'object' || cmd.fields === null || Array.isArray(cmd.fields))
+    return false;
   if (!jsonLike(cmd.fields)) return false;
+  const type = env.partType(cmd.partName);
   const part = song.instrumentsData
     .find((i) => i.id === cmd.instrumentId)
     ?.parts.find((p) => p.partName === cmd.partName) as Record<string, unknown> | undefined;
-  if (!part) return false;
-  const entries = Object.entries(cmd.fields);
-  // Only fields the part already has, and never partName; a field keeps its type. Strict: all or nothing.
-  for (const [key, value] of entries) {
-    if (key === 'partName' || !Object.hasOwn(part, key)) return false;
-    const current = part[key];
-    if (current !== undefined && current !== null && value !== undefined && value !== null) {
-      if (kind(current) !== kind(value)) return false;
-    }
-  }
-  for (const [key, value] of entries) part[key] = clone(value);
+  if (!type || !part) return false;
+  const keys = Object.keys(cmd.fields);
+  // Only the part's own fields, and the result must be valid for the part (it ends up in code). Strict: all or nothing.
+  if (keys.some((key) => !type.hasField(key))) return false;
+  const next = type.normalize({ ...part, ...clone(cmd.fields) }, true) as Record<
+    string,
+    unknown
+  > | null;
+  if (!next) return false;
+  for (const key of keys) part[key] = next[key];
   return true;
 }
 
@@ -158,7 +209,8 @@ function applySetInstrumentFields(
   const f = cmd.fields;
   if (!isId(cmd.instrumentId) || typeof f !== 'object' || f === null) return false;
   if (Object.keys(f).some((k) => k !== 'name' && k !== 'volume' && k !== 'state')) return false;
-  if (f.name !== undefined && (typeof f.name !== 'string' || f.name.length > MAX_STRING)) return false;
+  if (f.name !== undefined && (typeof f.name !== 'string' || f.name.length > MAX_STRING))
+    return false;
   if (f.volume !== undefined && !(typeof f.volume === 'number' && f.volume >= 0 && f.volume <= 1))
     return false;
   // 0 playing, 1 muted, 2 solo (TrackState)
@@ -172,12 +224,16 @@ function applySetInstrumentFields(
   return true;
 }
 
-function applyAddInstrument(song: Song, cmd: Extract<Command, { type: 'addInstrument' }>, env: Env) {
-  const i = cmd.instrument;
-  if (!validInstrument(i) || !env.isKnownInstrument(i.instrumentName)) return false;
+function applyAddInstrument(
+  song: Song,
+  cmd: Extract<Command, { type: 'addInstrument' }>,
+  env: Env
+) {
+  const i = cleanInstrument(cmd.instrument, env);
+  if (!i) return false;
   const at = song.instrumentsData.findIndex((x) => x.id === i.id);
   if (at >= 0) song.instrumentsData.splice(at, 1); // re-adding moves it to the end, where the host put it
-  song.instrumentsData.push(clone(i) as InstrumentData);
+  song.instrumentsData.push(i);
   return true;
 }
 
@@ -186,6 +242,19 @@ function applyRemoveInstrument(song: Song, cmd: Extract<Command, { type: 'remove
   const at = song.instrumentsData.findIndex((i) => i.id === cmd.instrumentId);
   if (at < 0) return false;
   song.instrumentsData.splice(at, 1);
+  return true;
+}
+
+function applyAddPart(song: Song, cmd: Extract<Command, { type: 'addPart' }>, env: Env) {
+  if (!isId(cmd.instrumentId) || !isId(cmd.partName)) return false;
+  const data = song.instrumentsData.find((i) => i.id === cmd.instrumentId);
+  const type = env.partType(cmd.partName);
+  if (!data || !type || type.isInput()) return false;
+  if (!env.canAddPart(data.instrumentName, type.id)) return false;
+  // already there (two peers added it at once): the first one wins, the second changes nothing
+  if (data.parts.some((p) => p.partName === type.id) || data.parts.length >= MAX_PARTS)
+    return false;
+  data.parts.push(type.createData());
   return true;
 }
 
@@ -201,16 +270,22 @@ export function applySongCommand(song: Song, cmd: SongCommand, env: Env): boolea
     case 'setCells':
       return applySetCells(song, cmd, env);
     case 'setPartFields':
-      return applySetPartFields(song, cmd);
+      return applySetPartFields(song, cmd, env);
     case 'setInstrumentFields':
       return applySetInstrumentFields(song, cmd);
     case 'addInstrument':
       return applyAddInstrument(song, cmd, env);
     case 'removeInstrument':
       return applyRemoveInstrument(song, cmd);
+    case 'addPart':
+      return applyAddPart(song, cmd, env);
     case 'setMasterVolume':
       if (!(typeof cmd.volume === 'number' && cmd.volume >= 0 && cmd.volume <= 1)) return false;
       song.volume = cmd.volume;
+      return true;
+    case 'setScale':
+      if (!KEYS.includes(cmd.scaleKey) || !MODE_NAMES.includes(cmd.scaleMode)) return false;
+      song.scale = { scaleKey: cmd.scaleKey, scaleMode: cmd.scaleMode };
       return true;
   }
 }

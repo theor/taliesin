@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest';
 import { AppStore } from './Store.svelte.js';
-import { getPart, TrackState, type InstrumentData } from './instruments.js';
-import { MonoSequence, PartSteps, PartTrackNotes } from './parts.svelte.js';
+import { TrackState, type InstrumentData } from './instruments.js';
+import { getPart, MonoSequence, PartSteps, PartTrackNotes } from './parts.svelte.js';
 import { createFakeNetwork } from './testing/fakeRoom.js';
 import { fakePlayer } from './testing/fakePlayer.js';
 import {
@@ -14,18 +14,6 @@ import {
 } from './commandBuilders.js';
 import { commitStroke, playheadStep, previewStroke } from './gesture.js';
 import { degreeName } from './scale.js';
-
-// code generation reads the Svelte context (key / scale), which only exists inside a component
-vi.mock('./context', () => ({
-  getGlobalContext: () => ({
-    host: true,
-    debug: false,
-    roomId: 'r',
-    scaleKey: 'A',
-    scaleMode: 'minor'
-  }),
-  setGlobalContext: () => {}
-}));
 
 // Presets are created in this order: Piano (0), Bass (1), Drum (2)
 const BASS = 1;

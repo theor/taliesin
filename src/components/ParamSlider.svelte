@@ -1,5 +1,7 @@
 <script lang="ts">
-  // Touch-friendly labelled slider: a native range input with a large thumb.
+  // Touch-friendly labelled slider: a native range input with a large thumb; a knob in the rack.
+  import { getControlStyle } from '$lib/controlStyle';
+  import Knob from './Knob.svelte';
   interface Props {
     value: number;
     min: number;
@@ -8,17 +10,27 @@
     label: string;
     format?: (v: number) => string;
   }
-  let { value = $bindable(), min, max, step = 1, label, format = (v) => String(v) }: Props =
-    $props();
+  let {
+    value = $bindable(),
+    min,
+    max,
+    step = 1,
+    label,
+    format = (v) => String(v)
+  }: Props = $props();
 </script>
 
-<label class="block py-2">
-  <span class="mb-1 flex justify-between text-sm">
-    <span>{label}</span>
-    <span class="tabular-nums opacity-70">{format(value)}</span>
-  </span>
-  <input type="range" class="param-slider" aria-label={label} {min} {max} {step} bind:value />
-</label>
+{#if getControlStyle() === 'rack'}
+  <Knob bind:value {min} {max} {step} {label} {format} />
+{:else}
+  <label class="block py-2">
+    <span class="mb-1 flex justify-between text-sm">
+      <span>{label}</span>
+      <span class="tabular-nums opacity-70">{format(value)}</span>
+    </span>
+    <input type="range" class="param-slider" aria-label={label} {min} {max} {step} bind:value />
+  </label>
+{/if}
 
 <style>
   .param-slider {

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render } from '@testing-library/svelte';
-import PianoScaleView from './PianoScaleView.svelte';
+import InputViewSwitcher from './InputViewSwitcher.svelte';
 import { createInstrument } from '$lib/Store.svelte';
 import { Drum } from '$lib/instruments/Drum';
 import { PianoScale } from '$lib/instruments/MonoSynth';
@@ -12,7 +12,7 @@ afterEach(() => {
 });
 
 const mount = (instrumentData: ReturnType<typeof createInstrument>) =>
-  render(PianoScaleView, { props: { index: 0, instrumentData, dispatch: vi.fn() } });
+  render(InputViewSwitcher, { props: { index: 0, instrumentData, dispatch: vi.fn() } });
 
 describe('instrument input view switch', () => {
   test('drums offer grid and circle, starting on the grid', () => {

@@ -1,8 +1,5 @@
-import { derived } from 'svelte/store';
-import { getGlobalContext } from './context';
 import { triadQuality } from './scale';
-import { getPart, type InstrumentData, type Length } from './instruments';
-import { strudel } from './strudel';
+import type { InstrumentData, Length } from './instruments';
 
 export enum DrumNote {
   kick = 'bd',
@@ -15,59 +12,190 @@ export enum DrumNote {
   medTom = 'mt',
   lowTom = 'lt'
 }
-export abstract class InstrumentPart {
-  // abstract serialize(): ({ [key: string]: any });
-  abstract createData(data?: InstrumentPartDataNoName): InstrumentPartData;
-  abstract assign(
-    self: InstrumentPartDataNoName,
-    other: InstrumentPartDataNoName
-  ): InstrumentPartDataNoName;
-  isInput(): boolean {
-    return false;
-  }
-  generate(data: InstrumentData, selfData: InstrumentPartData, length: Length): string {
-    return '';
-  }
+
+/** The key the whole song plays in. */
+export interface Scale {
+  scaleKey: string;
+  scaleMode: string;
 }
+export const DEFAULT_SCALE: Scale = { scaleKey: 'A', scaleMode: 'minor' };
+
+/** Everything a part needs to emit its code, besides its own data. Passed in, so generation is a pure function of the song. */
+export interface GenContext extends Length, Scale {
+  /** The scale degrees the instrument's input part plays, one per step (rests are null/undefined), if it plays degrees. */
+  degrees?: readonly (number | null | undefined)[];
+  /**
+   * Ids of parts another part has already rendered as part of its own code (the instrument skips
+   * them). Parts run in stage order, so a part can only take over one of a later stage.
+   */
+  consumed?: Set<string>;
+}
+
+/**
+ * Where a part's code goes in the instrument's chain. Parts are emitted in ascending stage order; the
+ * instrument inserts `.fast(steps)` after the last stage that works on the step grid (`Stage.arp`).
+ * Stages follow the signal, so sorting by stage never puts a later `Role` before an earlier one (a test
+ * checks it).
+ */
+export enum Stage {
+  input = 0,
+  harmony = 10,
+  arp = 20,
+  voice = 40,
+  fm = 41,
+  envelope = 42,
+  filter = 50,
+  effects = 60,
+  /** Parts that only feed other parts (octave, steps): they emit nothing themselves. */
+  none = 100
+}
+export const LAST_STEP_STAGE = Stage.arp;
+
+/**
+ * What a part does to the signal, in the order the signal flows. It decides where the part's controls
+ * show (`components/partViews.ts`, grouped by role). Never saved or sent, so it is free to change.
+ */
+export enum Role {
+  /** Makes the pattern: the input part and the loop's length. */
+  notes = 'notes',
+  /** Transforms the notes before they sound: octave, chords, arpeggiator. */
+  noteFx = 'noteFx',
+  /** Turns notes into audio: voice, FM, amplitude envelope. */
+  sound = 'sound',
+  /** Processes the audio: filter, effects. */
+  soundFx = 'soundFx'
+}
+export const ROLE_ORDER: readonly Role[] = [Role.notes, Role.noteFx, Role.sound, Role.soundFx];
+export const ROLE_LABELS: Record<Role, string> = {
+  [Role.notes]: 'Notes',
+  [Role.noteFx]: 'Note FX',
+  [Role.sound]: 'Sound',
+  [Role.soundFx]: 'Sound FX'
+};
+
+/** Longest pattern data accepted from the network (steps per track). */
+export const MAX_PATTERN = 4096;
+
+// ---- field validation ----------------------------------------------------------------------------
+// Part data comes from peers and ends up inside code that Strudel evaluates (i.e. runs as JavaScript),
+// so every field is declared with a validator, and the reducer only lets validated data in.
+
+const INVALID: unique symbol = Symbol('invalid');
+type Invalid = typeof INVALID;
+/** Validates (and may clamp) one field: returns the value to store, or INVALID. */
+export type Field<V> = (v: unknown) => V | Invalid;
+
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+export const field = {
+  /** A finite number, clamped into [min, max] (and rounded when `int`). */
+  num:
+    (min: number, max: number, int = false): Field<number> =>
+    (v) =>
+      isNum(v) ? Math.min(max, Math.max(min, int ? Math.round(v) : v)) : INVALID,
+  bool: (): Field<boolean> => (v) => (typeof v === 'boolean' ? v : INVALID),
+  oneOf:
+    <T extends string>(values: readonly T[]): Field<T> =>
+    (v) =>
+      (values as readonly unknown[]).includes(v) ? (v as T) : INVALID,
+  /** A pattern of steps: each an integer in [min, max], or a rest (null / undefined). */
+  steps:
+    (min: number, max: number): Field<(number | undefined)[]> =>
+    (v) => {
+      if (!Array.isArray(v) || v.length > MAX_PATTERN) return INVALID;
+      const out: (number | undefined)[] = [];
+      for (const x of v) {
+        if (x === null || x === undefined) out.push(undefined);
+        else if (Number.isInteger(x) && x >= min && x <= max) out.push(x);
+        else return INVALID;
+      }
+      return out;
+    }
+};
+
 export interface InstrumentPartData {
   partName: string;
 }
-type InstrumentPartDataNoName = Omit<InstrumentPartData, 'partName'>;
+/** A part's data as stored in the song: its fields plus its `partName`. */
+export type PartData<T extends InstrumentPart<any>> = PartType<T> & InstrumentPartData;
+export type PartType<T extends InstrumentPart<any>> = T extends InstrumentPart<infer U> ? U : never;
+/** A part class: constructible, with the stable id its data is stored under. */
+export type PartClass<T extends InstrumentPart<any> = InstrumentPart<any>> = (new () => T) & {
+  readonly id: string;
+};
 
-export abstract class InstrumentPartTyped<
-  T extends InstrumentPartDataNoName
-> extends InstrumentPart {
-  // data = $state<T & InstrumentPartData>({} as (T & InstrumentPartData));
-  // override serialize(): { [key: string]: any } {
-  //   return $state.snapshot(this.data) as { [key: string]: any };
-  // }
-  protected _dataType: T & InstrumentPartData = undefined!;
-  getPart(data: InstrumentData): T | undefined {
-    return getPart(this.constructor as any, data) as T;
+/**
+ * One aspect of an instrument (its notes, filter, effects...). Stateless: the data lives in the song as
+ * plain JSON (`T & { partName }`), and this object knows how to create, validate and render it.
+ */
+export abstract class InstrumentPart<T extends object = any> {
+  /**
+   * The id the part's data is stored under (`partName`). It is saved in songs and sent over the network,
+   * so it must never change. Every concrete part sets it; it is not derived from the class name, which
+   * a minifier is free to change.
+   */
+  static readonly id: string;
+  get id(): string {
+    const id = (this.constructor as PartClass).id;
+    if (!id) throw new Error(`${this.constructor.name} has no static id`);
+    return id;
   }
+  /** Type only (no value at runtime): the part's data as stored in the song. */
+  declare readonly dataType: T & InstrumentPartData;
+  /** Where the part's code goes in the chain. */
+  abstract readonly stage: Stage;
+  /** What it does to the signal, and so where its controls show. */
+  abstract readonly role: Role;
+  /** The validator for each field. Fields not listed here are not part of the part's data. */
+  protected abstract readonly fields: { [K in keyof T]-?: Field<T[K]> };
   abstract defaultData(): T;
-  override assign(self: T, other: T): T {
-    if (!other) {
-      throw new Error(`Cannot assign part of type ${other} to ${this.constructor.name}`);
+
+  isInput(): boolean {
+    return this.stage === Stage.input;
+  }
+  createData(data?: Partial<T>): T & InstrumentPartData {
+    return { ...this.defaultData(), ...data, partName: this.id };
+  }
+  hasField(key: string): boolean {
+    return Object.hasOwn(this.fields, key);
+  }
+  /**
+   * Validated part data from untrusted input. Missing fields get their default (data saved before a
+   * field existed); unknown fields are dropped. An invalid field makes the whole part invalid (`null`)
+   * when `strict`, otherwise it falls back to the default.
+   */
+  normalize(raw: unknown, strict = true): (T & InstrumentPartData) | null {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+    const defaults = this.defaultData() as Record<string, unknown>;
+    const out: Record<string, unknown> = { partName: this.id };
+    for (const [key, check] of Object.entries(this.fields) as [string, Field<unknown>][]) {
+      const v = (raw as Record<string, unknown>)[key];
+      if (v === undefined) {
+        out[key] = defaults[key];
+        continue;
+      }
+      const checked = check(v);
+      if (checked === INVALID) {
+        if (strict) return null;
+        out[key] = defaults[key];
+      } else out[key] = checked;
     }
-    return { ...self, ...other };
+    return out as T & InstrumentPartData;
   }
-  override createData(data?: Partial<Omit<T, 'partName'>>) {
-    const partName = this.constructor.name;
-    return data
-      ? { ...this.defaultData(), ...data, partName }
-      : { ...this.defaultData(), partName };
+  /** The scale degrees this (input) part plays per step, for parts that build on the melody. */
+  degrees(_selfData: T): readonly (number | null | undefined)[] | undefined {
+    return undefined;
   }
-  override generate(
-    data: InstrumentData,
-    selfData: T & InstrumentPartData,
-    length: Length
-  ): string {
+  generate(_data: InstrumentData, _selfData: T & InstrumentPartData, _ctx: GenContext): string {
     return '';
   }
 }
-export type PartType<T extends InstrumentPartTyped<any>> =
-  T extends InstrumentPartTyped<infer U> ? U : never;
+
+export function getPart<T extends InstrumentPart<any>>(
+  key: PartClass<T>,
+  data: InstrumentData
+): T['dataType'] | undefined {
+  return data?.parts?.find((x) => x.partName === key.id) as T['dataType'] | undefined;
+}
 
 /** Built-in Strudel synth sounds (no sample loading needed). */
 export const VOICES = [
@@ -101,35 +229,41 @@ export const VOICES = [
 ] as const;
 export type Voice = (typeof VOICES)[number];
 
+/** A number for the generated code: finite and inside [min, max] (defence in depth: the reducer already validated it). */
+const num = (v: unknown, min: number, max: number, fallback: number) =>
+  isNum(v) ? Math.min(max, Math.max(min, v)) : fallback;
+
 /** Which sound the instrument plays. The name comes from peers and ends up in code, so only known voices are emitted. */
-export class PartVoice extends InstrumentPartTyped<{ sound: string }> {
+export class PartVoice extends InstrumentPart<{ sound: string }> {
+  static override readonly id = 'PartVoice';
+  readonly stage = Stage.voice;
+  readonly role = Role.sound;
+  protected readonly fields = { sound: field.oneOf(VOICES) };
   override defaultData() {
     return { sound: 'sawtooth' };
   }
-  override generate(
-    data: InstrumentData,
-    selfData: PartVoice['_dataType'],
-    length: Length
-  ): string {
-    const sound = (VOICES as readonly string[]).includes(selfData.sound) ? selfData.sound : 'sawtooth';
+  override generate(_data: InstrumentData, selfData: PartVoice['dataType']): string {
+    const sound = (VOICES as readonly string[]).includes(selfData.sound)
+      ? selfData.sound
+      : 'sawtooth';
     return `.sound("${sound}")`;
   }
 }
 
-/** A number from a peer, kept finite and inside [min, max]. */
-const num = (v: unknown, min: number, max: number, fallback: number) =>
-  typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
-
 /** Frequency modulation: `index` is how much the modulator bends the pitch, `ratio` its frequency relative to the note. */
-export class PartFm extends InstrumentPartTyped<{ index: number; ratio: number; decay: number }> {
+export class PartFm extends InstrumentPart<{ index: number; ratio: number; decay: number }> {
+  static override readonly id = 'PartFm';
+  readonly stage = Stage.fm;
+  readonly role = Role.sound;
+  protected readonly fields = {
+    index: field.num(0, 32),
+    ratio: field.num(0.25, 16),
+    decay: field.num(0, 4)
+  };
   override defaultData() {
     return { index: 4, ratio: 2, decay: 0 };
   }
-  override generate(
-    data: InstrumentData,
-    selfData: PartFm['_dataType'],
-    length: Length
-  ): string {
+  override generate(_data: InstrumentData, selfData: PartFm['dataType']): string {
     const index = num(selfData.index, 0, 32, 0);
     if (index === 0) return '';
     const ratio = num(selfData.ratio, 0.25, 16, 1);
@@ -141,20 +275,25 @@ export class PartFm extends InstrumentPartTyped<{ index: number; ratio: number; 
 }
 
 /** Amplitude envelope. A short decay with no sustain turns any voice into a pluck. */
-export class PartEnvelope extends InstrumentPartTyped<{
+export class PartEnvelope extends InstrumentPart<{
   attack: number;
   decay: number;
   sustain: number;
   release: number;
 }> {
+  static override readonly id = 'PartEnvelope';
+  readonly stage = Stage.envelope;
+  readonly role = Role.sound;
+  protected readonly fields = {
+    attack: field.num(0, 4),
+    decay: field.num(0, 4),
+    sustain: field.num(0, 1),
+    release: field.num(0, 4)
+  };
   override defaultData() {
     return { attack: 0.005, decay: 0.3, sustain: 0.6, release: 0.1 };
   }
-  override generate(
-    data: InstrumentData,
-    selfData: PartEnvelope['_dataType'],
-    length: Length
-  ): string {
+  override generate(_data: InstrumentData, selfData: PartEnvelope['dataType']): string {
     const a = num(selfData.attack, 0, 4, 0.005);
     const d = num(selfData.decay, 0, 4, 0.3);
     const s = num(selfData.sustain, 0, 1, 0.6);
@@ -163,24 +302,38 @@ export class PartEnvelope extends InstrumentPartTyped<{
   }
 }
 
-export class PartOctave extends InstrumentPartTyped<{ octave: number }> {
+/** The octave the instrument's scale degrees are played in (read by the input and chord parts). */
+export class PartOctave extends InstrumentPart<{ octave: number }> {
+  static override readonly id = 'PartOctave';
+  readonly stage = Stage.none;
+  readonly role = Role.noteFx;
+  protected readonly fields = { octave: field.num(0, 8, true) };
   override defaultData() {
     return { octave: 4 };
   }
+  /** The octave of an instrument, safe to put in code. */
+  static of(data: InstrumentData): number {
+    return num(getPart(PartOctave, data)?.octave, 0, 8, 4);
+  }
 }
 
-export class PartSteps extends InstrumentPartTyped<{
+export const MAX_STEPS_PER_MEASURE = 64;
+export const MAX_MEASURES = 16;
+
+/** The loop's length: steps per measure and measures. */
+export class PartSteps extends InstrumentPart<{
   stepsPerMeasure: number;
   measures: number;
   oddSignature: boolean;
 }> {
-  time(data: PartType<PartSteps>, x: number): number {
-    return (x / data.measures) % 1;
-  }
-
-  override isInput(): boolean {
-    return true;
-  }
+  static override readonly id = 'PartSteps';
+  readonly stage = Stage.none;
+  readonly role = Role.notes;
+  protected readonly fields = {
+    stepsPerMeasure: field.num(1, MAX_STEPS_PER_MEASURE, true),
+    measures: field.num(1, MAX_MEASURES, true),
+    oddSignature: field.bool()
+  };
   override defaultData() {
     return { stepsPerMeasure: 4, measures: 1, oddSignature: false };
   }
@@ -196,6 +349,8 @@ export enum VoicingMode {
 const STRUDEL_TRIAD: Record<string, string> = { '': 'M', m: 'm', dim: 'o', aug: 'aug' };
 const quality = (mode: string, degree: number | null | undefined) =>
   degree == null ? 'm' : (STRUDEL_TRIAD[triadQuality(mode, degree)] ?? 'm');
+/** A degree for the code: an integer, or a rest. */
+const degree = (d: unknown) => (Number.isInteger(d) ? `${d}` : '~');
 
 /** How long a chord lasts: a new chord on every melody note, or one held per half bar / bar. */
 export enum ChordHold {
@@ -204,7 +359,24 @@ export enum ChordHold {
   bar = 'bar'
 }
 
-export class PartChords extends InstrumentPartTyped<{ enabled: boolean; mode: VoicingMode; hold: ChordHold }> {
+/**
+ * Triads built on the melody. Needs an input part that plays scale degrees (`GenContext.degrees`).
+ * When chords are held, they run the arpeggiator's pattern on the held chord themselves, and mark it
+ * consumed so it is not applied to the melody as well. (The arpeggiator knows nothing about chords.)
+ */
+export class PartChords extends InstrumentPart<{
+  enabled: boolean;
+  mode: VoicingMode;
+  hold: ChordHold;
+}> {
+  static override readonly id = 'PartChords';
+  readonly stage = Stage.harmony;
+  readonly role = Role.noteFx;
+  protected readonly fields = {
+    enabled: field.bool(),
+    mode: field.oneOf(Object.values(VoicingMode)),
+    hold: field.oneOf(Object.values(ChordHold))
+  };
   override defaultData() {
     return { enabled: false, mode: VoicingMode.below, hold: ChordHold.bar };
   }
@@ -214,21 +386,21 @@ export class PartChords extends InstrumentPartTyped<{ enabled: boolean; mode: Vo
     if (hold === ChordHold.half && stepsPerMeasure % 2 === 0) return stepsPerMeasure / 2;
     return stepsPerMeasure;
   }
-  /** Whether the chords are a layer under the melody (anything but one chord per step). */
-  static isHeld(selfData: { enabled: boolean; hold: ChordHold } | undefined): boolean {
-    return !!selfData?.enabled && selfData.hold !== ChordHold.step;
-  }
   override generate(
     data: InstrumentData,
-    selfData: PartChords['_dataType'],
-    length: Length
+    selfData: PartChords['dataType'],
+    ctx: GenContext
   ): string {
-    if (!selfData.enabled) return '';
-    const notes = getPart(MonoSequence, data)?.notes ?? [];
-    const { scaleKey, scaleMode } = getGlobalContext();
-    const total = length.stepsPerMeasure * length.measures;
-    const mode = (Object.values(VoicingMode) as string[]).includes(selfData.mode) ? selfData.mode : VoicingMode.below;
-    const hold = (Object.values(ChordHold) as string[]).includes(selfData.hold) ? selfData.hold : ChordHold.bar;
+    if (!selfData.enabled || !ctx.degrees) return '';
+    const notes = ctx.degrees;
+    const { scaleKey, scaleMode } = ctx;
+    const total = ctx.stepsPerMeasure * ctx.measures;
+    const mode = (Object.values(VoicingMode) as string[]).includes(selfData.mode)
+      ? selfData.mode
+      : VoicingMode.below;
+    const hold = (Object.values(ChordHold) as string[]).includes(selfData.hold)
+      ? selfData.hold
+      : ChordHold.bar;
 
     if (hold === ChordHold.step) {
       // each melody note becomes the triad built on its scale degree, one quality per step, aligned
@@ -241,17 +413,17 @@ export class PartChords extends InstrumentPartTyped<{ enabled: boolean; mode: Vo
     // Held: the melody keeps playing, with a chord under it per segment, built on the segment's first
     // melody note. Every chord is aligned to the same fixed anchor (the key's root at the melody's
     // octave), so consecutive chords move to their nearest inversion instead of jumping in parallel.
-    const k = PartChords.holdSteps(hold, length.stepsPerMeasure);
+    const k = PartChords.holdSteps(hold, ctx.stepsPerMeasure);
     const segments = Array.from({ length: Math.ceil(total / k) }, (_, s) =>
       notes.slice(s * k, s * k + k).find((x) => x != null)
     );
-    const degrees = segments.map((d) => (d == null ? '~' : d)).join(' ');
+    const degrees = segments.map(degree).join(' ');
     const qualities = segments.map((d) => quality(scaleMode, d)).join(' ');
-    const octave = getPart(PartOctave, data)?.octave ?? 4;
-    const root = `${scaleKey}${octave}`;
+    const root = `${scaleKey}${PartOctave.of(data)}`;
     const arp = getPart(PartArpeggiator, data);
     // the arpeggio plays the held chord (not the melody); it runs at its usual rate per step
     const arpCode = arp?.enabled ? PartArpeggiator.code(arp, k) : '';
+    if (arpCode) ctx.consumed?.add(PartArpeggiator.id);
     return `.stack(n("<${degrees}>").scale("${root}:${scaleMode}").asChords("<${qualities}>").dict('triads').anchor("${root}").mode('${mode}').voicing()${arpCode}.velocity(0.6).slow(${k}))`;
   }
 }
@@ -269,115 +441,181 @@ const ARP_ORDERS: Record<ArpeggiatorType, string> = {
   [ArpeggiatorType.random]: '0|1|2'
 };
 
-export class PartArpeggiator extends InstrumentPartTyped<{
+/** Plays the chord's notes one after another (held chords take it over: see `PartChords`). */
+export class PartArpeggiator extends InstrumentPart<{
   enabled: boolean;
   speed: number;
   arpeggiatorType: ArpeggiatorType;
 }> {
+  static override readonly id = 'PartArpeggiator';
+  readonly stage = Stage.arp;
+  readonly role = Role.noteFx;
+  protected readonly fields = {
+    enabled: field.bool(),
+    speed: field.num(0.25, 16),
+    arpeggiatorType: field.oneOf(Object.values(ArpeggiatorType))
+  };
   override defaultData() {
     return { enabled: false, arpeggiatorType: ArpeggiatorType.up, speed: 1 };
   }
 
-  override generate(
-    data: InstrumentData,
-    selfData: PartArpeggiator['_dataType'],
-    length: Length
-  ): string {
-    if (!selfData.enabled) return '';
-    // held chords run their own arpeggio (this one would arpeggiate the melody along with them)
-    if (data?.parts && PartChords.isHeld(getPart(PartChords, data))) return '';
-    return PartArpeggiator.code(selfData, 1);
+  override generate(_data: InstrumentData, selfData: PartArpeggiator['dataType']): string {
+    return selfData.enabled ? PartArpeggiator.code(selfData, 1) : '';
   }
   /** `stretch`: how many steps one cycle of the pattern lasts (a held chord is slowed down by its length). */
-  static code(selfData: PartType<PartArpeggiator>, stretch: number): string {
+  static code(selfData: PartArpeggiator['dataType'], stretch: number): string {
     // indices into the chord's notes (a triad has three; an index past the end wraps round)
     const order = ARP_ORDERS[selfData.arpeggiatorType] ?? ARP_ORDERS[ArpeggiatorType.up];
-    const speed = Number.isFinite(selfData.speed) ? selfData.speed : 1;
+    const speed = num(selfData.speed, 0.25, 16, 1);
     return `.arp("[${order}] * ${speed * stretch}")`;
   }
 }
-export class PartTrackNotes extends InstrumentPartTyped<{
-  notes: { [key in DrumNote]: (0 | 1)[] };
-}> {
-  override isInput(): boolean {
-    return true;
+
+const DRUM_NOTES = Object.values(DrumNote) as string[];
+type DrumTracks = { [key in DrumNote]: (0 | 1)[] };
+/** Drum tracks: only known drum sounds, each a pattern of hits (0 / 1). */
+const drumTracks: Field<DrumTracks> = (v) => {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return INVALID;
+  const out = {} as DrumTracks;
+  for (const [k, hits] of Object.entries(v as Record<string, unknown>)) {
+    if (!DRUM_NOTES.includes(k)) return INVALID;
+    if (!Array.isArray(hits) || hits.length > MAX_PATTERN) return INVALID;
+    if (!hits.every((h) => h === 0 || h === 1 || h === null)) return INVALID;
+    out[k as DrumNote] = hits.map((h) => (h === 1 ? 1 : 0));
   }
+  return out;
+};
+
+/** The input of a drum kit: one row of hits per drum sound. */
+export class PartTrackNotes extends InstrumentPart<{ notes: DrumTracks }> {
+  static override readonly id = 'PartTrackNotes';
+  readonly stage = Stage.input;
+  readonly role = Role.notes;
+  protected readonly fields = { notes: drumTracks };
   override defaultData() {
-    return { notes: {} as { [key in DrumNote]: (0 | 1)[] } };
+    return { notes: {} as DrumTracks };
   }
   override generate(
-    data: InstrumentData,
-    selfData: PartTrackNotes['_dataType'],
-    length: Length
+    _data: InstrumentData,
+    selfData: PartTrackNotes['dataType'],
+    ctx: GenContext
   ): string {
+    const total = ctx.stepsPerMeasure * ctx.measures;
     const joined = Object.entries(selfData.notes)
-      .map((t) => {
-        const [k, v] = t;
-        var p = Array.from({ length: length.stepsPerMeasure * length.measures }, (_, i) =>
-          v[i] == 1 ? k : '~'
-        ).join(' ');
-        return `<${p}>`;
-      })
-      .join(','); // `s("${data.notes.join(' ')}")`;
+      .filter(([k]) => DRUM_NOTES.includes(k))
+      .map(
+        ([k, v]) => `<${Array.from({ length: total }, (_, i) => (v[i] == 1 ? k : '~')).join(' ')}>`
+      )
+      .join(',');
     return `s("${joined}")`;
   }
 }
 
-export class MonoSequence extends InstrumentPartTyped<{ notes: (number | undefined)[] }> {
-  override isInput(): boolean {
-    return true;
-  }
+/** Lowest and highest scale degree a melody step can hold (a few octaves around the instrument's). */
+export const MIN_DEGREE = -32;
+export const MAX_DEGREE = 32;
+
+/** The input of a melodic instrument: one scale degree (or a rest) per step. */
+export class MonoSequence extends InstrumentPart<{ notes: (number | undefined)[] }> {
+  static override readonly id = 'MonoSequence';
+  readonly stage = Stage.input;
+  readonly role = Role.notes;
+  protected readonly fields = { notes: field.steps(MIN_DEGREE, MAX_DEGREE) };
   override defaultData() {
     return { notes: [] };
   }
+  override degrees(selfData: MonoSequence['dataType']) {
+    return selfData.notes;
+  }
   override generate(
     data: InstrumentData,
-    selfData: MonoSequence['_dataType'],
-    length: Length
+    selfData: MonoSequence['dataType'],
+    ctx: GenContext
   ): string {
-    const octave = getPart(PartOctave, data)?.octave ?? 4;
-    // console.log(`GEN ${this}`, selfData, length);
-
-    const ctx = getGlobalContext();
-    return `n("<${Array.from(
-      { length: length.stepsPerMeasure * length.measures },
-      (_, i) => selfData.notes[i]
-    )
-      .map((x) => x ?? '~')
-      .join(' ')}>")
- .scale("${ctx.scaleKey}${octave}:${ctx.scaleMode}")`;
+    const total = ctx.stepsPerMeasure * ctx.measures;
+    const steps = Array.from({ length: total }, (_, i) => degree(selfData.notes[i])).join(' ');
+    return `n("<${steps}>")
+ .scale("${ctx.scaleKey}${PartOctave.of(data)}:${ctx.scaleMode}")`;
   }
 }
 
-export class PartEffects extends InstrumentPartTyped<{
+export class PartEffects extends InstrumentPart<{
   reverb: number;
   delay: number;
   chorus: number;
 }> {
+  static override readonly id = 'PartEffects';
+  readonly stage = Stage.effects;
+  readonly role = Role.soundFx;
+  protected readonly fields = {
+    reverb: field.num(0, 1),
+    delay: field.num(0, 1),
+    chorus: field.num(0, 1)
+  };
   override defaultData() {
     return { reverb: 0, delay: 0, chorus: 0 };
   }
 
-  override generate(
-    data: InstrumentData,
-    selfData: PartEffects['_dataType'],
-    length: Length
-  ): string {
-    const chorus = selfData.chorus ? `.add(note(0, ${selfData.chorus}))` : '';
-    return `${chorus}.room(${selfData.reverb ?? 0}).delay(${selfData.delay ?? 0})`;
+  override generate(_data: InstrumentData, selfData: PartEffects['dataType']): string {
+    const chorusAmount = num(selfData.chorus, 0, 1, 0);
+    const chorus = chorusAmount ? `.add(note(0, ${chorusAmount}))` : '';
+    return `${chorus}.room(${num(selfData.reverb, 0, 1, 0)}).delay(${num(selfData.delay, 0, 1, 0)})`;
   }
 }
 
-export class PartFilter extends InstrumentPartTyped<{ freq: number; res: number }> {
+export const MIN_FILTER_HZ = 20;
+export const MAX_FILTER_HZ = 20000;
+
+export class PartFilter extends InstrumentPart<{ freq: number; res: number }> {
+  static override readonly id = 'PartFilter';
+  readonly stage = Stage.filter;
+  readonly role = Role.soundFx;
+  protected readonly fields = {
+    freq: field.num(MIN_FILTER_HZ, MAX_FILTER_HZ),
+    res: field.num(0, 50)
+  };
   override defaultData(): { freq: number; res: number } {
     return { freq: 1000, res: 0.5 };
   }
 
-  override generate(
-    data: InstrumentData,
-    selfData: PartFilter['_dataType'],
-    length: Length
-  ): string {
-    return `.lpf("${selfData.freq}:${selfData.res}").lpenv(4)`;
+  override generate(_data: InstrumentData, selfData: PartFilter['dataType']): string {
+    const freq = num(selfData.freq, MIN_FILTER_HZ, MAX_FILTER_HZ, 1000);
+    const res = num(selfData.res, 0, 50, 0.5);
+    return `.lpf("${freq}:${res}").lpenv(4)`;
   }
+}
+
+/** Every part type, by id. Adding a part: write the class, list it here, and give it a view in `components/partViews.ts`. */
+export const PART_TYPES: PartClass[] = [
+  MonoSequence,
+  PartTrackNotes,
+  PartVoice,
+  PartFm,
+  PartEnvelope,
+  PartChords,
+  PartArpeggiator,
+  PartFilter,
+  PartOctave,
+  PartSteps,
+  PartEffects
+];
+const partsById = new Map<string, InstrumentPart>(PART_TYPES.map((P) => [P.id, new P()]));
+/** The part type stored under `partName`, if it is one this version knows. */
+export function getPartType(partName: string): InstrumentPart | undefined {
+  return typeof partName === 'string' ? partsById.get(partName) : undefined;
+}
+/** A part's name for people: "PartArpeggiator" -> "Arpeggiator", "PartTrackNotes" -> "Track notes". */
+export function partTitle(partName: string): string {
+  if (partName === 'PartFm') return 'FM';
+  return partName
+    .replace(/^Part/, '')
+    .replace(/([a-z])([A-Z])/g, (_, a, b) => `${a} ${b.toLowerCase()}`);
+}
+
+/** New data for a part, with `data` over its defaults. */
+export function makePartData<T extends InstrumentPart<any>>(
+  part: PartClass<T>,
+  data?: Partial<T['dataType']>
+): T['dataType'] {
+  return getPartType(part.id)!.createData(data) as T['dataType'];
 }

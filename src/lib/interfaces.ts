@@ -1,4 +1,4 @@
-import type { InstrumentPart, InstrumentPartTyped, PartType } from './parts.svelte';
+import type { InstrumentPart, PartType } from './parts.svelte';
 import type { InstrumentData } from './instruments';
 import type { Dispatch } from './commands';
 
@@ -8,7 +8,8 @@ export enum Status {
   connected = 'connected'
 }
 
-export interface IPartViewProps<T extends InstrumentPartTyped<any>> {
+/** A part's controls: they edit `partData` (a draft, bound), and `InstrumentPartView` turns the edits into commands. */
+export interface IPartViewProps<T extends InstrumentPart<any>> {
   part: T;
   partData: PartType<T>;
 }
@@ -26,8 +27,4 @@ export interface IDispatchingInstrumentViewProps extends IInstrumentViewProps {
   now?: () => number;
   /** When someone else last edited this instrument (changes → the view flashes). */
   editedByOther?: number;
-}
-export interface ITypedInstrumentViewProps<T extends InstrumentData> {
-  instrumentData: T;
-  index: number;
 }

@@ -2,7 +2,7 @@
   import { store } from '$lib';
   import { Modal } from '@skeletonlabs/skeleton-svelte';
   import { Sparkles } from '@lucide/svelte';
-  import { getInstrumentIcon, presets } from '$lib/Store.svelte';
+  import { getInstrumentIcon, instrumentOf, presets } from '$lib/Store.svelte';
   import { addInstrumentCommand, presetCommands } from '$lib/commandBuilders';
   import type { Dispatch } from '$lib/commands';
 
@@ -48,7 +48,7 @@
         </span>
       </button>
       {#each presets as preset}
-        {@const Icon = getInstrumentIcon(preset.instrument.name)}
+        {@const Icon = getInstrumentIcon(instrumentOf(preset.instrument).name)}
         <button
           type="button"
           class="btn w-full justify-start"

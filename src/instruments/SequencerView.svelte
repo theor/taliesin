@@ -3,15 +3,7 @@
   import { commitStroke, playheadStep, previewStroke, strideOf, type Cell } from '$lib/gesture';
   import { getInstrument } from '$lib/Store.svelte';
   import { getGlobalContext } from '$lib/context';
-  import {
-    ArrowLeftIcon,
-    ArrowRightIcon,
-    ChevronFirstIcon,
-    ChevronLastIcon,
-    EllipsisIcon,
-    HelpCircleIcon
-  } from '@lucide/svelte';
-  import { Pagination } from '@skeletonlabs/skeleton-svelte';
+  import { HelpCircleIcon } from '@lucide/svelte';
   import { pointer } from '$lib/utils/hammerAction';
   import { SvelteMap } from 'svelte/reactivity';
 
@@ -20,19 +12,25 @@
     instrumentData = $bindable(),
     dispatch,
     position,
-    playing
-  }: IDispatchingInstrumentViewProps = $props();
+    playing,
+    maxVisibleSteps = 32
+  }: IDispatchingInstrumentViewProps & {
+    /** A loop up to this long is shown whole; a longer one is paged. Phones pass 16. */
+    maxVisibleSteps?: number;
+  } = $props();
   const instr: Instrument | undefined = getInstrument(instrumentData);
   const seq = instr?.sequencer!;
   const scale = getGlobalContext() ?? { scaleKey: 'A', scaleMode: 'minor' };
 
-  const buttonClassOn = 'preset-filled-primary-500';
-  const buttonClassOff = 'preset-outlined-primary-500';
-  const buttonClassOnOdd = 'preset-filled-tertiary-500';
-  const buttonClassOffOdd = 'preset-outlined-tertiary-500';
-  const buttonClassModifiedOn = 'preset-filled-secondary-500';
-  const buttonClassModifiedOff = 'preset-tonal-secondary';
-  const buttonClassErasing = 'preset-gradient';
+  // `cell-*` names the state (tests read it); the rest is the look. Lit cells wear the primary colour (the
+  // instrument's colour on a phone), dimmer every other bar; unlit ones alternate shades by beat.
+  const cellOn = 'cell-on bg-primary-500';
+  const cellOnOdd = 'cell-on bg-primary-500/70';
+  const cellOff = 'cell-off bg-surface-200-800';
+  const cellOffAlt = 'cell-off bg-surface-100-900';
+  const cellPreviewOn = 'cell-preview bg-surface-950-50';
+  const cellPreviewSkip = 'cell-preview-skip bg-surface-400-600';
+  const cellErasing = 'cell-erasing preset-gradient';
 
   let panWillTurnOn: boolean | undefined = $state(undefined);
   let start: Cell | undefined; // where the current stroke began
@@ -64,7 +62,8 @@
           erase: erasing,
           isOn: (step) => seq.getCell(instrumentData, from.track, step)
         });
-        if (cells.length) dispatch({ type: 'setCells', instrumentId: instrumentData.id, track, cells });
+        if (cells.length)
+          dispatch({ type: 'setCells', instrumentId: instrumentData.id, track, cells });
       }
       stride = 1;
       erasing = false;
@@ -74,7 +73,10 @@
 
     const elt = document.elementFromPoint(e.x, e.y);
     if (!elt || !elt.hasAttribute('data-x')) return;
-    const cell: Cell = { step: Number(elt.getAttribute('data-x')), track: Number(elt.getAttribute('data-y')) };
+    const cell: Cell = {
+      step: Number(elt.getAttribute('data-x')),
+      track: Number(elt.getAttribute('data-y'))
+    };
     if (isNaN(cell.step) || isNaN(cell.track)) return;
 
     if (last) last = { step: last.step, track: cell.track }; // the row can change within a column
@@ -94,8 +96,6 @@
     }
   }
 
-  /** A loop up to this long is shown whole; a longer one is paged. */
-  const MAX_VISIBLE_STEPS = 32;
   let page = $state(1);
   let pages = $derived(paginate(instr));
 
@@ -109,12 +109,12 @@
     if (!instr) return [];
     const length = instr.getLength(instrumentData);
     const totalLength = length.stepsPerMeasure * length.measures;
-    const pagesCount = Math.ceil(totalLength / MAX_VISIBLE_STEPS);
+    const pagesCount = Math.ceil(totalLength / maxVisibleSteps);
     return Array.from({ length: pagesCount }, (_, i) => ({
       page: i + 1,
       label: `Page ${i + 1}`,
-      start: i * MAX_VISIBLE_STEPS,
-      end: Math.min((i + 1) * MAX_VISIBLE_STEPS, totalLength)
+      start: i * maxVisibleSteps,
+      end: Math.min((i + 1) * maxVisibleSteps, totalLength)
     }));
   }
 
@@ -126,8 +126,12 @@
 
   // grid rows run from the highest track (top) to the lowest
   const rows = (seq?.tracks ?? []).map((track, trackIndex) => ({ track, trackIndex })).reverse();
+  // fewer, wider steps (a phone) get taller cells, so each one is a comfortable tap
+  const cellHeight = maxVisibleSteps <= 16 ? (rows.length <= 4 ? 'h-11' : 'h-9') : 'h-8';
   const nowStep = $derived(
-    instr ? playheadStep(position ?? 0, playing ?? false, instr.getLength(instrumentData)) : undefined
+    instr
+      ? playheadStep(position ?? 0, playing ?? false, instr.getLength(instrumentData))
+      : undefined
   );
 </script>
 
@@ -135,10 +139,14 @@
   {@const length = instr.getLength(instrumentData)}
   {@const currentRange = currentPageRange()}
 
-  <div class="mb-2 flex flex-col select-none" data-testid="sequencer-grid" use:pointer={{ onPointer }}>
+  <div
+    class="mb-2 flex flex-col select-none"
+    data-testid="sequencer-grid"
+    use:pointer={{ onPointer }}
+  >
     {#each rows as { track, trackIndex } (trackIndex)}
       <div class="flex flex-row">
-        <div class="mr-1 w-8 flex-none self-center text-right text-xs">
+        <div class="mr-1.5 w-8 flex-none self-center text-right text-xs font-semibold opacity-80">
           {instr.trackLabel(track, scale)}
         </div>
         <div
@@ -150,31 +158,37 @@
             {@const modifiedCell = modifiedSteps.get(i + 1000 * trackIndex)}
             {@const cell = seq.getCell(instrumentData, trackIndex, i)}
             {@const odd = Math.floor(i / length.stepsPerMeasure) % 2 === 1}
+            {@const altBeat = Math.floor(i / 4) % 2 === 1}
+            {@const now = nowStep === i}
 
             <div
               id="seq-{trackIndex}-{i}"
               aria-label="seq-{trackIndex}-{i}"
               data-x={i}
               data-y={trackIndex}
-              class="flex h-8 p-px {i % 4 === 0 && ri > 0 ? 'border-surface-500/40 border-l-2' : ''} {nowStep ===
-              i
-                ? 'bg-warning-500/40'
-                : ''}"
+              data-now={now ? '' : undefined}
+              class="flex {cellHeight} py-0.5 pr-0.5 {ri > 0 && i % length.stepsPerMeasure === 0
+                ? 'pl-2'
+                : ri > 0 && i % 4 === 0
+                  ? 'pl-1'
+                  : 'pl-0.5'}"
             >
               <span
-                class="pointer-events-none h-full flex-1 rounded-xs {modifiedCell === undefined
+                class="pointer-events-none h-full flex-1 rounded-md {now
+                  ? 'ring-surface-950-50 ring-2 ring-inset'
+                  : ''} {modifiedCell === undefined
                   ? cell
                     ? odd
-                      ? buttonClassOnOdd
-                      : buttonClassOn
-                    : odd
-                      ? buttonClassOffOdd
-                      : buttonClassOff
+                      ? cellOnOdd
+                      : cellOn
+                    : altBeat
+                      ? cellOffAlt
+                      : cellOff
                   : erasing
-                    ? buttonClassErasing
+                    ? cellErasing
                     : modifiedCell % stride === 0
-                      ? buttonClassModifiedOn
-                      : buttonClassModifiedOff}"
+                      ? cellPreviewOn
+                      : cellPreviewSkip}"
               ></span>
             </div>
           {/each}
@@ -185,13 +199,19 @@
 
   <div class="flex items-center justify-between gap-2">
     {#if pages.length > 1}
-      <Pagination data={pages} {page} pageSize={1} onPageChange={(e) => (page = e.page)}>
-        {#snippet labelEllipsis()}<EllipsisIcon class="size-4" />{/snippet}
-        {#snippet labelNext()}<ArrowRightIcon class="size-4" />{/snippet}
-        {#snippet labelPrevious()}<ArrowLeftIcon class="size-4" />{/snippet}
-        {#snippet labelFirst()}<ChevronFirstIcon class="size-4" />{/snippet}
-        {#snippet labelLast()}<ChevronLastIcon class="size-4" />{/snippet}
-      </Pagination>
+      <div class="flex flex-wrap gap-1.5" role="group" aria-label="Steps shown">
+        {#each pages as p (p.page)}
+          <button
+            type="button"
+            class="h-9 rounded-lg px-3 font-mono text-xs font-semibold {page === p.page
+              ? 'bg-surface-950-50 text-surface-50-950'
+              : 'bg-surface-100-900 border-surface-200-800 border'}"
+            aria-label="Steps {p.start + 1} to {p.end}"
+            aria-pressed={page === p.page}
+            onclick={() => (page = p.page)}>{p.start + 1}–{p.end}</button
+          >
+        {/each}
+      </div>
     {:else}
       <span></span>
     {/if}

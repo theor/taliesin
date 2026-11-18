@@ -1,18 +1,20 @@
 import { describe, expect, test, vi } from 'vitest';
 import { AppStore, createInstrument } from './Store.svelte.js';
 import { PianoScale } from './instruments/MonoSynth.js';
-import { getPart } from './instruments.js';
-import { MonoSequence, PartTrackNotes } from './parts.svelte.js';
+import {
+  getPart,
+  makePartData,
+  MonoSequence,
+  PartChords,
+  PartFilter,
+  PartFm,
+  PartTrackNotes,
+  PartVoice
+} from './parts.svelte.js';
 import { createFakeNetwork } from './testing/fakeRoom.js';
 import { fakePlayer } from './testing/fakePlayer.js';
 import { randomizeCommands } from './commandBuilders.js';
 import type { Command } from './commands.js';
-
-// code generation reads the Svelte context (key / scale), which only exists inside a component
-vi.mock('./context', () => ({
-  getGlobalContext: () => ({ host: true, debug: false, roomId: 'r', scaleKey: 'A', scaleMode: 'minor' }),
-  setGlobalContext: () => {}
-}));
 
 // Presets are created in this order: Piano (0), Bass (1), Drum (2)
 const PIANO = 0;
@@ -21,14 +23,22 @@ const DRUM = 2;
 
 const snap = (s: AppStore) => JSON.parse(JSON.stringify(s.instrumentsData.instrumentsData));
 const idOf = (s: AppStore, index: number): string => s.instrumentsData.instrumentsData[index].id;
-const setCells = (s: AppStore, index: number, track: number, cells: [number, boolean][]): Command => ({
+const setCells = (
+  s: AppStore,
+  index: number,
+  track: number,
+  cells: [number, boolean][]
+): Command => ({
   type: 'setCells',
   instrumentId: idOf(s, index),
   track,
   cells: cells.map(([step, on]) => ({ step, on }))
 });
 const drumNotes = (s: AppStore) =>
-  getPart(PartTrackNotes, s.instrumentsData.instrumentsData[DRUM])!.notes as Record<string, number[]>;
+  getPart(PartTrackNotes, s.instrumentsData.instrumentsData[DRUM])!.notes as Record<
+    string,
+    number[]
+  >;
 const bassNotes = (s: AppStore) =>
   getPart(MonoSequence, s.instrumentsData.instrumentsData[BASS])!.notes as (number | undefined)[];
 
@@ -63,7 +73,10 @@ describe('dispatch: setCells', () => {
 
   test('is idempotent: applying the same command again changes nothing', () => {
     const s = solo();
-    const cmd = setCells(s, DRUM, 0, [[1, true], [2, true]]);
+    const cmd = setCells(s, DRUM, 0, [
+      [1, true],
+      [2, true]
+    ]);
     s.dispatch(cmd);
     const once = snap(s);
     s.dispatch(cmd);
@@ -73,7 +86,12 @@ describe('dispatch: setCells', () => {
   test('unknown ids, bad tracks and malformed cells are ignored', () => {
     const s = solo();
     const before = snap(s);
-    s.dispatch({ type: 'setCells', instrumentId: 'nope', track: 0, cells: [{ step: 0, on: true }] });
+    s.dispatch({
+      type: 'setCells',
+      instrumentId: 'nope',
+      track: 0,
+      cells: [{ step: 0, on: true }]
+    });
     s.dispatch(setCells(s, DRUM, 99, [[0, true]]));
     s.dispatch(setCells(s, DRUM, 0, [[-1, true]]));
     s.dispatch({ ...(setCells(s, DRUM, 0, []) as object), cells: 'x' } as unknown as Command);
@@ -86,9 +104,19 @@ describe('command log and replay', () => {
     const live = solo();
     const start = snap(live);
 
-    live.dispatch(setCells(live, DRUM, 1, [[1, true], [3, true]]));
+    live.dispatch(
+      setCells(live, DRUM, 1, [
+        [1, true],
+        [3, true]
+      ])
+    );
     live.dispatch(setCells(live, DRUM, 0, [[4, false]]));
-    live.dispatch(setCells(live, BASS, 5, [[0, true], [6, true]]));
+    live.dispatch(
+      setCells(live, BASS, 5, [
+        [0, true],
+        [6, true]
+      ])
+    );
     live.dispatch(setCells(live, BASS, 2, [[6, false]]));
     live.dispatch({ type: 'transport', action: 'toggle' });
     expect(live.commandLog).toHaveLength(5);
@@ -104,7 +132,12 @@ describe('command log and replay', () => {
 
   test('the log survives JSON, so a recorded session can be saved and replayed later', () => {
     const live = solo();
-    live.dispatch(setCells(live, DRUM, 2, [[0, false], [5, true]]));
+    live.dispatch(
+      setCells(live, DRUM, 2, [
+        [0, false],
+        [5, true]
+      ])
+    );
     const saved = JSON.stringify(live.commandLog.map((e) => e.cmd));
 
     const replayed = solo();
@@ -256,8 +289,193 @@ describe('convergence (randomised)', () => {
       expect(snap(a), `seed ${seed}: a differs from host`).toEqual(expected);
       expect(snap(b), `seed ${seed}: b differs from host`).toEqual(expected);
       for (const s of [a, b]) {
-        expect(s.instrumentsData.volume, `seed ${seed}: master volume`).toBe(host.instrumentsData.volume);
+        expect(s.instrumentsData.volume, `seed ${seed}: master volume`).toBe(
+          host.instrumentsData.volume
+        );
       }
     }
+  });
+});
+
+describe('untrusted part data', () => {
+  test('a field that would break out of the generated code is rejected', () => {
+    const s = solo();
+    const before = snap(s);
+    const bass = idOf(s, BASS);
+    const drum = idOf(s, DRUM);
+    const set = (instrumentId: string, partName: string, fields: object) =>
+      s.dispatch({ type: 'setPartFields', instrumentId, partName, fields } as Command);
+    set(bass, 'MonoSequence', { notes: ['1")+evil+("'] });
+    set(bass, 'PartEffects', { reverb: '0);evil();(' });
+    set(bass, 'PartOctave', { octave: '4");evil();("' });
+    set(drum, 'PartTrackNotes', { notes: { 'bd")+evil+("': [1] } });
+    set(bass, 'PartEffects', { reverb: 0.5, mystery: 1 }); // all or nothing
+    expect(snap(s)).toEqual(before);
+    expect(s.code()).not.toContain('evil');
+  });
+
+  test('hostile instruments never make the song unparseable', () => {
+    const s = solo();
+    const add = (instrumentName: string, parts: object[]) =>
+      s.dispatch({
+        type: 'addInstrument',
+        instrument: {
+          id: `x${parts.length}${instrumentName}`,
+          name: 'x',
+          instrumentName,
+          volume: 1,
+          state: 0,
+          parts
+        }
+      } as Command);
+    const before = snap(s).length;
+    add('PianoScale', []); // no input: rejected
+    add('PianoScale', [{ partName: 'PartSteps', stepsPerMeasure: 8, measures: 1 }]); // still no input
+    add('Drum', [{ partName: 'MonoSequence', notes: [1] }]); // another instrument's input
+    expect(snap(s)).toHaveLength(before);
+    // two inputs: only the instrument's own one is kept
+    add('PianoScale', [
+      { partName: 'MonoSequence', notes: [1] },
+      { partName: 'PartTrackNotes', notes: { bd: [1] } }
+    ]);
+    expect(
+      snap(s)
+        .at(-1)
+        .parts.map((p: any) => p.partName)
+    ).toEqual(['MonoSequence']);
+    // `$:` is a label, so the song is plain JavaScript: it must parse (this does not run it)
+    expect(() => new Function(s.code())).not.toThrow();
+  });
+
+  test('numbers are kept in range, so a huge loop cannot freeze the peers', () => {
+    const s = solo();
+    s.dispatch({
+      type: 'setPartFields',
+      instrumentId: idOf(s, BASS),
+      partName: 'PartSteps',
+      fields: { measures: 1e9 }
+    });
+    const steps = s.instrumentsData.instrumentsData[BASS].parts.find(
+      (p) => p.partName === 'PartSteps'
+    ) as any;
+    expect(steps.measures).toBe(16);
+  });
+});
+
+describe('the whole song over the network', () => {
+  test('a client only takes the song from its host, and only what the reducer accepts', () => {
+    const net = createFakeNetwork();
+    const host = new AppStore(true, 'r', net.join('host'), fakePlayer());
+    const a = new AppStore(false, 'r', net.join('a'), fakePlayer());
+    net.settle();
+    expect(snap(a)).toEqual(snap(host));
+
+    const rogue = net.join('rogue');
+    net.settle();
+    const [sendState] = rogue.makeAction<any>('state');
+    const evil = { ...snap(host)[BASS], id: 'evil' };
+    evil.parts = evil.parts.map((p: any) =>
+      p.partName === 'PartEffects' ? { ...p, reverb: '0);evil();(' } : p
+    );
+    sendState({ instruments: [evil], volume: 1, scale: host.scale }); // to everyone: the host and the client
+    expect(snap(a)).toEqual(snap(host)); // not the host: ignored
+    expect(host.instrumentsData.instrumentsData).toHaveLength(3); // the host never takes a song
+
+    const [sendCmd] = rogue.makeAction<any>('cmd');
+    sendCmd({ cmd: setCells(host, DRUM, 1, [[1, true]]), ordered: true }, 'a'); // pretending to be the host
+    expect(drumNotes(a).sd[1]).toBe(0);
+  });
+
+  test("the host's song goes through the reducer: an invalid field gets its default", () => {
+    const net = createFakeNetwork();
+    const host = new AppStore(true, 'r', net.join('host'), fakePlayer());
+    const effects = host.instrumentsData.instrumentsData[BASS].parts.find(
+      (p) => p.partName === 'PartEffects'
+    );
+    (effects as any).reverb = '0);evil();(';
+    const a = new AppStore(false, 'r', net.join('a'), fakePlayer());
+    net.settle();
+    expect(a.instrumentsData.instrumentsData).toHaveLength(3);
+    expect(a.code()).not.toContain('evil');
+  });
+});
+
+describe('the scale', () => {
+  test('is song state: set by command, synced, and only known keys and modes', () => {
+    const { host, a, b } = trio();
+    expect(a.scale).toEqual({ scaleKey: 'A', scaleMode: 'minor' });
+    a.dispatch({ type: 'setScale', scaleKey: 'D', scaleMode: 'dorian' });
+    for (const s of [host, a, b]) {
+      expect(s.scale).toEqual({ scaleKey: 'D', scaleMode: 'dorian' });
+      expect(s.code()).toContain(':dorian")');
+    }
+    a.dispatch({ type: 'setScale', scaleKey: 'H")+evil+("', scaleMode: 'dorian' });
+    a.dispatch({ type: 'setScale', scaleKey: 'C', scaleMode: 'bebop' });
+    expect(host.scale).toEqual({ scaleKey: 'D', scaleMode: 'dorian' });
+  });
+
+  test('a peer that joins later gets the scale and master volume with the song', () => {
+    const net = createFakeNetwork();
+    const host = new AppStore(true, 'r', net.join('host'), fakePlayer());
+    host.dispatch({ type: 'setScale', scaleKey: 'F#', scaleMode: 'lydian' });
+    host.dispatch({ type: 'setMasterVolume', volume: 0.3 });
+    const late = new AppStore(false, 'r', net.join('late'), fakePlayer());
+    net.settle();
+    expect(late.scale).toEqual({ scaleKey: 'F#', scaleMode: 'lydian' });
+    expect(late.instrumentsData.volume).toBe(0.3);
+    expect(late.code()).toBe(host.code());
+  });
+});
+
+describe('addPart', () => {
+  const addPart = (s: AppStore, index: number, partName: string): Command => ({
+    type: 'addPart',
+    instrumentId: idOf(s, index),
+    partName
+  });
+  const partNames = (s: AppStore, index: number) =>
+    s.instrumentsData.instrumentsData[index].parts.map((p) => p.partName);
+
+  test('gives an instrument a part it lacks, with its defaults, on every peer', () => {
+    const { host, a, b } = trio();
+    expect(partNames(host, BASS)).not.toContain(PartFm.id);
+    a.dispatch(addPart(a, BASS, PartFm.id));
+    for (const s of [host, a, b]) {
+      expect(getPart(PartFm, s.instrumentsData.instrumentsData[BASS])).toEqual(
+        makePartData(PartFm)
+      );
+    }
+  });
+
+  test('two peers adding the same part at once end up with one', () => {
+    const { net, host, a, b } = trio({ queued: true });
+    a.dispatch(addPart(a, BASS, PartFm.id));
+    b.dispatch(addPart(b, BASS, PartFm.id));
+    net.flush();
+    for (const s of [host, a, b])
+      expect(partNames(s, BASS).filter((n) => n === PartFm.id)).toHaveLength(1);
+    expect(snap(a)).toEqual(snap(host));
+    expect(snap(b)).toEqual(snap(host));
+  });
+
+  test('only parts the instrument kind allows: no voice on drums, no second input, nothing unknown', () => {
+    const s = solo();
+    const before = snap(s);
+    for (const cmd of [
+      addPart(s, DRUM, PartVoice.id), // would replace the drum samples
+      addPart(s, DRUM, PartChords.id), // needs melody notes
+      addPart(s, BASS, MonoSequence.id), // input parts are not added
+      addPart(s, BASS, PartTrackNotes.id),
+      addPart(s, BASS, 'PartNope'),
+      { type: 'addPart', instrumentId: 'nobody', partName: PartFm.id } as Command
+    ])
+      s.dispatch(cmd);
+    expect(snap(s)).toEqual(before);
+  });
+
+  test('drums can take a filter', () => {
+    const s = solo();
+    s.dispatch(addPart(s, DRUM, PartFilter.id));
+    expect(partNames(s, DRUM)).toContain(PartFilter.id);
   });
 });

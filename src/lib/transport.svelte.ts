@@ -51,6 +51,9 @@ const SETTLE_MS = 400;
 const WARMUP_ANNOUNCE_MS = 600;
 /** Ping samples kept: the smallest round trip is the least jittery estimate of the network delay. */
 const PING_SAMPLES = 5;
+/** Client heartbeat (ms): a beat that comes this much later than due means the main thread was stalled. */
+const BEAT_MS = 50;
+const STALL_MS = 40;
 
 /**
  * Host-authoritative play/stop state and playhead.
@@ -122,14 +125,45 @@ export class Transport {
         if (state.seq <= this.appliedSeq) return; // stale or duplicate
         this.appliedSeq = state.seq;
         this.hostId = peerId;
-        this.playing = state.playing;
         this.hostOnly = state.hostOnly === true;
+        this.watchStalls(state.playing);
+        // A message handled just after the main thread was stalled (a slow device evaluating the song)
+        // may have waited behind it for a long time: its arrival time is unknown, so its position would
+        // put us behind by that wait. Keep the previous reference and correct on the next clean one.
+        const sameSong = this.last?.playing === state.playing && this.last?.cps === state.cps;
+        if (sameSong && this.mayBeStale()) return;
+        this.playing = state.playing;
         this.last = state;
         this.receivedAt = this.now();
         // measure first, so even the first start uses a real latency estimate
         void this.measureLatency(peerId).then(() => this.reconcile(true));
       });
     }
+  }
+
+  private heartbeat: ReturnType<typeof setInterval> | undefined;
+  private lastBeat = 0;
+  private lastStall = -Infinity;
+  /** Client: while playing, a heartbeat that notices when the main thread was stalled. */
+  private watchStalls(on: boolean) {
+    if (on && !this.heartbeat) {
+      this.lastBeat = this.now();
+      this.heartbeat = setInterval(() => {
+        const t = this.now();
+        if (t - this.lastBeat > BEAT_MS + STALL_MS) this.lastStall = t;
+        this.lastBeat = t;
+      }, BEAT_MS);
+    } else if (!on && this.heartbeat) {
+      clearInterval(this.heartbeat);
+      this.heartbeat = undefined;
+    }
+  }
+  /** Whether something handled now may have waited behind a long task (the main thread is or was just stalled). */
+  private mayBeStale(): boolean {
+    // hidden tabs run timers once a second: no evidence either way, and messages are not delayed there
+    if (!this.heartbeat || (typeof document !== 'undefined' && document.hidden)) return false;
+    const t = this.now();
+    return t - this.lastBeat > BEAT_MS + STALL_MS || t - this.lastStall < 2 * BEAT_MS;
   }
 
   private updateResync() {

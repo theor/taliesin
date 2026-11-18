@@ -127,8 +127,8 @@ describe('InstrumentView', () => {
   test('the whole loop is shown, with the playhead on the right step', () => {
     mount(PianoScale, { playing: true, position: 0.5 }); // 8 steps per cycle: half a cycle is step 4
     expect(document.querySelectorAll('[data-y="0"]')).toHaveLength(16);
-    expect(document.querySelector('[data-x="4"][data-y="0"]')).toHaveClass('bg-warning-500/40');
-    expect(document.querySelector('[data-x="5"][data-y="0"]')).not.toHaveClass('bg-warning-500/40');
+    expect(document.querySelector('[data-x="4"][data-y="0"]')).toHaveAttribute('data-now');
+    expect(document.querySelector('[data-x="5"][data-y="0"]')).not.toHaveAttribute('data-now');
   });
 
   test('grid rows are named after the notes of the scale', () => {

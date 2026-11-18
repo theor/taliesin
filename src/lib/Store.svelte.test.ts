@@ -1,7 +1,6 @@
 import { expect, test, describe, vi, afterEach } from 'vitest';
-import { AppStore, createInstrument, makePartData } from './Store.svelte.js';
-import { PartEffects, PartSteps } from './parts.svelte.js';
-import { getPart } from './instruments.js';
+import { AppStore, createInstrument } from './Store.svelte.js';
+import { getPart, makePartData, PartEffects, PartSteps } from './parts.svelte.js';
 import { presetCommands } from './commandBuilders.js';
 import type { Command } from './commands.js';
 import { PianoScale } from './instruments/MonoSynth.js';
@@ -245,6 +244,7 @@ describe('robustness', () => {
     const [sendState] = old.makeAction<any>('state');
     const legacy = snap(client).map(({ id, ...rest }: any) => rest);
     await sendState(legacy);
+    expect(snap(client)).toHaveLength(legacy.length);
     expect(snap(client).every((i: any) => !!i.id)).toBe(true);
   });
 });
@@ -280,6 +280,23 @@ describe('transport sync', () => {
     await vi.waitFor(() => expect(players.a.calls).toEqual(['start', 'stop']));
     expect(players.b.calls).toEqual(['start', 'stop']);
     expect(players.host.calls).toEqual(['toggle', 'stop']);
+  });
+
+  test('a resync handled right after the main thread stalled does not move the timing reference', async () => {
+    const { host, a } = setup();
+    await host.transport.toggle();
+    await new Promise((r) => setTimeout(r, 120)); // a few heartbeats
+    const ref = () => (a.transport as any).receivedAt as number;
+    const before = ref();
+    const until = performance.now() + 200;
+    while (performance.now() < until); // a long task: the message below waited behind it
+    host.transport.broadcast();
+    expect(ref()).toBe(before);
+    expect(a.transport.playing).toBe(true);
+    await new Promise((r) => setTimeout(r, 150)); // the thread is free again
+    host.transport.broadcast();
+    expect(ref()).toBeGreaterThan(before);
+    host.transport.stop();
   });
 
   test('a client request is executed by the host and mirrored everywhere', async () => {

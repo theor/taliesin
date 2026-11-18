@@ -1,17 +1,15 @@
-import { findPartTypeAndData, getPartType, getPartTypeAndData } from './Store.svelte';
 import {
-  PartChords,
-  PartEffects,
-  PartFilter,
+  getPart,
+  getPartType,
+  LAST_STEP_STAGE,
   PartSteps,
+  type GenContext,
   type InstrumentPart,
-  PartArpeggiator,
   type InstrumentPartData,
-  InstrumentPartTyped,
-  type PartType
+  type PartClass,
+  type Scale
 } from './parts.svelte';
 import type { ISequencer } from './sequencer';
-import { strudel } from './strudel';
 
 /** How an instrument's cells can be edited: the step grid, one Euclidean circle per track, nested rings, or pads to play along on. */
 export type InputView = 'grid' | 'circle' | 'rings' | 'record';
@@ -20,63 +18,85 @@ export interface Length {
   stepsPerMeasure: number;
   measures: number;
 }
+
+/**
+ * A kind of instrument (a synth, a drum kit). Stateless, like parts: its state is an `InstrumentData` in
+ * the song, and this object knows how to create it, edit its cells and turn it into Strudel code.
+ */
 export abstract class Instrument {
-  getLength(data: InstrumentData): Length {
-    var steps = getPart(PartSteps, data);
-    if (steps) {
-      return steps;
-    }
-    return { stepsPerMeasure: 4, measures: 1 };
-  }
-  abstract randomize(data: InstrumentData): InstrumentData;
-  /** What a grid row is called (e.g. a note name instead of a scale degree). */
-  trackLabel(track: string, _scale: { scaleKey: string; scaleMode: string }): string {
-    return track;
-  }
+  /** The id its data is stored under (`instrumentName`): saved and sent over the network, so it never changes. */
+  abstract readonly name: string;
+  /** The part its notes come from (the start of its code). An instrument without it plays nothing. */
+  abstract readonly input: PartClass;
+  /** The parts that can be added to it from the rack (`addPart`), besides those it starts with. */
+  readonly addableParts: readonly PartClass[] = [];
+  /** Adapts the instrument's input part to the grid views; undefined when its cells can't be edited. */
   sequencer: ISequencer | undefined;
   /** The ways this instrument's cells can be edited; the first is the default. */
   views: InputView[] = ['grid'];
-  // abstract sequencer(data: InstrumentData): ISequencer|undefined ;
-  notes: string[] = [];
-  name: string = this.constructor.name;
-  // progress(data:InstrumentData) { return getPart(PartSteps, data)?.time(strudel.time)!; }
 
-  abstract createData_(): InstrumentPartData[];
+  getLength(data: InstrumentData): Length {
+    const steps = getPart(PartSteps, data);
+    return steps
+      ? { stepsPerMeasure: steps.stepsPerMeasure, measures: steps.measures }
+      : { stepsPerMeasure: 4, measures: 1 };
+  }
+  abstract randomize(data: InstrumentData): InstrumentData;
+  /** What a grid row is called (e.g. a note name instead of a scale degree). */
+  trackLabel(track: string, _scale: Scale): string {
+    return track;
+  }
+
+  protected abstract createParts(): InstrumentPartData[];
   createData(name?: string): InstrumentData {
     return {
       id: newId(),
-      parts: this.createData_(),
+      parts: this.createParts(),
       instrumentName: this.name,
       name: name || this.name,
       volume: 1,
       state: TrackState.Playing
     };
   }
-  protected abstract generate_(data: InstrumentData): string;
-  generate(data: InstrumentData): string {
-    const generatePart = (x:Constructor<InstrumentPartTyped<any>>) => {
-      const part = getPartTypeAndData(x, data);
-      // console.log(`Generating part ${x.name}`, part);
-      if (part.part && part.data) {
-        
-        return part.part.generate(data, part.data, this.getLength(data));
-      }
-      return '';
-    }
-    const inputPart = findPartTypeAndData(data, (x) => x.isInput());
-// console.warn(`Generating instrument ${this.name} with input part:`, inputPart?.part, inputPart?.data, data);
 
-    const l = this.getLength(data);
-    return `${inputPart?.part.generate(data, inputPart.data, l) || ''}
-  ${generatePart(PartChords)}
-  ${generatePart(PartArpeggiator)}
-  .fast(${this.getLength(data).stepsPerMeasure})
-  ${generatePart(PartFilter)}
-  ${generatePart(PartEffects)}
-  ${this.generate_(data)}
-  ${this.trackOptions(data)}`;
+  /**
+   * The instrument as Strudel code: its parts in stage order (see `Stage`), with `.fast(steps)` after
+   * the parts that work on the step grid, then anything instrument-specific, then the track's gain.
+   * A pure function of the data and the scale.
+   */
+  generate(data: InstrumentData, scale: Scale): string {
+    const parts = data.parts
+      .map((p) => ({ data: p, type: getPartType(p.partName) }))
+      .filter((p): p is { data: InstrumentPartData; type: InstrumentPart } => !!p.type)
+      // the instrument's own input is the start of the chain; any other input part is not played
+      .filter((p) => !p.type.isInput() || p.type.id === this.input.id)
+      .sort((a, b) => a.type.stage - b.type.stage);
+    const input = parts.find((p) => p.type.isInput());
+    if (!input) return ''; // nothing to play (the reducer never lets such an instrument in)
+    const length = this.getLength(data);
+    const ctx: GenContext = {
+      ...length,
+      ...scale,
+      degrees: input.type.degrees(input.data),
+      consumed: new Set()
+    };
+    // in order: a part may take over a later one (`GenContext.consumed`)
+    const code = (p: (typeof parts)[number]) =>
+      ctx.consumed!.has(p.type.id) ? '' : p.type.generate(data, p.data, ctx);
+    return [
+      ...parts.filter((p) => p.type.stage <= LAST_STEP_STAGE).map(code),
+      `.fast(${length.stepsPerMeasure})`,
+      ...parts.filter((p) => p.type.stage > LAST_STEP_STAGE).map(code),
+      this.generateExtra(data),
+      this.trackOptions(data)
+    ]
+      .filter(Boolean)
+      .join('\n  ');
   }
-
+  /** Code the instrument adds after its parts. */
+  protected generateExtra(_data: InstrumentData): string {
+    return '';
+  }
   protected trackOptions(data: InstrumentData): string {
     return `.gain(${data.volume})`;
   }
@@ -90,7 +110,10 @@ export enum TrackState {
 /** Stable identity used to address an instrument across peers (array indices shift on add/remove). */
 export function newId(): string {
   // crypto.randomUUID needs a secure context; fall back for plain-http LAN sessions
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+  );
 }
 export interface InstrumentData {
   id: string;
@@ -100,17 +123,4 @@ export interface InstrumentData {
   volume: number;
   state: TrackState;
 }
-export type InstrumentDataJsonValue = InstrumentData & { [key: string]: any }; // Omit<InstrumentData, 'parts'> & {parts: {name:string}[]};
-export function getPart<T extends InstrumentPartTyped<any>>(
-  key: Constructor<T>,
-  data: InstrumentData
-): PartType<T> | undefined {
-  return data.parts.find((x) => x.partName === key.name) as PartType<T>;
-}
-
-export function hasPart<T extends InstrumentPart>(
-  key: Constructor<T>,
-  data: InstrumentData
-): boolean {
-  return data.parts.some((x) => x instanceof key);
-}
+export type InstrumentDataJsonValue = InstrumentData & { [key: string]: any };

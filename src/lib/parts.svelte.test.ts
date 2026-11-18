@@ -1,19 +1,37 @@
-import { describe, expect, test, vi } from 'vitest';
-import './Store.svelte'; // load the store first: instruments and the store import each other
-import { ArpeggiatorType, ChordHold, PartArpeggiator, PartChords, VoicingMode } from './parts.svelte';
+import { describe, expect, test } from 'vitest';
+import { createInstrument, getInstrument, presets } from './Store.svelte';
+import {
+  ArpeggiatorType,
+  ChordHold,
+  DEFAULT_SCALE,
+  PartArpeggiator,
+  PartChords,
+  VoicingMode,
+  getPartType,
+  makePartData,
+  PART_TYPES,
+  type GenContext
+} from './parts.svelte';
 
-vi.mock('./context', () => ({
-  getGlobalContext: () => ({ host: true, debug: false, roomId: 'r', scaleKey: 'A', scaleMode: 'minor' }),
-  setGlobalContext: () => {}
-}));
+const ctx = (
+  stepsPerMeasure: number,
+  measures: number,
+  degrees?: GenContext['degrees']
+): GenContext => ({
+  stepsPerMeasure,
+  measures,
+  ...DEFAULT_SCALE,
+  degrees
+});
 
 describe('PartArpeggiator.generate', () => {
   const gen = (type: ArpeggiatorType, enabled = true, speed = 2) =>
-    new PartArpeggiator().generate(
-      undefined!,
-      { partName: 'PartArpeggiator', enabled, speed, arpeggiatorType: type },
-      { stepsPerMeasure: 4, measures: 1 } as any
-    );
+    new PartArpeggiator().generate(undefined!, {
+      partName: 'PartArpeggiator',
+      enabled,
+      speed,
+      arpeggiatorType: type
+    });
 
   test('nothing when disabled', () => {
     expect(gen(ArpeggiatorType.up, false)).toBe('');
@@ -40,7 +58,7 @@ describe('PartChords.generate', () => {
     new PartChords().generate(
       { parts: [{ partName: 'MonoSequence', notes }, ...extra] } as any,
       { partName: 'PartChords', enabled: true, mode: VoicingMode.below, hold },
-      { stepsPerMeasure, measures } as any
+      ctx(stepsPerMeasure, measures, notes)
     );
 
   test('nothing when disabled', () => {
@@ -48,7 +66,7 @@ describe('PartChords.generate', () => {
       new PartChords().generate(
         undefined!,
         { partName: 'PartChords', enabled: false, mode: VoicingMode.below, hold: ChordHold.bar },
-        {} as any
+        ctx(4, 1, [0])
       )
     ).toBe('');
   });
@@ -83,7 +101,9 @@ describe('PartChords.generate', () => {
       expect(gen([0, 1, 2, 3], ChordHold.half)).toContain('.slow(2)');
     });
     test('a bar with no note has no chord', () => {
-      expect(gen([0, null, null, null, null, null, null, null], ChordHold.bar, [], 4, 2)).toContain('n("<0 ~>")');
+      expect(gen([0, null, null, null, null, null, null, null], ChordHold.bar, [], 4, 2)).toContain(
+        'n("<0 ~>")'
+      );
     });
     test('half of an odd bar is the whole bar, so chords stay in line with the loop', () => {
       expect(PartChords.holdSteps(ChordHold.half, 7)).toBe(7);
@@ -91,10 +111,17 @@ describe('PartChords.generate', () => {
       expect(PartChords.holdSteps(ChordHold.step, 8)).toBe(1);
     });
     test('the octave follows the melody', () => {
-      expect(gen([0, 1], ChordHold.bar, [{ partName: 'PartOctave', octave: 3 }])).toContain('anchor("A3")');
+      expect(gen([0, 1], ChordHold.bar, [{ partName: 'PartOctave', octave: 3 }])).toContain(
+        'anchor("A3")'
+      );
     });
     test('the arpeggio plays the held chord at its usual rate, not the melody', () => {
-      const arp = { partName: 'PartArpeggiator', enabled: true, speed: 2, arpeggiatorType: ArpeggiatorType.up };
+      const arp = {
+        partName: 'PartArpeggiator',
+        enabled: true,
+        speed: 2,
+        arpeggiatorType: ArpeggiatorType.up
+      };
       const data = {
         parts: [
           { partName: 'MonoSequence', notes: [0, 1, 2, 3] },
@@ -102,9 +129,86 @@ describe('PartChords.generate', () => {
           arp
         ]
       } as any;
-      const code = new PartChords().generate(data, data.parts[1], { stepsPerMeasure: 4, measures: 1 } as any);
+      const c = { ...ctx(4, 1, [0, 1, 2, 3]), consumed: new Set<string>() };
+      const code = new PartChords().generate(data, data.parts[1], c);
       expect(code).toContain('.voicing().arp("[0 1 2] * 8").velocity(0.6).slow(4)'); // 2 per step, 4 steps
-      expect(new PartArpeggiator().generate(data, arp, { stepsPerMeasure: 4, measures: 1 } as any)).toBe('');
+      expect([...c.consumed]).toEqual(['PartArpeggiator']); // so the instrument does not apply it to the melody
     });
+    test('the instrument applies the arpeggio once: on the held chord, not on the melody too', () => {
+      const piano = presets.find((p) => p.name === 'Piano')!;
+      const data = createInstrument(piano.instrument, [
+        ...piano.parts,
+        makePartData(PartChords, { enabled: true, hold: ChordHold.bar }),
+        makePartData(PartArpeggiator, { enabled: true, speed: 2 })
+      ]);
+      const code = getInstrument(data)!.generate(data, DEFAULT_SCALE);
+      expect(code.match(/\.arp\(/g)).toHaveLength(1);
+      expect(code).toMatch(/\.voicing\(\)\.arp\([^)]*\)\.velocity/);
+      // one chord per step: no held layer, so the arpeggio is on the chain
+      const perStep = createInstrument(piano.instrument, [
+        ...piano.parts,
+        makePartData(PartChords, { enabled: true, hold: ChordHold.step }),
+        makePartData(PartArpeggiator, { enabled: true, speed: 2 })
+      ]);
+      expect(getInstrument(perStep)!.generate(perStep, DEFAULT_SCALE)).toContain(
+        '.voicing()\n  .arp('
+      );
+    });
+  });
+});
+
+describe('part validation', () => {
+  test('ids are stable strings, not class names', () => {
+    expect(PART_TYPES.map((P) => P.id)).toEqual([
+      'MonoSequence',
+      'PartTrackNotes',
+      'PartVoice',
+      'PartFm',
+      'PartEnvelope',
+      'PartChords',
+      'PartArpeggiator',
+      'PartFilter',
+      'PartOctave',
+      'PartSteps',
+      'PartEffects'
+    ]);
+  });
+  test('every default is valid for its own part', () => {
+    for (const P of PART_TYPES) {
+      const part = getPartType(P.id)!;
+      expect(part.normalize(part.createData()), P.id).toEqual(part.createData());
+    }
+  });
+  test('numbers are clamped, wrong types and unknown values rejected', () => {
+    const steps = getPartType('PartSteps')!;
+    expect(
+      steps.normalize({ stepsPerMeasure: 1e9, measures: 0, oddSignature: false })
+    ).toMatchObject({
+      stepsPerMeasure: 64,
+      measures: 1
+    });
+    expect(steps.normalize({ stepsPerMeasure: '8' })).toBeNull();
+    expect(getPartType('PartChords')!.normalize({ mode: 'sideways' })).toBeNull();
+    expect(getPartType('PartChords')!.normalize({ mode: 'sideways' }, false)).toMatchObject({
+      mode: 'below'
+    });
+  });
+  test('melody steps are integers or rests', () => {
+    const seq = getPartType('MonoSequence')!;
+    expect(seq.normalize({ notes: [1, null, undefined, 7] })).toEqual({
+      partName: 'MonoSequence',
+      notes: [1, undefined, undefined, 7]
+    });
+    expect(seq.normalize({ notes: ['1")+evil+("'] })).toBeNull();
+    expect(seq.normalize({ notes: [1.5] })).toBeNull();
+  });
+  test('drum tracks are known sounds with hits', () => {
+    const drums = getPartType('PartTrackNotes')!;
+    expect(drums.normalize({ notes: { bd: [1, 0] } })).toEqual({
+      partName: 'PartTrackNotes',
+      notes: { bd: [1, 0] }
+    });
+    expect(drums.normalize({ notes: { 'bd")+evil+("': [1] } })).toBeNull();
+    expect(drums.normalize({ notes: { bd: ['x'] } })).toBeNull();
   });
 });
