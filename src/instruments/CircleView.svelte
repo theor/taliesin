@@ -14,10 +14,14 @@
   const scale = getGlobalContext() ?? { scaleKey: 'A', scaleMode: 'minor' };
 
   const steps = $derived(
-    instr ? instr.getLength(instrumentData).stepsPerMeasure * instr.getLength(instrumentData).measures : 0
+    instr
+      ? instr.getLength(instrumentData).stepsPerMeasure * instr.getLength(instrumentData).measures
+      : 0
   );
   const nowStep = $derived(
-    instr ? playheadStep(position ?? 0, playing ?? false, instr.getLength(instrumentData)) : undefined
+    instr
+      ? playheadStep(position ?? 0, playing ?? false, instr.getLength(instrumentData))
+      : undefined
   );
   const tracks = $derived((seq?.tracks ?? []).map((track, trackIndex) => ({ track, trackIndex })));
 
@@ -27,7 +31,8 @@
   /** What the user last asked for on a track; only used when it still matches the cells. */
   let asked = $state<Record<number, { pulses: number; rotation: number }>>({});
 
-  const paramsOf = (trackIndex: number, cells: boolean[]) => resolveParams(cells, asked[trackIndex]);
+  const paramsOf = (trackIndex: number, cells: boolean[]) =>
+    resolveParams(cells, asked[trackIndex]);
 
   function setParams(trackIndex: number, pulses: number, rotation: number) {
     asked[trackIndex] = { pulses, rotation };
@@ -81,7 +86,7 @@
                 cx={x}
                 cy={y}
                 r={dotRadius(steps)}
-                class={on ? 'fill-primary-500' : 'fill-transparent stroke-primary-500'}
+                class={on ? 'fill-primary-500' : 'stroke-primary-500 fill-transparent'}
                 stroke-width="1.5"
               />
               {#if nowStep === step}

@@ -122,7 +122,8 @@ export function findChirp(
   let probeEnergy = 0;
   for (let i = 0; i < m; i++) probeEnergy += probe[i] * probe[i];
   const prefix = new Float64Array(recording.length + 1);
-  for (let i = 0; i < recording.length; i++) prefix[i + 1] = prefix[i] + recording[i] * recording[i];
+  for (let i = 0; i < recording.length; i++)
+    prefix[i + 1] = prefix[i] + recording[i] * recording[i];
 
   // |correlation| so a speaker/mic that inverts polarity still counts
   const ncc = new Float64Array(span + 1);

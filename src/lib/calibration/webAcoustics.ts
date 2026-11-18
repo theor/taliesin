@@ -22,7 +22,12 @@ export interface WebAcousticsOptions {
 
 const defaultStream = () =>
   navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 }
+    audio: {
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: false,
+      channelCount: 1
+    }
   });
 
 /** Acoustics on a real AudioContext: same context and output path as the song itself. */

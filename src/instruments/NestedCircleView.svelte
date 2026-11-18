@@ -47,7 +47,8 @@
     y: 50 + r * Math.sin(angle(i))
   });
   /** Dots shrink when rings are close together or steps are many. */
-  const dotR = (r: number) => Math.max(1, Math.min(spacing * 0.36, (Math.PI * r) / steps * 0.6, 3));
+  const dotR = (r: number) =>
+    Math.max(1, Math.min(spacing * 0.36, ((Math.PI * r) / steps) * 0.6, 3));
   const hitR = (r: number) => Math.max(dotR(r), Math.min(spacing / 2, (Math.PI * r) / steps / 1.2));
 
   function setParams(pulses: number, rotation: number) {
@@ -124,7 +125,7 @@
               cx={x}
               cy={y}
               r={dotR(r)}
-              class={on ? 'fill-primary-500' : 'fill-transparent stroke-primary-500'}
+              class={on ? 'fill-primary-500' : 'stroke-primary-500 fill-transparent'}
               stroke-width="0.5"
               opacity={ring.trackIndex === selected ? 1 : 0.75}
             />

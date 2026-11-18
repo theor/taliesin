@@ -7,7 +7,10 @@ export interface IceServer {
 
 function isIceServer(x: any): x is IceServer {
   const urls = Array.isArray(x?.urls) ? x.urls : [x?.urls];
-  return urls.length > 0 && urls.every((u: unknown) => typeof u === 'string' && /^(stun|turn)s?:/.test(u));
+  return (
+    urls.length > 0 &&
+    urls.every((u: unknown) => typeof u === 'string' && /^(stun|turn)s?:/.test(u))
+  );
 }
 
 /**
@@ -21,8 +24,11 @@ export function trimIceServers(servers: IceServer[]): IceServer[] {
   for (const server of servers) {
     const urls = Array.isArray(server.urls) ? server.urls : [server.urls];
     const stun = urls.find((u) => u.startsWith('stun:'));
-    const turn = urls.find((u) => /^turn:.*transport=udp/.test(u)) ?? urls.find((u) => u.startsWith('turn:'));
-    const turns = urls.find((u) => /^turns:[^?]*:443(\?|$)/.test(u)) ?? urls.find((u) => u.startsWith('turns:'));
+    const turn =
+      urls.find((u) => /^turn:.*transport=udp/.test(u)) ?? urls.find((u) => u.startsWith('turn:'));
+    const turns =
+      urls.find((u) => /^turns:[^?]*:443(\?|$)/.test(u)) ??
+      urls.find((u) => u.startsWith('turns:'));
     const kept = [stun, turn, turns].filter((u): u is string => !!u);
     if (kept.length) trimmed.push({ ...server, urls: kept });
   }
@@ -43,7 +49,9 @@ export async function fetchIceServers(
     const res = await fetchImpl(endpoint, { signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) return [];
     const body = await res.json();
-    return Array.isArray(body?.iceServers) ? trimIceServers(body.iceServers.filter(isIceServer)) : [];
+    return Array.isArray(body?.iceServers)
+      ? trimIceServers(body.iceServers.filter(isIceServer))
+      : [];
   } catch {
     return [];
   }

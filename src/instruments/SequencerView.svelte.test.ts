@@ -6,7 +6,6 @@ import { createInstrument } from '$lib/Store.svelte';
 import { Drum } from '$lib/instruments/Drum';
 import type { Command } from '$lib/commands';
 
-
 // The view in isolation: no store, no network, no audio. It is handed state and a spy `dispatch`, and
 // the tests check which commands a gesture produces. Drum starts as
 //   bd (track 0): X . . . X . . .     sd (track 1): . . X . . . X .     hh (track 2): all on
@@ -78,7 +77,12 @@ describe('SequencerView', () => {
 
   test('dragging along a row dispatches one command covering the whole stroke', async () => {
     const { dispatch, gesture } = mount();
-    await gesture([[1, 1], [2, 1], [3, 1], [4, 1]]);
+    await gesture([
+      [1, 1],
+      [2, 1],
+      [3, 1],
+      [4, 1]
+    ]);
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(dispatch.mock.calls[0][0]).toMatchObject({
       track: 1,
@@ -88,7 +92,11 @@ describe('SequencerView', () => {
 
   test('moving a row away while dragging sets a stride of 2', async () => {
     const { dispatch, gesture } = mount();
-    await gesture([[1, 0], [3, 0], [5, 1]]); // starts on an empty cell, so it paints
+    await gesture([
+      [1, 0],
+      [3, 0],
+      [5, 1]
+    ]); // starts on an empty cell, so it paints
     expect(dispatch.mock.calls[0][0]).toMatchObject({
       track: 0,
       cells: [1, 3, 5].map((step) => ({ step, on: true }))
@@ -97,7 +105,14 @@ describe('SequencerView', () => {
 
   test('a drag that starts on a lit cell erases everything it covers', async () => {
     const { dispatch, cell, gesture } = mount();
-    await gesture([[4, 0], [5, 0], [6, 0]], false); // the kick is on at step 4
+    await gesture(
+      [
+        [4, 0],
+        [5, 0],
+        [6, 0]
+      ],
+      false
+    ); // the kick is on at step 4
     expect(cell(5, 0).firstElementChild).toHaveClass('cell-erasing'); // erase preview
     await gesture([], true);
     expect(dispatch.mock.calls[0][0]).toMatchObject({
@@ -114,7 +129,14 @@ describe('SequencerView', () => {
 
   test('nothing is dispatched until the pointer is released, but the stroke is previewed', async () => {
     const { dispatch, cell, gesture } = mount();
-    await gesture([[1, 1], [2, 1], [3, 1]], false);
+    await gesture(
+      [
+        [1, 1],
+        [2, 1],
+        [3, 1]
+      ],
+      false
+    );
     expect(dispatch).not.toHaveBeenCalled();
     expect(cell(2, 1).firstElementChild).toHaveClass('cell-preview'); // preview colour
   });
@@ -122,7 +144,11 @@ describe('SequencerView', () => {
   test('the view never mutates the instrument itself', async () => {
     const { instrumentData, gesture } = mount();
     const before = JSON.stringify(instrumentData);
-    await gesture([[1, 1], [2, 1], [3, 1]]);
+    await gesture([
+      [1, 1],
+      [2, 1],
+      [3, 1]
+    ]);
     expect(JSON.stringify(instrumentData)).toBe(before);
   });
 

@@ -79,7 +79,8 @@ describe('probe detection', () => {
       const rec = new Float32Array(20000);
       let s = seed;
       const uniform = () => ((s = (s * 16807) % 2147483647) / 2147483647 - 0.5) * Math.sqrt(12);
-      for (let i = 0; i < rec.length; i++) rec[i] = sigma * ((uniform() + uniform() + uniform() + uniform()) / 2);
+      for (let i = 0; i < rec.length; i++)
+        rec[i] = sigma * ((uniform() + uniform() + uniform() + uniform()) / 2);
       return rec;
     };
     const sigma = 2.19; // noise power 0.15 x 31.6: the probe is 15 dB below the noise
@@ -89,7 +90,10 @@ describe('probe detection', () => {
       const found = findChirp(rec, probe);
       expect(found, `probe in noise, seed ${seed}`).toBeDefined();
       expect(found!.index).toBeCloseTo(6000, 0);
-      expect(findChirp(noise(seed + 100, sigma), probe), `noise only, seed ${seed}`).toBeUndefined();
+      expect(
+        findChirp(noise(seed + 100, sigma), probe),
+        `noise only, seed ${seed}`
+      ).toBeUndefined();
     }
   });
 
@@ -123,8 +127,13 @@ describe('acoustic calibration', () => {
     const net = createFakeNetwork();
     const air = createAir();
     const players = { host: fakePlayer({ clocked: true }), a: fakePlayer({ clocked: true }) };
-    const host = new AppStore(true, 'r', net.join('host', { latencyMs: 20 }), players.host, undefined, () =>
-      fakeAcoustics(air, { out: hostLoop })
+    const host = new AppStore(
+      true,
+      'r',
+      net.join('host', { latencyMs: 20 }),
+      players.host,
+      undefined,
+      () => fakeAcoustics(air, { out: hostLoop })
     );
     const a = new AppStore(false, 'r', net.join('a', { latencyMs: 30 }), players.a, undefined, () =>
       fakeAcoustics(air, guest)
@@ -139,7 +148,7 @@ describe('acoustic calibration', () => {
     await vi.advanceTimersByTimeAsync(2000); // the guest re-measures the network, then applies
   }
 
-  test("measures how much later than the host a guest sounds, net of the network delay it assumes", async () => {
+  test('measures how much later than the host a guest sounds, net of the network delay it assumes', async () => {
     const { host, a } = setup({ out: 0.15 }, 0.03);
     await calibrate(host);
     expect(host.calibration.results.a.status).toBe('ok');

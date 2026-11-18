@@ -14,23 +14,22 @@ type P = {
 export function gestures(node: HTMLDivElement, p: P): ActionReturn<P> {
   var hammertime = new Hammer(node, {});
   hammertime.get('pan').set({ direction: Hammer.DIRECTION_ALL });
-  if(p.onSwipe)
-  hammertime.on('swipe', (ev) => {
-    // console.log("swipe",ev);
-    if (ev.direction === SwipeDirection.Left || ev.direction === SwipeDirection.Right)
-      p.onSwipe!(ev.direction);
-  });
-  if(p.onPan)
-  hammertime.on('pan', (ev) => {
-    p.onPan!(ev);
-  });
+  if (p.onSwipe)
+    hammertime.on('swipe', (ev) => {
+      // console.log("swipe",ev);
+      if (ev.direction === SwipeDirection.Left || ev.direction === SwipeDirection.Right)
+        p.onSwipe!(ev.direction);
+    });
+  if (p.onPan)
+    hammertime.on('pan', (ev) => {
+      p.onPan!(ev);
+    });
   // ...
   return {
     // update: (updatedParameter) => {...},
     destroy: () => {}
   };
 }
-
 
 type PointerParams = {
   onPointer?: (e: PointerEvent) => void;
@@ -41,7 +40,7 @@ enum PointerState {
   Up,
   Pressed,
   Down,
-  Released,
+  Released
 }
 /** A finger that moves further than this (px) before the hold has elapsed is scrolling. */
 const SCROLL_SLOP = 8;
@@ -99,7 +98,10 @@ export function pointer(node: HTMLElement, p: PointerParams): ActionReturn<Point
         return;
       case 'pointermove':
         if (pending) {
-          if (Math.hypot(event.clientX - pending.clientX, event.clientY - pending.clientY) > SCROLL_SLOP) {
+          if (
+            Math.hypot(event.clientX - pending.clientX, event.clientY - pending.clientY) >
+            SCROLL_SLOP
+          ) {
             clearPending(); // scrolling: not ours
           }
           return;

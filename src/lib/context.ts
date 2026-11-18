@@ -1,19 +1,19 @@
-import { getContext, setContext } from "svelte";
+import { getContext, setContext } from 'svelte';
 
 interface GlobalContext {
-    host: boolean;
-    debug: boolean;
-    roomId: string;
-    scaleKey: string;
-    scaleMode: string;
+  host: boolean;
+  debug: boolean;
+  roomId: string;
+  scaleKey: string;
+  scaleMode: string;
 }
 
-const key = "globalContext";
+const key = 'globalContext';
 
 export function setGlobalContext(ctx: GlobalContext) {
-	setContext(key, ctx);
+  setContext(key, ctx);
 }
 
 export function getGlobalContext() {
-	return getContext(key) as GlobalContext;
+  return getContext(key) as GlobalContext;
 }

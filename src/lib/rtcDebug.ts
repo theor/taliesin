@@ -34,7 +34,9 @@ function trackSockets() {
   window.WebSocket = class extends Native {
     constructor(url: string | URL, protocols?: string | string[]) {
       super(url, protocols);
-      const name = String(url).replace(/^wss?:\/\//, '').replace(/\/$/, '');
+      const name = String(url)
+        .replace(/^wss?:\/\//, '')
+        .replace(/\/$/, '');
       // a reconnecting relay keeps adding to the same counters
       let stats = relays.find((r) => r.url === name);
       if (!stats) {
@@ -104,7 +106,9 @@ export function installRtcDebug() {
       const mark = (what: string) =>
         entry.timeline.push(`${what}@${(performance.now() / 1000).toFixed(1)}`);
       this.addEventListener('signalingstatechange', () => mark(`sig:${this.signalingState}`));
-      this.addEventListener('iceconnectionstatechange', () => mark(`ice:${this.iceConnectionState}`));
+      this.addEventListener('iceconnectionstatechange', () =>
+        mark(`ice:${this.iceConnectionState}`)
+      );
       this.addEventListener('connectionstatechange', () => mark(`conn:${this.connectionState}`));
       this.addEventListener('icecandidate', (e) => {
         const type = e.candidate?.type ?? (e.candidate?.candidate.split(' ')[7] || '?');

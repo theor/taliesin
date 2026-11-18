@@ -82,10 +82,14 @@ export function createFakeNetwork(opts: { queued?: boolean } = {}): FakeNetwork 
             // JSON round-trip: the real transport serializes, so shared references would hide bugs
             const wire = data === undefined ? undefined : JSON.stringify(data);
             log.push({ action: name, from: peerId, to: t, data: wire && JSON.parse(wire) });
-            deliver(() => {
-              const peer = peers.get(t);
-              peer?.handlers.get(name)?.forEach((h) => h(wire && JSON.parse(wire), peerId));
-            }, oneWay(peerId, t), `${peerId}>${t}`);
+            deliver(
+              () => {
+                const peer = peers.get(t);
+                peer?.handlers.get(name)?.forEach((h) => h(wire && JSON.parse(wire), peerId));
+              },
+              oneWay(peerId, t),
+              `${peerId}>${t}`
+            );
           }
         };
         const receive = (h: Handler) => {
@@ -97,10 +101,13 @@ export function createFakeNetwork(opts: { queued?: boolean } = {}): FakeNetwork 
       },
       onPeerJoin: (l: Listener) => void me.joinListeners.push(l),
       onPeerLeave: (l: Listener) => void me.leaveListeners.push(l),
-      getPeers: () => Object.fromEntries([...peers.keys()].filter((p) => p !== peerId).map((p) => [p, {}])),
+      getPeers: () =>
+        Object.fromEntries([...peers.keys()].filter((p) => p !== peerId).map((p) => [p, {}])),
       ping: (to: string) => {
         const rtt = 2 * oneWay(peerId, to);
-        return new Promise<number>((resolve) => (rtt > 0 ? setTimeout(() => resolve(rtt), rtt) : resolve(0)));
+        return new Promise<number>((resolve) =>
+          rtt > 0 ? setTimeout(() => resolve(rtt), rtt) : resolve(0)
+        );
       },
       leave: () => {
         peers.delete(peerId);

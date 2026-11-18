@@ -18,8 +18,7 @@ describe('euclid', () => {
   });
   test('always the requested number of pulses', () => {
     for (let steps = 1; steps <= 16; steps++)
-      for (let p = 0; p <= steps; p++)
-        expect(euclid(p, steps).filter(Boolean)).toHaveLength(p);
+      for (let p = 0; p <= steps; p++) expect(euclid(p, steps).filter(Boolean)).toHaveLength(p);
   });
   test('edge cases', () => {
     expect(euclid(0, 4)).toEqual([false, false, false, false]);

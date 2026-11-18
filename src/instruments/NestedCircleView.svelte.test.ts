@@ -13,9 +13,7 @@ function mount() {
   const dispatch = vi.fn<(cmd: Command) => void>();
   const view = render(NestedCircleView, { props: { index: 0, instrumentData, dispatch } });
   const ringTracks = () =>
-    new Set(
-      [...view.container.querySelectorAll('[data-y]')].map((e) => e.getAttribute('data-y'))
-    );
+    new Set([...view.container.querySelectorAll('[data-y]')].map((e) => e.getAttribute('data-y')));
   return { instrumentData, dispatch, ringTracks, ...view };
 }
 afterEach(cleanup);

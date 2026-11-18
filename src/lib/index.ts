@@ -2,7 +2,7 @@
 
 export * from './interfaces';
 
-export {strudel} from './strudel';
-export {store} from './Store.svelte';
-export * from './parts.svelte'
-export * from './instruments'
+export { strudel } from './strudel';
+export { store } from './Store.svelte';
+export * from './parts.svelte';
+export * from './instruments';

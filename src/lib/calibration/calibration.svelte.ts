@@ -179,13 +179,22 @@ export class Calibration {
     }
 
     if (delays.up.length < 1) {
-      return { status: 'failed', reason: 'The host could not hear its own speaker (volume too low?)' };
+      return {
+        status: 'failed',
+        reason: 'The host could not hear its own speaker (volume too low?)'
+      };
     }
     if (delays.down.length < MIN_GOOD_PROBES) {
-      return { status: 'failed', reason: 'The host could not hear that device (too far, or muted?)' };
+      return {
+        status: 'failed',
+        reason: 'The host could not hear that device (too far, or muted?)'
+      };
     }
     if (Math.max(...delays.down) - Math.min(...delays.down) > MAX_SPREAD_S) {
-      return { status: 'failed', reason: 'The measurements were inconsistent (noise or a bad connection)' };
+      return {
+        status: 'failed',
+        reason: 'The measurements were inconsistent (noise or a bad connection)'
+      };
     }
     return { status: 'ok', delay: median(delays.down) - median(delays.up) };
   }
