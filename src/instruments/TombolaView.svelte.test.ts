@@ -87,8 +87,14 @@ describe('tombola input view', () => {
       );
       const playOnce = vi.spyOn(strudel, 'playOnce');
       const dispatch = vi.fn<(cmd: Command) => void>();
+      /** Whether the pattern is left out on this device now. */
+      const here = { out: false };
+      const playHere = vi.fn((id: string, on: boolean) => {
+        expect(id).toBe(instrumentData.id);
+        here.out = on;
+      });
       const view = render(InputViewSwitcher, {
-        props: { index: 0, instrumentData, dispatch, playing, now: () => audio * 0.5 }
+        props: { index: 0, instrumentData, dispatch, playing, now: () => audio * 0.5, playHere }
       });
       await fireEvent.click(view.getByLabelText('Tombola view'));
       await fireEvent.input(view.getByLabelText('Spin'), { target: { value: '1' } });
@@ -105,7 +111,7 @@ describe('tombola input view', () => {
         }
         return played;
       };
-      return { run, dispatch, ...view };
+      return { run, dispatch, here, ...view };
     }
     afterEach(() => {
       vi.unstubAllGlobals();
@@ -134,11 +140,31 @@ describe('tombola input view', () => {
       expect(dispatch).not.toHaveBeenCalled(); // nothing is sent until a take records it
     });
 
-    test('a take records what it played, on the steps it played them', async () => {
-      const { run, dispatch, getByLabelText } = await physics(true);
+    test('live, the drum plays and the pattern is silent here; on the loop, the reverse', async () => {
+      const { run, here, getByRole, getByLabelText } = await physics(true);
+      expect(here.out).toBe(true);
+      expect((await run(2)).length).toBeGreaterThan(0);
+      await fireEvent.click(getByRole('button', { name: 'Loop' }));
+      expect(here.out).toBe(false);
+      const after = await run(5);
+      // only what was scheduled before the switch (0.12 s ahead at most)
+      expect(after.every((p) => p.asked < 2.2)).toBe(true);
+      // physics off: the pattern is back, whatever was chosen
+      await fireEvent.click(getByRole('button', { name: 'Live' }));
+      expect(here.out).toBe(true);
+      await fireEvent.click(getByLabelText('Physics'));
+      expect(here.out).toBe(false);
+    });
+
+    test('a take records what it played, on the steps it played them, then the loop plays it', async () => {
+      const { run, dispatch, here, getByRole, getByLabelText } = await physics(true);
+      await fireEvent.click(getByRole('button', { name: 'Loop' }));
       await run(1); // half a measure in
       await fireEvent.click(getByLabelText('Record a take')); // from the next measure: 2 s to 6 s
+      expect(here.out).toBe(true); // arming plays it live
       const played = await run(7);
+      expect(here.out).toBe(false); // over: the loop it recorded, not the drum on top
+      expect(played.every((p) => p.asked < 6.2)).toBe(true);
       const inTake = new Set(
         played
           .map((p) => Math.round(p.at * 4))

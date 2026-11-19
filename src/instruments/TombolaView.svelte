@@ -74,8 +74,16 @@
   }
 
   // --- physics: the drum played live on this device ---
-  /** Records what the drum plays (the take card), and holds "hear notes". */
-  const rec = new LiveTake(() => props, scale, 'nearest');
+  /**
+   * Records what the drum plays (the take card), and holds "hear notes" and what is heard here: "Live"
+   * plays the drum (the pattern silent here), "Loop" the pattern (the drum silent). A take plays it live
+   * and then goes back to the loop it recorded, so the two are never heard together.
+   */
+  const rec = new LiveTake(() => props, scale, 'nearest', {
+    heard: 'live',
+    liveWhileRecording: true,
+    active: () => settings.physics
+  });
   /** Each ball's note as the instrument plays it now, compiled ahead: a hit then costs no compiling. */
   const ballNotes = $derived(
     new Map(balls.map((t) => [t, instr ? previewCode(instr, instrumentData, scale, t) : undefined]))
@@ -116,7 +124,10 @@
     const clock = drumClock(audio);
     const spm = length.stepsPerMeasure;
     player ??= new TombolaPlayer(Math.floor(Math.random() * 2 ** 32), balls);
+    // on "Loop" the drum still turns, silent: the pattern plays instead
+    const live = rec.playingLive;
     for (const n of player.update(clock, audio, spm, settings.spin)) {
+      if (!live) continue;
       const note = ballNotes.get(n.track);
       if (note && rec.hear) void strudel.playOnce(note.code, note.window, n.seconds);
       if (playing) toRecord.push(n);
@@ -241,7 +252,10 @@
         />
       </g>
       {#each placed as ball (ball.track)}
-        {@const lit = picture ? sounding.includes(ball.track) : ball.track === playingTrack}
+        {@const lit =
+          picture && rec.heard === 'live'
+            ? sounding.includes(ball.track)
+            : ball.track === playingTrack}
         <g transform="translate({ball.x.toFixed(1)} {ball.y.toFixed(1)})">
           <circle
             r={ballRadius * (lit ? 1.2 : 1)}
@@ -333,7 +347,15 @@
   </div>
 
   {#if settings.physics}
-    <TakeControls live={rec} playing={playing ?? false} {nowStep} />
+    <TakeControls
+      live={rec}
+      playing={playing ?? false}
+      {nowStep}
+      heardHelp={{
+        loop: 'The pattern, as everyone hears it: the drum turns silently. A take plays it live again.',
+        live: 'The drum, here only: the pattern is silent here (the others still hear it).'
+      }}
+    />
   {/if}
 
   <div

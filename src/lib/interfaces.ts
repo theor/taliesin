@@ -27,4 +27,9 @@ export interface IDispatchingInstrumentViewProps extends IInstrumentViewProps {
   now?: () => number;
   /** When someone else last edited this instrument (changes → the view flashes). */
   editedByOther?: number;
+  /**
+   * Leave the instrument's pattern out on this device, or put it back: for live views set to "Live",
+   * so what is played is not heard twice (`PatternCues.setPlayingHere`).
+   */
+  playHere?: (instrumentId: string, on: boolean) => void;
 }

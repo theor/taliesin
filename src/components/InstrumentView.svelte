@@ -133,6 +133,7 @@
       {position}
       {playing}
       {now}
+      playHere={cues ? (id, on) => cues.setPlayingHere(id, on) : undefined}
     />
   </div>
 

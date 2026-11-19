@@ -53,6 +53,20 @@ describe('RecordView', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  test('"Live" leaves the pattern out on this device until the view closes; "Loop" is the default', async () => {
+    const instrumentData = createInstrument(Drum);
+    const playHere = vi.fn<(id: string, on: boolean) => void>();
+    const view = render(RecordView, {
+      props: { index: 0, instrumentData, dispatch: vi.fn(), playing: true, playHere }
+    });
+    expect(playHere).not.toHaveBeenCalled();
+    expect(view.getByRole('button', { name: 'Loop' })).toHaveAttribute('aria-pressed', 'true');
+    await fireEvent.click(view.getByRole('button', { name: 'Live' }));
+    expect(playHere).toHaveBeenLastCalledWith(instrumentData.id, true);
+    view.unmount();
+    expect(playHere).toHaveBeenLastCalledWith(instrumentData.id, false);
+  });
+
   test('outside a take the pads only play: nothing is recorded', async () => {
     const play = vi.spyOn(strudel, 'playOnce');
     const { dispatch, getByLabelText } = mount();

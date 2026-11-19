@@ -85,6 +85,17 @@ export class PatternCues {
     this.announce();
   }
 
+  /**
+   * Instruments this device is playing live (an input view set to "Live"): their pattern is left out
+   * here, so what is played is not heard twice. The others hear the pattern as always.
+   */
+  playingHere = $state<Record<string, boolean>>({});
+  setPlayingHere(instrumentId: string, on: boolean) {
+    if (!!this.playingHere[instrumentId] === on) return;
+    if (on) this.playingHere[instrumentId] = true;
+    else delete this.playingHere[instrumentId];
+  }
+
   /** Make a slot live for everyone at the next bar (right away when stopped). */
   launch(data: InstrumentData, slot: number) {
     if (!isSlot(slot) || slot === liveSlot(data)) return;

@@ -17,6 +17,7 @@
     position,
     playing,
     now,
+    playHere,
     maxVisibleSteps
   }: IDispatchingInstrumentViewProps & {
     /** Passed to the grid: how many steps it shows before paging. */
@@ -90,11 +91,11 @@
       {#if view === 'circle'}
         <CircleView {instrumentData} {index} {dispatch} {position} {playing} />
       {:else if view === 'record'}
-        <RecordView {instrumentData} {index} {dispatch} {position} {playing} {now} />
+        <RecordView {instrumentData} {index} {dispatch} {position} {playing} {now} {playHere} />
       {:else if view === 'draw'}
-        <DrawView {instrumentData} {index} {dispatch} {position} {playing} {now} />
+        <DrawView {instrumentData} {index} {dispatch} {position} {playing} {now} {playHere} />
       {:else if view === 'tombola'}
-        <TombolaView {instrumentData} {index} {dispatch} {position} {playing} {now} />
+        <TombolaView {instrumentData} {index} {dispatch} {position} {playing} {now} {playHere} />
       {:else if view === 'rings'}
         <NestedCircleView {instrumentData} {index} {dispatch} {position} {playing} />
       {:else}

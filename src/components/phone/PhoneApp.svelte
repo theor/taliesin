@@ -286,6 +286,7 @@
                 {position}
                 {playing}
                 {now}
+                playHere={(id, on) => store.cues.setPlayingHere(id, on)}
                 maxVisibleSteps={16}
               />
             </div>

@@ -257,10 +257,15 @@ export class AppStore {
   }
   /**
    * The song as Strudel code: every audible instrument's live pattern, or, with `heard`, the pattern
-   * slot it gives for an instrument (this device's cues: `localCode`).
+   * slot it gives for an instrument (this device's cues: `localCode`), leaving out the instruments
+   * `leaveOut` names.
    */
-  code = (heard?: (data: InstrumentData) => number) => {
+  code = (
+    heard?: (data: InstrumentData) => number,
+    leaveOut?: (data: InstrumentData) => boolean
+  ) => {
     const code = audibleInstruments(this.instrumentsData.instrumentsData)
+      .filter((data) => !leaveOut?.(data))
       .map((data) => {
         const i = heard ? patternFor(data, heard(data)) : data;
         const code = getInstrument(i)?.generate(i, this.scale);
@@ -271,8 +276,15 @@ export class AppStore {
     // Strudel ignores an empty evaluation, which would leave the previous song playing
     return code.trim() === '' ? '$: silence' : code;
   };
-  /** What this device plays: the song, with its own cues in place of those instruments' live patterns. */
-  localCode = () => this.code((data) => this.cues.heard(data));
+  /**
+   * What this device plays: the song, with its own cues in place of those instruments' live patterns,
+   * and without the instruments it is playing live (`cues.playingHere`).
+   */
+  localCode = () =>
+    this.code(
+      (data) => this.cues.heard(data),
+      (data) => !!this.cues.playingHere[data.id]
+    );
   /** This device's patterns: the slot open per instrument, cues, launches waiting for the next bar. */
   cues: PatternCues = undefined!;
 

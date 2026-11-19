@@ -1,21 +1,28 @@
 <script lang="ts">
-  // The take card shared by the live-input views (pads, draw): the loop strip, the record button and
-  // what the take is doing, and a summary of the take settings that opens them in a sheet. The view
+  // The take card shared by the live-input views (pads, draw, tombola): the loop strip, the record button
+  // and what the take is doing, what is heard here (the loop, or only what is played), and a summary of
+  // the take settings that opens them in a sheet. The view
   // owns the take (it feeds it hits); this arms, stops and undoes it, and moves it on every frame.
   import { beatsPerBar, type OldNotes } from '$lib/take.svelte';
   import { ChevronRight, SlidersHorizontal, Undo2 } from '@lucide/svelte';
-  import { RESOLUTIONS, type LiveTake } from './liveTake.svelte';
+  import { RESOLUTIONS, type Heard, type LiveTake } from './liveTake.svelte';
   import TakeStrip from './TakeStrip.svelte';
 
   const {
     live,
     playing,
-    nowStep
+    nowStep,
+    heardHelp = {
+      loop: 'The pattern as everyone hears it, and what you play on top.',
+      live: 'Only what you play: the pattern is silent here (the others still hear it).'
+    }
   }: {
     live: LiveTake;
     playing: boolean;
     /** The playhead's step, or undefined when stopped. */
     nowStep: number | undefined;
+    /** What "Loop" and "Live" mean for this view. */
+    heardHelp?: Record<Heard, string>;
   } = $props();
   const take = $derived(live.take);
   const length = $derived(live.length());
@@ -203,6 +210,28 @@
         <Undo2 size={16} /> Undo take
       </button>
     {/if}
+  </div>
+
+  <div class="flex flex-col gap-1.5">
+    <div
+      role="group"
+      aria-label="Hear here"
+      class="bg-surface-800 border-surface-700 grid grid-cols-2 gap-1 rounded-xl border p-1"
+    >
+      <button
+        type="button"
+        class={segment(live.heard === 'loop')}
+        aria-pressed={live.heard === 'loop'}
+        onclick={() => (live.heard = 'loop')}>Loop</button
+      >
+      <button
+        type="button"
+        class={segment(live.heard === 'live')}
+        aria-pressed={live.heard === 'live'}
+        onclick={() => (live.heard = 'live')}>Live</button
+      >
+    </div>
+    <span class="text-surface-300 text-[13px] leading-snug">{heardHelp[live.heard]}</span>
   </div>
 
   {#if take.phase === 'idle'}

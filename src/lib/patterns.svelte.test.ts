@@ -197,6 +197,17 @@ describe('cues: a pattern heard on this device only', () => {
     expect(s.localCode()).toBe(shared);
   });
 
+  test('an instrument played live here is left out here only, until that ends', () => {
+    const s = solo();
+    const shared = s.code();
+    const count = shared.match(/\$:/g)!.length;
+    s.cues.setPlayingHere(inst(s, BASS).id, true);
+    expect(s.localCode().match(/\$:/g)).toHaveLength(count - 1);
+    expect(s.code()).toBe(shared); // the room still hears it
+    s.cues.setPlayingHere(inst(s, BASS).id, false);
+    expect(s.localCode()).toBe(shared);
+  });
+
   test('mute still applies to a cue', () => {
     const s = solo();
     s.cues.pick(inst(s, BASS), 1);
